@@ -1,0 +1,5 @@
+# be careful using * independatly because it will not allow you to override the rules anywhere else
+*/
+!nix/
+!home-manager/
+# !*/
