@@ -3,8 +3,8 @@
 {
   # Home Manager needs a bit of information about you and the paths it should
   # manage.
-  home.username = "wolfy";
-  home.homeDirectory = "/home/wolfy";
+  home.username = "alan";
+  home.homeDirectory = "/home/alan";
 
   # This value determines the Home Manager release that your configuration is
   # compatible with. This helps avoid breakage when a new Home Manager release
@@ -15,13 +15,7 @@
   # release notes.
   home.stateVersion = "23.05"; # Please read the comment before changing.
 
-  # The home.packages option allows you to install Nix packages into your
-  # environment.
   home.packages = [
-    # # Adds the 'hello' command to your environment. It prints a friendly
-    # # "Hello, world!" when run.
-    # pkgs.hello
-    # pkgs.htop
     pkgs.zellij
 
     # # It is sometimes useful to fine-tune packages, for example, by applying
@@ -69,34 +63,10 @@
 
   # Let Home Manager install and manage itself.
   programs.home-manager.enable = true;
-  # Docs for programs config https://nix-community.github.io/home-manager/options.html#opt-home.packages
-  programs.helix = {
-    enable = true;
-    settings = {
-      theme = "mytheme";
-      editor = {
-        line-number = "relative";
-        true-color = true;
-        bufferline = "multiple";
-        gutters = ["diagnostics" "spacer" "line-numbers" "spacer" "diff"];
+  # Docs for programs config httd:s://nix-community.github.io/home-manager/options.html#opt-home.packages
 
-        cursor-shape = {
-          insert = "bar";
-          normal = "block";
-          select = "underline";
-        };
-      };
-      keys.insert = {
-        j = { k = "normal_mode"; };
-      };
-    };
-    themes = {
-      mytheme = let
-        background = "white";
-      in {
-        "inherits"= "fleet_dark";
-        "ui.background" = background;
-      };
-    };
-  };
+  imports = [
+    ../programs/helix.nix
+  ];
+
 }
