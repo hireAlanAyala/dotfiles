@@ -1,5 +1,22 @@
 { config, pkgs, ... }:
 
+# TODO: 
+# - add shortcut for snipping tool
+# - add commands for OS level logging
+# - add command for creating reports out of data
+# - add chatgpt command
+# - add a way to switch between git users (personal, work)
+# - add aliases to commonly used commands
+# - add OS level note taking
+# - add a way to store encrypted secrets in my git
+# - add the following tools: bat, ripgrep, awk, git, nerdfont, node, python
+# - configure nix to import OS user settings from a git untracked file
+# - change nix config to be OS agnostic
+# - use a remote server to create a client - server development environment
+# - setup zsh
+# - setup a way to spin up a virtual machine from one command and code in it
+# - setup ssh
+
 {
   # Home Manager needs a bit of information about you and the paths it should
   # manage.
@@ -67,6 +84,7 @@
 
   imports = [
     ../programs/helix.nix
+    ../programs/git.nix
   ];
 
 }
