@@ -1,4 +1,5 @@
 {
+  # TODO: be able to switch github users
   programs.git = {
     enable = true;
     userName = "Alan Walker";
