@@ -1,6 +1,7 @@
 { config, pkgs, ... }:
 
 # TODO: 
+# - grab user and home folder from a config
 # - add shortcut for snipping tool
 # - add commands for OS level logging
 # - add command for creating reports out of data
@@ -18,11 +19,6 @@
 # - setup ssh
 
 {
-  # Home Manager needs a bit of information about you and the paths it should
-  # manage.
-  home.username = "alan";
-  home.homeDirectory = "/home/alan";
-
   # This value determines the Home Manager release that your configuration is
   # compatible with. This helps avoid breakage when a new Home Manager release
   # introduces backwards incompatible changes.
@@ -83,8 +79,9 @@
   # Docs for programs config httd:s://nix-community.github.io/home-manager/options.html#opt-home.packages
 
   imports = [
-    ../programs/helix.nix
-    ../programs/git.nix
+    ../config/system.nix
+    ../config/helix.nix
+    ../config/git.nix
   ];
 
 }
