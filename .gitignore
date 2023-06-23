@@ -1,5 +1,6 @@
 # be careful using * independatly because it will not allow you to override the rules anywhere else
 */
+# environment/
 !nix/
 !home-manager/
-!config/
+!programs/

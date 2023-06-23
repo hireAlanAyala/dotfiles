@@ -79,9 +79,9 @@
   # Docs for programs config httd:s://nix-community.github.io/home-manager/options.html#opt-home.packages
 
   imports = [
-    ../config/system.nix
-    ../config/helix.nix
-    ../config/git.nix
+    ../environment/system.nix
+    ../programs/helix.nix
+    ../programs/git.nix
   ];
 
 }
