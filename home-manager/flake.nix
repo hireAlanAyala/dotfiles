@@ -15,15 +15,32 @@
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
     in {
-      homeConfigurations."alan" = home-manager.lib.homeManagerConfiguration {
-        inherit pkgs;
+      homeConfigurations = {
+        "alan" = home-manager.lib.homeManagerConfiguration {
+          inherit pkgs;
+          modules = [
+            ./home.nix
+            {
+              home.username = "alan";
+              home.homeDirectory = "/home/alan";
+            }
+          ];
 
-        # Specify your home configuration modules here, for example,
-        # the path to your home.nix.
-        modules = [ ./home.nix ];
+          # Optionally use extraSpecialArgs
+          # to pass through arguments to home.nix
+        };
 
-        # Optionally use extraSpecialArgs
-        # to pass through arguments to home.nix
+        # I can add another user with different values here
+        "wolfy" = home-manager.lib.homeManagerConfiguration {
+          inherit pkgs;
+          modules = [
+            ./home.nix
+            {
+              home.username = "wolfy";
+              home.homeDirectory = "/home/wolfy";
+            }
+          ];
+        };
       };
     };
 }

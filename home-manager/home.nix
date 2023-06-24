@@ -80,7 +80,7 @@
   # Docs for programs config httd:s://nix-community.github.io/home-manager/options.html#opt-home.packages
 
   imports = [
-    ./user-config.nix
+    ../user-config.nix
     ../programs/helix.nix
     ../programs/git.nix
   ];
