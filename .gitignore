@@ -1,6 +1,5 @@
 # be careful using * independatly because it will not allow you to override the rules anywhere else
 */
-user-config.nix
 !nix/
 !home-manager/
 !programs/
