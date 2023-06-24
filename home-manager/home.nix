@@ -17,6 +17,7 @@
 # - setup zsh
 # - setup a way to spin up a virtual machine from one command and code in it
 # - setup ssh
+# install your own repos
 
 {
   # This value determines the Home Manager release that your configuration is
@@ -79,7 +80,7 @@
   # Docs for programs config httd:s://nix-community.github.io/home-manager/options.html#opt-home.packages
 
   imports = [
-    ../environment/system.nix
+    ./user-config.nix
     ../programs/helix.nix
     ../programs/git.nix
   ];
