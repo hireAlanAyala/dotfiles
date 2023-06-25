@@ -37,12 +37,15 @@
           inherit pkgs;
           modules = [
             ./home.nix
-            home = {
-              username = "wolfy";
-              homeDirectory = "/home/wolfy";
-            };
+            {
+              home = {
+                username = "wolfy";
+                homeDirectory = "/home/wolfy";
+              };
+            }
           ];
         };
+
       };
     };
 }

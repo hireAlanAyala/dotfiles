@@ -1,23 +1,21 @@
 { config, pkgs, ... }:
 
 # TODO: 
-# - grab user and home folder from a config
-# - add shortcut for snipping tool
-# - add commands for OS level logging
-# - add command for creating reports out of data
 # - add chatgpt command
+# - setup a way to spin up a virtual machine from one command and code in it
+# - add commands for OS level logging (must be able to log to a file and the terminal at the same time)
+# - add command for creating reports out of data
 # - add a way to switch between git users (personal, work)
-# - add aliases to commonly used commands
 # - add OS level note taking
 # - add a way to store encrypted secrets in my git
-# - add the following tools: bat, ripgrep, awk, git, nerdfont, node, python
+# - add the following tools: bat, ripgrep, awk, git, nerdfont, node, python, fzf
 # - configure nix to import OS user settings from a git untracked file
 # - change nix config to be OS agnostic
 # - use a remote server to create a client - server development environment
 # - setup zsh
-# - setup a way to spin up a virtual machine from one command and code in it
 # - setup ssh
 # install your own repos
+# integrate wsl with my clipboard
 
 {
   # This value determines the Home Manager release that your configuration is
@@ -31,6 +29,7 @@
 
   home.packages = [
     pkgs.zellij
+    pkgs.nodejs_20
 
     # # It is sometimes useful to fine-tune packages, for example, by applying
     # # overrides. You can do that directly here, just don't forget the
@@ -75,12 +74,16 @@
     # EDITOR = "emacs";
   };
 
+  home.shellAliases = {
+    work = "cd /mnt/c/Users/AlanAyala/Documents/work";
+  };
+
   # Let Home Manager install and manage itself.
   programs.home-manager.enable = true;
   # Docs for programs config httd:s://nix-community.github.io/home-manager/options.html#opt-home.packages
 
   imports = [
-    ../user-config.nix
+    # ../programs/bash.nix
     ../programs/helix.nix
     ../programs/git.nix
   ];
