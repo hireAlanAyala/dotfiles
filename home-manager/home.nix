@@ -2,20 +2,18 @@
 
 # TODO: 
 # - add chatgpt command
+# - setup ssh
+# - integrate wsl with my clipboard
 # - setup a way to spin up a virtual machine from one command and code in it
-# - add commands for OS level logging (must be able to log to a file and the terminal at the same time)
-# - add command for creating reports out of data
-# - add a way to switch between git users (personal, work)
-# - add OS level note taking
 # - add a way to store encrypted secrets in my git
-# - add the following tools: bat, ripgrep, awk, git, nerdfont, node, python, fzf
+# - add the following tools: bat, ripgrep, awk, nerdfont, python, fzf
+# - add a way to switch between git users (personal, work)
+# - add command for creating reports out of data
 # - configure nix to import OS user settings from a git untracked file
 # - change nix config to be OS agnostic
 # - use a remote server to create a client - server development environment
-# - setup zsh
-# - setup ssh
-# install your own repos
-# integrate wsl with my clipboard
+# - add commands for OS level logging (must be able to log to a file and the terminal at the same time)
+# - add OS level note taking
 
 {
   # This value determines the Home Manager release that your configuration is
@@ -74,16 +72,15 @@
     # EDITOR = "emacs";
   };
 
-  home.shellAliases = {
-    work = "cd /mnt/c/Users/AlanAyala/Documents/work";
-  };
-
   # Let Home Manager install and manage itself.
   programs.home-manager.enable = true;
   # Docs for programs config httd:s://nix-community.github.io/home-manager/options.html#opt-home.packages
 
   imports = [
-    # ../programs/bash.nix
+    # TODO: only import this for linux and not macos
+    ../programs/bash.nix
+    ../programs/exa.nix
+    ../programs/zsh.nix
     ../programs/helix.nix
     ../programs/git.nix
   ];

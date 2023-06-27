@@ -1,5 +1,10 @@
 {
-  # TODO: be able to switch github users
+  programs.gh = {
+    enable = true;
+    settings.git_protocol = "ssh";
+  };
+
+  # TODO: be able to switch github users (can potentially use gcm - git credit manager for a solution that works on github, gitlabs, and others)
   programs.git = {
     enable = true;
     userName = "Alan Walker";
