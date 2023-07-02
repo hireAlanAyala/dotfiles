@@ -28,6 +28,9 @@
   home.packages = [
     pkgs.zellij
     pkgs.nodejs_20
+    pkgs.nodePackages.typescript
+    pkgs.nodePackages.typescript-language-server
+    # TODO: add node packages ->  eslint, prettier, vite-create
 
     # # It is sometimes useful to fine-tune packages, for example, by applying
     # # overrides. You can do that directly here, just don't forget the
