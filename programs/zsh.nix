@@ -9,13 +9,14 @@
     shellAliases = {
       work = "cd /mnt/c/Users/AlanAyala/Documents/work";
       hm = "home-manager switch --flake ~/.config/home-manager/flake.nix#alan";
+      ai = "node ~/documents/terminal_ai/index.js";
+      fucking = "sudo env 'PATH=$PATH'";
     };
     oh-my-zsh = {
       enable = true;
       # TODO: set up powerlevel10k theme
       theme = "clean";
-      # plugins =
-      #   [ "git" "vi-mode" "web-search" "aws" "terraform" "nomad" "vault" ];
+      plugins = [ "git" "vi-mode" "web-search" ];
     };
   };
 }

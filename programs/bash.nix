@@ -1,5 +1,6 @@
 # bash must be managed by home-manager so that I can force zsh as a shell on shell spawn
 # can remove once I find a better way
+# WARNING: running zsh at the start of a new terminal creates a bug when running nix-shell that doesn't give you access to the packages you installed. You have to exit out of zsh first.
 {
   programs.bash = {
     enable = true;
