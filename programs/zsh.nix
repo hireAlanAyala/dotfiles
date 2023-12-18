@@ -10,7 +10,7 @@
       work = "cd /mnt/c/Users/AlanAyala/Documents/work";
       hm = "home-manager switch --flake ~/.config/home-manager/flake.nix#alan";
       ai = "node ~/documents/terminal_ai/index.js";
-      fucking = "sudo env 'PATH=$PATH'";
+      fucking = "sudo env PATH=$PATH";
     };
     oh-my-zsh = {
       enable = true;

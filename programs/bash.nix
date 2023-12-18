@@ -27,6 +27,9 @@
 
       # forces zsh as default shell
       zsh
+      export DOCKER_HOST=unix:///home/alan/.docker/desktop/docker.sock
+      export BUN_INSTALL="$HOME/.bun"
+      export PATH=$BUN_INSTALL/bin:$PATH
     ";
   };
 }

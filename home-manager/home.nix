@@ -25,11 +25,15 @@
   # release notes.
   home.stateVersion = "23.05"; # Please read the comment before changing.
 
+  # if a tool is project specific consider installing it with npm i -D <tool> instead of here
   home.packages = [
     pkgs.zellij
     pkgs.nodejs_20
     pkgs.nodePackages.typescript
     pkgs.nodePackages.typescript-language-server
+    pkgs.docker
+    pkgs.postgresql_15
+    
     # TODO: add node packages ->  eslint, prettier, vite-create
 
     # # It is sometimes useful to fine-tune packages, for example, by applying
@@ -86,6 +90,7 @@
     ../programs/zsh.nix
     ../programs/helix.nix
     ../programs/git.nix
+    ../programs/neovim.nix
   ];
 
 }
