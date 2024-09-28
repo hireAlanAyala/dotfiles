@@ -33,7 +33,7 @@
     pkgs.nodePackages.typescript-language-server
     pkgs.docker
     pkgs.postgresql_15
-    pkgs.fzf
+#    pkgs.fzf
     
     # TODO: add node packages ->  eslint, prettier, vite-create
 
@@ -88,7 +88,7 @@
     # TODO: only import this for linux and not macos
     ../programs/bash.nix
     ../programs/exa.nix
-    ../programs/fzf.nix
+#    ../programs/fzf.nix
     ../programs/zsh.nix
     ../programs/helix.nix
     ../programs/git.nix
