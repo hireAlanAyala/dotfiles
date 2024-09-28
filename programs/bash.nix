@@ -4,7 +4,7 @@
 {
   programs.bash = {
     enable = true;
-    bashrcExtra = "
+    bashrcExtra = ''
       # if running bash
       if [ -n '$BASH_VERSION' ]; then
           # include .bashrc if it exists
@@ -30,6 +30,6 @@
       export DOCKER_HOST=unix:///home/alan/.docker/desktop/docker.sock
       export BUN_INSTALL="$HOME/.bun"
       export PATH=$BUN_INSTALL/bin:$PATH
-    ";
+    '';
   };
 }
