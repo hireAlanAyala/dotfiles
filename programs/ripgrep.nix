@@ -1,5 +1,5 @@
 {
   programs.ripgrep = {
-    enable: true;
+    enable = true;
   };
 }
