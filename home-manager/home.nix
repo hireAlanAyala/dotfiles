@@ -35,6 +35,7 @@
     pkgs.postgresql_15
     pkgs.fzf
     pkgs.bat
+    pkgs.zoxide
     
     # TODO: add node packages ->  eslint, prettier, vite-create
 
@@ -91,6 +92,7 @@
     ../programs/bat.nix
     ../programs/exa.nix
     ../programs/fzf.nix
+    ../programs/zoxide.nix
     ../programs/zsh.nix
     ../programs/helix.nix
     ../programs/git.nix
