@@ -18,5 +18,12 @@
       theme = "clean";
       plugins = [ "git" "vi-mode" "web-search" ];
     };
+    initExtra = ''
+      source <(fzf --zsh)
+      HISTFILE=~/.zsh_history
+      HISTSIZE=10000
+      SAVEHIST=10000
+      setopt appendhistory
+    '';
   };
 }

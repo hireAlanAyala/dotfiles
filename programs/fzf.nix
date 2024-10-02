@@ -1,6 +1,6 @@
 {
   programs.fzf = {
     enable = true;
-    keybindings = true;
+    enableZshIntegration = true;
   };
 }
