@@ -36,6 +36,7 @@
     pkgs.fzf
     pkgs.bat
     pkgs.zoxide
+    pkgs.ripgrep
     
     # TODO: add node packages ->  eslint, prettier, vite-create
 
@@ -92,6 +93,7 @@
     ../programs/bat.nix
     ../programs/exa.nix
     ../programs/fzf.nix
+    ../programs/ripgrep.nix
     ../programs/zoxide.nix
     ../programs/zsh.nix
     ../programs/helix.nix
