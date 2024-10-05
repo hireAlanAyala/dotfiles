@@ -8,8 +8,12 @@
     history.extended = true;
     shellAliases = {
       work = "cd /mnt/c/Users/AlanAyala/Documents/work";
+      wnpm = "/mnt/c/Program\\ Files/nodejs/npm";
+      wnpx = "/mnt/c/Program\\ Files/nodejs/npx";
+      wgit = "/mnt/c/Program\\ Files/nodejs/npx";
       hm = "home-manager switch --flake ~/.config/home-manager/flake.nix#alan";
       ai = "node ~/documents/terminal_ai/index.js";
+      fuckingInit = "sudo dockerd";
       fucking = "sudo env PATH=$PATH";
     };
     oh-my-zsh = {
