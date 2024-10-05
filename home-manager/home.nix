@@ -38,6 +38,7 @@
     pkgs.zoxide
     pkgs.ripgrep
     pkgs.lua
+    pkgs.mpv
     # TODO: add node packages ->  eslint, prettier, vite-create
 
     # # It is sometimes useful to fine-tune packages, for example, by applying
