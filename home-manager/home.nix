@@ -15,6 +15,12 @@
 # - add commands for OS level logging (must be able to log to a file and the terminal at the same time)
 # - add OS level note taking
 
+let
+  #import the neovim nightly overlay
+  neovim-nightly-overlay = import (builtins.fetchTarball {
+    url = https://github.com/nix-community/neovim-nightly-overlay/archive/master.tar.gz;
+  });
+in
 {
   # This value determines the Home Manager release that your configuration is
   # compatible with. This helps avoid breakage when a new Home Manager release
@@ -24,6 +30,10 @@
   # want to update the value, then make sure to first check the Home Manager
   # release notes.
   home.stateVersion = "23.05"; # Please read the comment before changing.
+
+  nixpkgs.overlays = [
+    neovim-nightly-overlay
+  ];
 
   # if a tool is project specific consider installing it with npm i -D <tool> instead of here
   home.packages = [
@@ -40,6 +50,7 @@
     pkgs.ripgrep
     pkgs.lua
     pkgs.mpv
+    pkgs.neovim-nightly
     # TODO: add node packages ->  eslint, prettier, vite-create
 
     # # It is sometimes useful to fine-tune packages, for example, by applying

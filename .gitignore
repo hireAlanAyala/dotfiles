@@ -4,3 +4,8 @@
 !home-manager/
 !programs/
 !nvim/
+# these belong to nvim kickstart
+!nvim/tags
+!nvim/test.sh
+!nvim/.luarc.json
+!nvim/spell/
