@@ -31,6 +31,7 @@
     pkgs.nodejs_20
     pkgs.nodePackages.typescript
     pkgs.nodePackages.typescript-language-server
+    pkgs.nodePackages.nodemon
     pkgs.docker
     pkgs.postgresql_15
     pkgs.fzf
