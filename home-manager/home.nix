@@ -34,6 +34,7 @@
     pkgs.nodePackages.nodemon
     pkgs.docker
     pkgs.postgresql_15
+    # pkgs.neovim
     pkgs.fzf
     pkgs.bat
     pkgs.zoxide
@@ -94,7 +95,7 @@
     # TODO: only import this for linux and not macos
     ../programs/bash.nix
     ../programs/bat.nix
-    ../programs/exa.nix
+    ../programs/eza.nix
     ../programs/fzf.nix
     ../programs/ripgrep.nix
     ../programs/zoxide.nix

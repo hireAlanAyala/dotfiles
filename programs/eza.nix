@@ -1,7 +1,7 @@
 {
-  programs.exa = {
+  programs.eza = {
     enable = true;
-    enableAliases = true;
+    enableZshIntergration = true;
     extraOptions = [
       "-F"
       "--group-directories-first"
