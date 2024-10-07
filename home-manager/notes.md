@@ -33,3 +33,7 @@ A more advanced way to structure your config is to use imports to keep the main 
 example: https://github.com/ghedamat/nixfiles/blob/d10cf981baf3d928e3910593d881a92f18cd39d6/nixpkgs/home-dev.nix#L18-L23
 
 An even more advanced way is to created your own nix modules
+
+# HOW TO UPGRADE PACKAGES
+run `nix flake update` inside of .config/home-manager
+then run `hm` to refresh home-manager
