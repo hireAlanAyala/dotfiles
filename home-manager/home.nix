@@ -27,6 +27,7 @@
 
   # if a tool is project specific consider installing it with npm i -D <tool> instead of here
   home.packages = [
+    (pkgs.callPackage ../derivations/win32yank.nix { })
     pkgs.zellij
     pkgs.nodejs_20
     pkgs.nodePackages.typescript
@@ -34,14 +35,12 @@
     pkgs.nodePackages.nodemon
     pkgs.docker
     pkgs.postgresql_15
-    # pkgs.neovim
     pkgs.fzf
     pkgs.bat
     pkgs.zoxide
     pkgs.ripgrep
     pkgs.lua
     pkgs.mpv
-    # pkgs.neovim-nightly
     # TODO: add node packages ->  eslint, prettier, vite-create
 
     # # It is sometimes useful to fine-tune packages, for example, by applying
@@ -84,7 +83,7 @@
   #
   # if you don't want to manage your shell through Home Manager.
   home.sessionVariables = {
-    # EDITOR = "emacs";
+    EDITOR = "nvim";
   };
 
   # Let Home Manager install and manage itself.

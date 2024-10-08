@@ -36,4 +36,10 @@ An even more advanced way is to created your own nix modules
 
 # HOW TO UPGRADE PACKAGES
 run `nix flake update` inside of .config/home-manager
+run `nix-channel --update`
 then run `hm` to refresh home-manager
+
+# how to build derivations
+test building a specific detivation `nix-build -E 'with import <nixpkgs> {}; callPackage ./win32yank.nix {}'`
+
+get the hash of a github repo `nix-prefetch-url https://github.com/equalsraf/win32yank/releases/download/v0.1.1/win32yank-x64.zip`
