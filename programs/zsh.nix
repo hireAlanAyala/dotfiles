@@ -13,7 +13,7 @@
       wnpx = "/mnt/c/Program\\ Files/nodejs/npx";
       wgit = "/mnt/c/Program\\ Files/nodejs/npx";
       clip = "/mnt/c/Windows/System32/clip.exe";
-      hm = "home-manager switch --flake ~/.config/home-manager/flake.nix#alan";
+      hm = "(cd ~/.config/home-manager && git add . && home-manager switch --flake ~/.config/home-manager/flake.nix#alan)";
       ai = "node ~/documents/terminal_ai/index.js";
       fuckingInit = "sudo dockerd";
       fucking = "sudo env PATH=$PATH";
