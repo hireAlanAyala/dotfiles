@@ -7,7 +7,7 @@
     enableSyntaxHighlighting = true;
     history.extended = true;
     shellAliases = {
-      v = "nvim";
+      v = "wrapped_nvim";
       work = "cd /mnt/c/Users/AlanAyala/Documents/work";
       wnpm = "/mnt/c/Program\\ Files/nodejs/npm";
       wnpx = "/mnt/c/Program\\ Files/nodejs/npx";

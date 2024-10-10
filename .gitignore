@@ -4,6 +4,7 @@
 !home-manager/
 !derivations/
 !programs/
+!scripts/
 !nvim/
 # these belong to nvim kickstart
 !nvim/tags

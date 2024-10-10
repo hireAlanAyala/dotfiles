@@ -434,12 +434,15 @@ require('lazy').setup({
         -- You can put your default mappings / updates / etc. in here
         --  All the info you're looking for is in `:help telescope.setup()`
         --
-        -- defaults = {
-        --   mappings = {
-        --     i = { ['<c-enter>'] = 'to_fuzzy_refine' },
-        --   },
-        -- },
-        -- pickers = {}
+        defaults = {
+          mappings = {},
+          file_ignore_patterns = { 'node_modules' },
+        },
+        pickers = {
+          find_files = {
+            hidden = true,
+          },
+        },
         extensions = {
           ['ui-select'] = {
             require('telescope.themes').get_dropdown(),
@@ -716,6 +719,21 @@ require('lazy').setup({
     end,
   },
 
+  -- {
+  --   "folke/flash.nvim",
+  --   event = "VeryLazy",
+  --   ---@type Flash.Config
+  --   opts = {},
+  --   -- stylua: ignore
+  --   keys = {
+  --     { "s", mode = { "n", "x", "o" }, function() require("flash").jump() end, desc = "Flash" },
+  --     { "S", mode = { "n", "x", "o" }, function() require("flash").treesitter() end, desc = "Flash Treesitter" },
+  --     { "r", mode = "o", function() require("flash").remote() end, desc = "Remote Flash" },
+  --     { "R", mode = { "o", "x" }, function() require("flash").treesitter_search() end, desc = "Treesitter Search" },
+  --     { "<c-s>", mode = { "c" }, function() require("flash").toggle() end, desc = "Toggle Flash Search" },
+  --   },
+  -- },
+
   { -- Autoformat
     'stevearc/conform.nvim',
     event = { 'BufWritePre' },
@@ -762,6 +780,7 @@ require('lazy').setup({
   { -- Autocompletion
     'hrsh7th/nvim-cmp',
     event = 'InsertEnter',
+
     dependencies = {
       -- Snippet Engine & its associated nvim-cmp source
       {
@@ -875,7 +894,13 @@ require('lazy').setup({
       }
     end,
   },
-
+  {
+    'windwp/nvim-autopairs',
+    event = 'InsertEnter',
+    config = true,
+    -- use opts = {} for passing setup options
+    -- this is equivalent to setup({}) function
+  },
   { -- You can easily change to a different colorscheme.
     -- Change the name of the colorscheme plugin below, and then
     -- change the command in the config to whatever the name of that colorscheme is.
@@ -890,6 +915,8 @@ require('lazy').setup({
       vim.cmd.colorscheme 'tokyonight-night'
 
       -- You can configure highlights by doing something like:
+      vim.cmd.hi 'Normal guibg=NONE ctermbg=NONE'
+      vim.cmd.hi 'NonText guibg=NONE ctermbg=NONE'
       vim.cmd.hi 'Comment gui=none'
     end,
   },
@@ -958,6 +985,10 @@ require('lazy').setup({
     --    - Incremental selection: Included, see `:help nvim-treesitter-incremental-selection-mod`
     --    - Show your current context: https://github.com/nvim-treesitter/nvim-treesitter-context
     --    - Treesitter + textobjects: https://github.com/nvim-treesitter/nvim-treesitter-textobjects
+  },
+
+  {
+    'ThePrimeagen/vim-be-good',
   },
 
   -- The following two comments only work if you have downloaded the kickstart repo, not just copy pasted the
