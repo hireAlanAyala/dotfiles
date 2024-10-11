@@ -1,13 +1,5 @@
-# be careful using * independatly because it will not allow you to override the rules anywhere else
-*/
-!nix/
-!home-manager/
-!derivations/
-!programs/
-!scripts/
-!nvim/
-# these belong to nvim kickstart
-!nvim/tags
-!nvim/test.sh
-!nvim/.luarc.json
-!nvim/spell/
+.git/
+.secrets/
+environment.d/
+gh/
+

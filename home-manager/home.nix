@@ -24,29 +24,41 @@
   # release notes.
   home.stateVersion = "23.05"; # Please read the comment before changing.
 
-  home.packages = [
-    (pkgs.callPackage ../derivations/win32yank.nix { })
-    (pkgs.writeShellScriptBin "wrapped_nvim" (builtins.readFile ../scripts/wrapped_nvim.sh))
-    pkgs.zellij
-    pkgs.nodejs_20
-    pkgs.nodePackages.typescript
-    pkgs.nodePackages.typescript-language-server
-    pkgs.nodePackages.nodemon
-    pkgs.docker
-    pkgs.postgresql_15
-    pkgs.fzf
-    pkgs.bat
-    pkgs.zoxide
-    pkgs.ripgrep
-    pkgs.lua
-    pkgs.mpv
+  home.packages = with pkgs; [
+    (callPackage ../derivations/win32yank.nix { })
+    (writeShellScriptBin "wrapped_nvim" (builtins.readFile ../scripts/wrapped_nvim.sh))
+    
+    # INFO: How to debug duplicate packages
+    # sometimes a package already exists from the OS package manager
+    # apt-mark showmanual (Shows packages installed manually by apt)
+    # nix-env -q (Shows packages installed manually by nix-env)
+    # which <package-name> (shows the path of the package, should come from nix-profile)
+    # if you don't want to risk removing a package from apt, you can ensure the package is
+    # referenced from nix instead of apt like this: export PATH="$HOME/.nix-profile/bin:$PATH"
+    
+    zellij
+    nodejs_20
+    nodePackages.typescript
+    nodePackages.typescript-language-server
+    nodePackages.nodemon
+    docker
+    postgresql_15
+    fzf
+    bat
+    zoxide
+    ripgrep
+    lua
+    mpv
+    htop
+    sops
+    yq
     # TODO: add node packages ->  eslint, prettier, vite-create
 
     # # It is sometimes useful to fine-tune packages, for example, by applying
     # # overrides. You can do that directly here, just don't forget the
     # # parentheses. Maybe you want to install Nerd Fonts with a limited number of
     # # fonts?
-    # (pkgs.nerdfonts.override { fonts = [ "FantasqueSansMono" ]; })
+    # (nerdfonts.override { fonts = [ "FantasqueSansMono" ]; })
   ];
 
   # Home Manager is pretty good at managing dotfiles. The primary way to manage
