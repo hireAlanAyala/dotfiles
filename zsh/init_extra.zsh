@@ -44,7 +44,12 @@ alias hm='zsh ~/.config/zsh/scripts/hm.zsh'
 # alias ai="node ~/documents/terminal_ai/index.js"
 alias ai="aichat"
 alias fucking="sudo env PATH=$PATH"
+# SSH Key Management
 alias gen-ssh-key="bash ~/.config/.ssh/generate_ssh_key.sh"
+alias ssh-keyman="bash ~/.config/ssh/ssh-keyman.sh"
+alias rotate-keys="bash ~/.config/ssh/rotate-keys.sh"
+alias deploy-keys="bash ~/.config/ssh/deploy-keys.sh"
+alias backup-ssh="bash ~/.config/ssh/backup-restore.sh"
 alias tinit="~/.config/tmux/tmux-init.sh"
 
 # Directories

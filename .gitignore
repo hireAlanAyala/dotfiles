@@ -3,3 +3,13 @@
 environment.d/
 gh/
 
+# Runtime/cache data
+**/cache/
+**/logs/
+**/.DS_Store
+**/tmp/
+
+# Tool-specific sensitive data
+pulse/
+systemd/
+

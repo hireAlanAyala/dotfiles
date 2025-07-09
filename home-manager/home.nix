@@ -45,7 +45,6 @@
     
     direnv
     tree
-    zellij
     go
     air
     nodejs_20
@@ -110,6 +109,28 @@
     #   org.gradle.console=verbose
     #   org.gradle.daemon.idletimeout=3600000
     # '';
+
+    # WSL global configuration (applies to all distributions)
+    ".wslconfig" = {
+      target = "/mnt/c/Users/AlanAyala/.wslconfig";
+      text = ''
+        [wsl2]
+        memory=12GB
+        processors=8
+        swap=4GB
+        localhostForwarding=true
+        dns=8.8.8.8
+      '';
+    };
+
+    # WSL distribution-specific configuration
+    "wsl.conf" = {
+      target = "/etc/wsl.conf";
+      text = ''
+        [interop]
+        appendWindowsPath = false
+      '';
+    };
   };
 
   # You can also manage environment variables but you will have to manually
@@ -150,7 +171,6 @@
     ../programs/ripgrep.nix
     ../programs/zoxide.nix
     ../programs/zsh.nix
-    ../programs/helix.nix
     ../programs/git.nix
     ../programs/neovim.nix
     ../programs/tmux.nix
