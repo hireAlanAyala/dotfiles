@@ -1,0 +1,13 @@
+{
+  "env": {
+    "CLAUDE_CONFIG_DIR": "/home/alan/.config/claude-code",
+    "HM_COMMAND": "hm",
+    "NIXOS_CONFIG_DIR": "/home/alan/.config"
+  },
+  "cleanupPeriodDays": 30,
+  "permissions": {
+    "allowBashCommands": true,
+    "allowFileSystem": true,
+    "allowNetworking": true
+  },
+}

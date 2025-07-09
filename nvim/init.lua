@@ -16,6 +16,14 @@ vim.g.have_nerd_font = true
 
 vim.o.shell = '/home/alan/.nix-profile/bin/zsh -i'
 vim.env.NVIM = '1' -- allows zshrc to disable zle when open in nvim
+vim.env.PATH = vim.env.PATH .. ':' .. os.getenv 'HOME' .. '/.nix-profile/bin'
+-- helps mason find the dotnet env
+vim.env.DOTNET_ROOT = os.getenv 'HOME' .. '/.nix-profile'
+
+vim.api.nvim_create_user_command('CheckMasonEnv', function()
+  local mason_env = vim.fn.system 'env | grep DOTNET'
+  vim.notify('Mason Environment:\n' .. mason_env)
+end, {})
 
 -- Make line numbers default
 vim.opt.number = false
@@ -76,6 +84,67 @@ vim.opt.cursorline = true
 -- Minimal number of screen lines to keep above and below the cursor.
 vim.opt.scrolloff = 10
 
+vim.opt.showtabline = 0
+
+vim.o.sessionoptions = vim.o.sessionoptions:gsub(',?options,?', '')
+vim.g.session_directory = '~/.config/nvim/sessions/'
+
+-- Auto session management for tmux resurrect
+local function auto_session()
+  local session_dir = vim.fn.expand('~/.config/nvim/sessions/')
+  if vim.fn.isdirectory(session_dir) == 0 then
+    vim.fn.mkdir(session_dir, 'p')
+  end
+  
+  -- Get current tmux session name for session file
+  local tmux_session = vim.fn.system('tmux display-message -p "#S"'):gsub('\n', '')
+  if tmux_session == '' then
+    tmux_session = 'default'
+  end
+  
+  local session_file = session_dir .. tmux_session .. '.vim'
+  
+  -- Auto save session on exit
+  vim.api.nvim_create_autocmd('VimLeavePre', {
+    callback = function()
+      if vim.fn.argc() == 0 then  -- Only save if no arguments passed
+        vim.cmd('mksession! ' .. session_file)
+      end
+    end
+  })
+  
+  -- Auto restore session if no files opened
+  if vim.fn.argc() == 0 and vim.fn.filereadable(session_file) == 1 then
+    vim.defer_fn(function()
+      vim.cmd('source ' .. session_file)
+    end, 100)
+  end
+end
+
+-- Only enable auto session in tmux
+if vim.env.TMUX then
+  auto_session()
+end
+
+-- Manual session save command
+vim.api.nvim_create_user_command('SaveSession', function()
+  local session_dir = vim.fn.expand('~/.config/nvim/sessions/')
+  if vim.fn.isdirectory(session_dir) == 0 then
+    vim.fn.mkdir(session_dir, 'p')
+  end
+  
+  local tmux_session = vim.fn.system('tmux display-message -p "#S"'):gsub('\n', '')
+  if tmux_session == '' then
+    tmux_session = 'default'
+  end
+  
+  local session_file = session_dir .. tmux_session .. '.vim'
+  vim.cmd('mksession! ' .. session_file)
+  print('Session saved: ' .. session_file)
+end, {})
+
+-- [[ Terminal ]]
+
 -- [[ Basic Keymaps ]]
 --  See `:help vim.keymap.set()`
 
@@ -92,13 +161,21 @@ vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagn
 --
 -- NOTE: This won't work in all terminal emulators/tmux/etc. Try your own mapping
 -- or just use <C-\><C-n> to exit terminal mode
-vim.keymap.set('t', '<Esc><Esc>', '<C-\\><C-n>', { desc = 'Exit terminal mode' })
+-- vim.keymap.set('t', '<Esc><Esc>', '<C-\\><C-n>', { desc = 'Exit terminal mode' })
 
--- TIP: Disable arrow keys in normal mode
-vim.keymap.set('n', '<left>', '<cmd>echo "Use h to move!!"<CR>')
-vim.keymap.set('n', '<right>', '<cmd>echo "Use l to move!!"<CR>')
-vim.keymap.set('n', '<up>', '<cmd>echo "Use k to move!!"<CR>')
-vim.keymap.set('n', '<down>', '<cmd>echo "Use j to move!!"<CR>')
+-- hide vim terminal mode status line
+vim.o.showmode = false
+
+vim.api.nvim_set_keymap('t', '<Esc>[A', '<Up>', { noremap = true, silent = true })
+vim.api.nvim_set_keymap('t', '<Esc>[B', '<Down>', { noremap = true, silent = true })
+vim.api.nvim_set_keymap('t', '<Esc>[C', '<Right>', { noremap = true, silent = true })
+vim.api.nvim_set_keymap('t', '<Esc>[D', '<Left>', { noremap = true, silent = true })
+
+vim.opt.termguicolors = true
+vim.opt.ttimeoutlen = 50
+vim.o.compatible = false
+
+-- vim.keymap.del('t', '<Tab>')
 
 -- Keybinds to make split navigation easier.
 -- Use CTRL+<hjkl> to switch between windows
@@ -109,12 +186,39 @@ vim.keymap.set('n', '<C-l>', '<C-w><C-l>', { desc = 'Move focus to the right win
 vim.keymap.set('n', '<C-j>', '<C-w><C-j>', { desc = 'Move focus to the lower window' })
 vim.keymap.set('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper window' })
 
-vim.keymap.set(
-  'n',
-  '<leader>b',
-  '<cmd>Telescope buffers sort_mru=true sort_lastused=true initial_mode=normal theme=ivy<cr>',
-  { desc = 'Open Telescope Buffers' }
-)
+-- TODO: add permanent marks
+-- TODO: on quit add a timestamped
+-- TODO: unused code is too dark
+-- TODO: remove :terminal status line for zsh status line
+
+-- vim rooter but native: https://www.reddit.com/r/neovim/comments/zy5s0l/you_dont_need_vimrooter_usually_or_how_to_set_up/
+-- -- Array of file names indicating root directory. Modify to your liking.
+-- local root_names = { '.git', 'Makefile' }
+--
+-- -- Cache to use for speed up (at cost of possibly outdated results)
+-- local root_cache = {}
+--
+-- local set_root = function()
+--   -- Get directory path to start search from
+--   local path = vim.api.nvim_buf_get_name(0)
+--   if path == '' then return end
+--   path = vim.fs.dirname(path)
+--
+--   -- Try cache and resort to searching upward for root directory
+--   local root = root_cache[path]
+--   if root == nil then
+--     local root_file = vim.fs.find(root_names, { path = path, upward = true })[1]
+--     if root_file == nil then return end
+--     root = vim.fs.dirname(root_file)
+--     root_cache[path] = root
+--   end
+--
+--   -- Set current directory
+--   vim.fn.chdir(root)
+-- end
+--
+-- local root_augroup = vim.api.nvim_create_augroup('MyAutoRoot', {})
+-- vim.api.nvim_create_autocmd('BufEnter', { group = root_augroup, callback = set_root })
 
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
@@ -155,7 +259,21 @@ vim.opt.rtp:prepend(lazypath)
 -- NOTE: Here is where you install your plugins.
 require('lazy').setup({
   -- NOTE: Plugins can be added with a link (or for a github repo: 'owner/repo' link).
-  'tpope/vim-sleuth', -- Detect tabstop and shiftwidth automatically
+  {
+    'tpope/vim-sleuth', -- Detect tabstop and shiftwidth automatically
+    config = function()
+      -- Override Sleuth for F# files (force spaces)
+      vim.api.nvim_create_autocmd('FileType', {
+        pattern = 'fsharp',
+        callback = function()
+          vim.bo.expandtab = true
+          vim.bo.tabstop = 4
+          vim.bo.shiftwidth = 4
+          vim.bo.softtabstop = 4
+        end,
+      })
+    end,
+  },
 
   -- NOTE: Plugins can also be added by using a table,
   -- with the first argument being the link and the following
@@ -189,6 +307,22 @@ require('lazy').setup({
     },
   },
   {
+    'NeogitOrg/neogit',
+    dependencies = {
+      'nvim-lua/plenary.nvim', -- required
+      'sindrets/diffview.nvim', -- optional - Diff integration
+
+      -- Only one of these is needed.
+      'nvim-telescope/telescope.nvim', -- optional
+      'ibhagwan/fzf-lua', -- optional
+      'echasnovski/mini.pick', -- optional
+    },
+    config = true,
+  },
+  {
+    'sindrets/diffview.nvim',
+  },
+  {
     'max397574/better-escape.nvim',
     config = function()
       require('better_escape').setup()
@@ -211,6 +345,11 @@ require('lazy').setup({
       watch_for_changes = true,
       win_options = {
         wrap = true,
+      },
+      preview = {
+        width = 40,
+        height = 20,
+        border = 'rounded',
       },
       view_options = {
         show_hidden = true,
@@ -290,6 +429,39 @@ require('lazy').setup({
         { '<leader>t', group = '[T]oggle' },
         { '<leader>h', group = 'Git [H]unk', mode = { 'n', 'v' } },
       },
+      config = function(_, opts)
+        -- Set up which-key with the provided opts
+        local wk = require 'which-key'
+        wk.setup(opts)
+
+        -- Function to yank diagnostic messages
+        local function yank_diagnostic()
+          print 'yank_diagnostic'
+          local diagnostics = vim.diagnostic.get(0, { lnum = vim.api.nvim_win_get_cursor(0)[1] - 1 })
+          if #diagnostics == 0 then
+            vim.notify('No diagnostics found at cursor position', vim.log.levels.WARN)
+            return
+          end
+
+          -- Concatenate all diagnostic messages with newlines
+          local messages = {}
+          for _, diagnostic in ipairs(diagnostics) do
+            table.insert(messages, diagnostic.message)
+          end
+          local message_text = table.concat(messages, '\n')
+
+          -- Yank to system clipboard and default register
+          vim.fn.setreg('+', message_text)
+          vim.fn.setreg('"', message_text)
+
+          vim.notify('Diagnostic message yanked to clipboard', vim.log.levels.INFO)
+        end
+
+        -- Register our yank diagnostic mapping
+        wk.add {
+          { 'yd', yank_diagnostic, desc = 'Yank diagnostic message', mode = 'n' },
+        }
+      end,
     },
   },
 
@@ -344,6 +516,232 @@ require('lazy').setup({
       -- Telescope picker. This is really useful to discover what Telescope can
       -- do as well as how to actually do it!
 
+      local builtin = require 'telescope.builtin'
+      local actions = require 'telescope.actions'
+      local action_state = require 'telescope.actions.state'
+
+      local function remove_qf_item(prompt_bufnr)
+        local selected_entry = action_state.get_selected_entry()
+
+        if not selected_entry then
+          print 'No entry selected!'
+          return
+        end
+
+        -- Get the current quickfix list
+        local qflist = vim.fn.getqflist()
+
+        -- Remove the selected entry
+        local new_qflist = {}
+        for _, item in ipairs(qflist) do
+          if item.lnum ~= selected_entry.lnum or item.bufnr ~= selected_entry.bufnr then
+            table.insert(new_qflist, item)
+          end
+        end
+
+        -- Update the quickfix list
+        vim.fn.setqflist(new_qflist, 'r')
+
+        -- Close the current Telescope prompt
+        actions.close(prompt_bufnr)
+
+        -- Reopen the Quickfix picker
+        vim.defer_fn(function()
+          require('telescope.builtin').quickfix()
+        end, 50) -- Small delay to avoid flicker
+      end
+
+      local pickers = require 'telescope.pickers'
+      local finders = require 'telescope.finders'
+      local conf = require('telescope.config').values
+
+      -- our picker function: colors
+      local colors = function(opts)
+        opts = opts or {}
+        pickers
+          .new(opts, {
+            prompt_title = 'colors',
+            finder = finders.new_table {
+              results = {
+                { 'red', '#ff0000' },
+                { 'green', '#00ff00' },
+                { 'blue', '#0000ff' },
+              },
+              entry_maker = function(entry)
+                return {
+                  value = entry, -- best practice reference to the original entry, for later use
+                  display = entry[1],
+                  ordinal = entry[1],
+                }
+              end,
+            },
+            sorter = conf.generic_sorter(opts),
+            -- prompt_bufnr represents the picker as it is a buffer in nvim
+            attach_mappings = function(prompt_bufnr, map)
+              actions.select_default:replace(function()
+                actions.close(prompt_bufnr)
+                print(prompt_bufnr)
+                -- returns a table hash
+                -- this differs from the string passed in because internally it's packed into a table with multiple key:value pairs
+                -- it's possible to get selection after closing the buffer
+                local selection = action_state.get_selected_entry()
+                print('selection', selection)
+                -- inspect takes tables, functions, etc and turns them to strings for printing
+                print('inspected selection', vim.inspect(selection))
+                vim.api.nvim_put({ selection[1] }, '', false, true)
+              end)
+
+              return true
+            end,
+          })
+          :find()
+      end
+
+      local function git_log_source_picker(opts)
+        opts = opts or {}
+
+        pickers
+          .new(opts, {
+            prompt_title = 'Git File Content Search (-S)',
+            finder = finders.new_job(
+              function(prompt)
+                if not prompt or prompt == '' then
+                  return nil
+                end
+                return { 'git', 'log', '-S', prompt, '--source', '--all', '--pretty=format:%h %ad %s', '--date=short' }
+              end,
+              nil, -- This should be `nil` because entry_maker will handle formatting
+              {
+                entry_maker = function(entry)
+                  -- Split the log entry into commit hash, date, and message
+                  local parts = vim.split(entry, ' ', { trimempty = true })
+
+                  -- Ensure we have at least <commit_hash> <date> <message>
+                  if #parts < 3 then
+                    return nil
+                  end
+
+                  local commit_hash = parts[1]
+                  local date = parts[2]
+                  local message = table.concat(parts, ' ', 3) -- Preserve full commit message
+                  local display = string.format('%-10s %-12s %s', commit_hash, date, message)
+
+                  -- Debugging Output
+                  print('display', display)
+
+                  local result = {
+                    value = commit_hash, -- The actual commit hash
+                    display = display, -- How it looks in Telescope UI
+                    ordinal = commit_hash .. ' ' .. date .. ' ' .. message, -- Used for searching
+                    commit = commit_hash, -- Store the commit hash for selection
+                  }
+
+                  -- Debugging Output
+                  print('result', vim.inspect(result))
+
+                  return result
+                end,
+              }
+            ),
+            sorter = conf.generic_sorter(opts),
+            attach_mappings = function(_, map)
+              map('i', '<CR>', function(prompt_bufnr)
+                local selection = action_state.get_selected_entry()
+
+                if not selection or not selection.commit then
+                  print '⚠️ No valid commit selected!'
+                  return
+                end
+
+                actions.close(prompt_bufnr)
+                vim.cmd('Git show ' .. selection.commit) -- Open commit details
+              end)
+              return true
+            end,
+          })
+          :find()
+      end
+
+      local previewers = require 'telescope.previewers'
+      local utils = require 'telescope.utils'
+
+      -- local function git_history_search(opts)
+      --   opts = opts or {}
+      --
+      --   -- Prompt for the search term if not provided
+      --   local search_term = opts.search_term or vim.fn.input 'Search git history for: '
+      --   if search_term == '' then
+      --     return
+      --   end
+      --
+      --   -- Create the git command
+      --   local git_cmd = {
+      --     'git',
+      --     'log',
+      --     '-S',
+      --     search_term,
+      --     '--source',
+      --     '--all',
+      --     '--pretty=format:%h %ad %s',
+      --     '--date=short',
+      --   }
+      --
+      --   -- Create custom previewer that properly handles multiple preview requests
+      --   local previewer = previewers.new_buffer_previewer {
+      --     title = 'Git Commit Preview',
+      --     get_buffer_by_name = function(_, entry)
+      --       return entry.value
+      --     end,
+      --     define_preview = function(self, entry)
+      --       local commit_hash = entry.value:match '^(%w+)'
+      --
+      --       -- Clear the buffer content
+      --       vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, {})
+      --
+      --       -- Run git show and handle the output
+      --       local stdout, ret, stderr = utils.get_os_command_output {
+      --         'git',
+      --         'show',
+      --         commit_hash,
+      --       }
+      --
+      --       if ret == 0 then
+      --         vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, stdout)
+      --         -- Optional: Set filetype for syntax highlighting
+      --         vim.api.nvim_buf_set_option(self.state.bufnr, 'filetype', 'git')
+      --       else
+      --         vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, stderr)
+      --       end
+      --     end,
+      --   }
+      --
+      --   pickers
+      --     .new(opts, {
+      --       prompt_title = 'Git History Search: ' .. search_term,
+      --       finder = finders.new_oneshot_job(git_cmd, opts),
+      --       sorter = conf.generic_sorter(opts),
+      --       previewer = previewer,
+      --       attach_mappings = function(buffer_number)
+      --         -- Add custom key mappings here
+      --         actions.select_default:replace(function()
+      --           local selection = action_state.get_selected_entry()
+      --           local commit_hash = selection.value:match '^(%w+)'
+      --
+      --           -- Close telescope
+      --           actions.close(buffer_number)
+      --
+      --           -- Open commit in a new split
+      --           vim.cmd 'vsplit'
+      --           vim.cmd('terminal git show ' .. commit_hash)
+      --           vim.cmd 'startinsert'
+      --         end)
+      --
+      --         return true
+      --       end,
+      --     })
+      --     :find()
+      -- end
+
       -- [[ Configure Telescope ]]
       -- See `:help telescope` and `:help telescope.setup()`
       require('telescope').setup {
@@ -358,6 +756,11 @@ require('lazy').setup({
           find_files = {
             hidden = true,
           },
+          quickfix = {
+            mappings = {
+              n = { ['d'] = remove_qf_item },
+            },
+          },
         },
         extensions = {
           ['ui-select'] = {
@@ -371,7 +774,6 @@ require('lazy').setup({
       pcall(require('telescope').load_extension, 'ui-select')
 
       -- See `:help telescope.builtin`
-      local builtin = require 'telescope.builtin'
       vim.keymap.set('n', '<leader>sh', builtin.help_tags, { desc = '[S]earch [H]elp' })
       vim.keymap.set('n', '<leader>sk', builtin.keymaps, { desc = '[S]earch [K]eymaps' })
       vim.keymap.set('n', '<leader>sf', builtin.find_files, { desc = '[S]earch [F]iles' })
@@ -382,6 +784,10 @@ require('lazy').setup({
       vim.keymap.set('n', '<leader>sr', builtin.resume, { desc = '[S]earch [R]esume' })
       vim.keymap.set('n', '<leader>s.', builtin.oldfiles, { desc = '[S]earch Recent Files ("." for repeat)' })
       vim.keymap.set('n', '<leader><leader>', builtin.buffers, { desc = '[ ] Find existing buffers' })
+      -- vim.keymap.set('n', '<leader>gs', git_history_search, { noremap = true, silent = true })
+      vim.keymap.set('n', '<leader>gc', function()
+        colors(require('telescope.themes').get_dropdown {})
+      end)
 
       -- Slightly advanced example of overriding default behavior and theme
       vim.keymap.set('n', '<leader>/', function()
@@ -602,6 +1008,27 @@ require('lazy').setup({
             },
           },
         },
+        fsautocomplete = {
+          -- cmd = { vim.fn.stdpath 'data' .. '/mason/bin/fsautocomplete', '--adaptive-lsp-server-enabled' },
+          cmd = { 'dotnet', 'fsautocomplete', '--adaptive-lsp-server-enabled' },
+          -- cmd = {
+          --   vim.fn.stdpath 'data' .. '/mason/bin/fsautocomplete',
+          --   '--framework',
+          --   'net9.0', -- Force usage of .NET 9.0 runtime
+          -- },
+          -- cmd_env = {
+          --   DOTNET_ROOT = os.getenv 'HOME' .. '/.nix-profile', -- Ensure it points to the Nix environment
+          --   PATH = vim.env.PATH .. ':' .. os.getenv 'HOME' .. '/.nix-profile/bin',
+          --   DOTNET_MULTILEVEL_LOOKUP = '0', -- Prevents .NET from searching outside Nix environment
+          -- },
+          filetypes = { 'fsharp', 'fs', 'fsx', 'fsproj' }, -- Set the relevant file types
+          root_dir = require('lspconfig.util').root_pattern('*.sln', '*.fsproj', '.git'), -- Detect the project root
+          settings = {
+            FSharp = {
+              automaticWorkspaceInit = true, -- Automatically load context for scripts
+            },
+          },
+        },
       }
 
       -- Ensure the servers and tools above are installed
@@ -615,14 +1042,24 @@ require('lazy').setup({
       -- You can add other tools here that you want Mason to install
       -- for you, so that they are available from within Neovim.
       local ensure_installed = vim.tbl_keys(servers or {})
+      -- Remove "fsautocomplete" from the list
+      ensure_installed = vim.tbl_filter(function(server)
+        return server ~= 'fsautocomplete'
+      end, ensure_installed)
       vim.list_extend(ensure_installed, {
         'stylua', -- Used to format Lua code
       })
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
 
+      print('mason bin: ', vim.fn.stdpath 'data' .. '/mason/bin/fantomas')
+
       require('mason-lspconfig').setup {
         handlers = {
           function(server_name)
+            if server_name == 'fsautocomplete' then
+              return -- skip fsautocomplete, you set it up manually
+            end
+
             local server = servers[server_name] or {}
             -- This handles overriding only values explicitly passed
             -- by the server configuration above. Useful when disabling
@@ -634,7 +1071,125 @@ require('lazy').setup({
       }
     end,
   },
+  {
+    'rcarriga/nvim-dap-ui',
+    dependencies = {
+      'mfussenegger/nvim-dap',
+      'nvim-neotest/nvim-nio',
+      'theHamsta/nvim-dap-virtual-text',
+      {
+        'folke/neodev.nvim',
+        config = function()
+          require('neodev').setup {
+            library = { plugins = { 'nvim-dap-ui' }, types = true },
+          }
+        end,
+      },
+    },
+    config = function()
+      local dap = require 'dap'
+      local dapui = require 'dapui'
 
+      dapui.setup()
+
+      -- Setup keymaps
+      vim.api.nvim_set_keymap('n', '<leader>td', ':lua require("dapui").toggle()<CR>', { noremap = true, silent = true })
+
+      vim.keymap.set({ 'n', 'v' }, '<leader>?', function()
+        -- INFO: tj has this warning, it's ok, skipping values allows it to auto size
+        dapui.eval(nil, { enter = true })
+      end, { desc = 'Evaluate expression (DAP UI)' })
+
+      vim.keymap.set('n', '<leader>b', function()
+        require('dap').toggle_breakpoint()
+      end, { desc = 'Toggle breakpoint (DAP)' })
+
+      vim.keymap.set('n', '<F5>', function()
+        dap.continue()
+      end, { desc = 'DAP: Continue/Start' })
+
+      vim.keymap.set('n', '<F1>', function()
+        dap.step_into()
+      end, { desc = 'DAP: Step Into' })
+
+      vim.keymap.set('n', '<F2>', function()
+        dap.step_over()
+      end, { desc = 'DAP: Step Over' })
+
+      vim.keymap.set('n', '<F3>', function()
+        dap.step_out()
+      end, { desc = 'DAP: Step Out' })
+
+      vim.keymap.set('n', '<F4>', function()
+        dap.terminate()
+      end, { desc = 'DAP: Terminate Debugging' })
+
+      -- Event hooks
+      dap.listeners.before.attach.dapui_config = function()
+        dapui.open()
+      end
+      dap.listeners.before.launch.dapui_config = function()
+        dapui.open()
+      end
+      dap.listeners.before.event_terminated.dapui_config = function()
+        dapui.close()
+      end
+      dap.listeners.before.event_exited.dapui_config = function()
+        dapui.close()
+      end
+
+      -- Language configs
+      dap.adapters.coreclr = {
+        type = 'executable',
+        command = os.getenv 'HOME' .. '/.nix-profile/bin/netcoredbg',
+        args = { '--interpreter=vscode' },
+      }
+
+      local dotnet_config = {
+        {
+          type = 'coreclr',
+          name = 'Launch - netcoredbg',
+          request = 'launch',
+          program = function()
+            local cwd = vim.fn.getcwd()
+            local dlls = vim.fn.glob(cwd .. '/bin/Debug/**/*.dll', false, true)
+
+            if #dlls == 0 then
+              return vim.fn.input('No DLLs found. Enter path manually: ', cwd .. '/bin/Debug/', 'file')
+            elseif #dlls == 1 then
+              return dlls[1]
+            else
+              -- Use Neovim's UI selector (can be telescope, dressing.nvim, etc.)
+              local co = coroutine.running()
+              vim.ui.select(dlls, { prompt = 'Select DLL to debug' }, function(choice)
+                coroutine.resume(co, choice)
+              end)
+              return coroutine.yield()
+            end
+          end,
+        },
+      }
+
+      dap.configurations.cs = dotnet_config
+      dap.configurations.fsharp = dotnet_config
+    end,
+  },
+  { 'Olical/conjure' },
+  { 'ionide/Ionide-vim' },
+  -- {
+  --   'liquidz/vim-iced',
+  --   ft = { 'clojure' },
+  --   config = function()
+  --     vim.g.iced_enable_default_key_mappings = true
+  --   end,
+  --   dependencies = {
+  --     { 'guns/vim-sexp', ft = { 'clojure' } },
+  --     {
+  --       'ctrlpvim/ctrlp.vim',
+  --       cond = vim.fn.executable 'ctrlp' == 1,
+  --     },
+  --   },
+  -- },
   -- {
   --   "folke/flash.nvim",
   --   event = "VeryLazy",
@@ -689,6 +1244,38 @@ require('lazy').setup({
         --
         -- You can use 'stop_after_first' to run the first available formatter from the list
         javascript = { 'prettierd', 'prettier', stop_after_first = true },
+        typescript = { 'prettierd', 'prettier', stop_after_first = true },
+        javascriptreact = { 'prettierd', 'prettier', stop_after_first = true },
+        typescriptreact = { 'prettierd', 'prettier', stop_after_first = true },
+        jsx = { 'prettierd', 'prettier', stop_after_first = true },
+        tsx = { 'prettierd', 'prettier', stop_after_first = true },
+        ts = { 'prettierd', 'prettier', stop_after_first = true },
+        js = { 'prettierd', 'prettier', stop_after_first = true },
+        fsharp = { 'fantomas' },
+        fs = { 'fantomas' },
+        fsx = { 'fantomas' },
+        fsproj = { 'fantomas' },
+      },
+      formatters = {
+        prettier = {
+          append_args = { '--config', vim.fn.expand '~/.config/nvim/formatters/prettierrc' },
+          env = {
+            tab_widh = 1,
+          },
+          tabWidth = 2,
+        },
+        prettierd = {
+          append_args = { '--config', vim.fn.expand '~/.config/nvim/formatters/.prettierrc.json' },
+          env = {
+            string.format('PRETTIERD_DEFAULT_CONFIG=%s', vim.fn.expand '~/.config/nvim/formatters/.prettierrc.json'),
+          },
+          tabWidth = 2,
+        },
+        fantomas = {
+          command = vim.fn.stdpath 'data' .. '/mason/bin/fantomas', -- Use Mason's installed fantomas binary
+          args = { '--indent-size', '4', '--no-newline-at-end' }, -- Example args, adjust as needed
+          stdin = true, -- Pipe input directly from the buffer
+        },
       },
     },
   },
@@ -729,12 +1316,21 @@ require('lazy').setup({
       --  into multiple repos for maintenance purposes.
       'hrsh7th/cmp-nvim-lsp',
       'hrsh7th/cmp-path',
+      'hrsh7th/cmp-cmdline',
+      'hrsh7th/cmp-buffer',
     },
     config = function()
       -- See `:help cmp`
       local cmp = require 'cmp'
       local luasnip = require 'luasnip'
       luasnip.config.setup {}
+
+      cmp.setup.filetype({ 'sql' }, {
+        sources = {
+          { name = 'vim-dadbod-completion' },
+          { name = 'buffer' },
+        },
+      })
 
       cmp.setup {
         snippet = {
@@ -795,6 +1391,7 @@ require('lazy').setup({
 
           -- For more advanced Luasnip keymaps (e.g. selecting choice nodes, expansion) see:
           --    https://github.com/L3MON4D3/LuaSnip?tab=readme-ov-file#keymaps
+          --
         },
         sources = {
           -- WARNING: if you ever add a plugin with completion, you want to make sure you add it to sources #here
@@ -807,9 +1404,67 @@ require('lazy').setup({
           { name = 'nvim_lsp' },
           { name = 'luasnip' },
           { name = 'path' },
+          { name = 'fsautocomplete' },
         },
       }
+
+      cmp.setup.cmdline(':', {
+        sources = {
+          { name = 'path' },
+          { name = 'cmdline' },
+        },
+      })
+
+      cmp.setup.cmdline('/', {
+        sources = {
+          { name = 'buffer' },
+        },
+      })
+
+      local function is_specific_buffer()
+        local name_of_buffer = 'term_input' -- Replace this with your buffer name
+        return vim.api.nvim_buf_get_name(0):match(name_of_buffer) ~= nil
+      end
+
+      -- Create an autocommand for setting specific configuration for your buffer
+      vim.api.nvim_create_autocmd('BufEnter', {
+        pattern = '*',
+        callback = function()
+          if is_specific_buffer() then
+            cmp.setup.buffer {
+              sources = {
+                { name = 'cmp-buffer' },
+                { name = 'hrsh7th/cmp-path' },
+                { name = 'hrsh7th/cmp-cmdline' },
+              },
+            }
+          end
+        end,
+      })
     end,
+  },
+  {
+    'kristijanhusak/vim-dadbod-ui',
+    dependencies = {
+      { 'tpope/vim-dadbod', lazy = true },
+      { 'kristijanhusak/vim-dadbod-completion', ft = { 'sql', 'mysql', 'plsql' }, lazy = true }, -- Optional
+    },
+    cmd = {
+      'DBUI',
+      'DBUIToggle',
+      'DBUIAddConnection',
+      'DBUIFindBuffer',
+    },
+    init = function()
+      -- Your DBUI configuration
+      vim.g.db_ui_use_nerd_fonts = 1
+    end,
+  },
+  {
+    'folke/ts-comments.nvim',
+    opts = {},
+    event = 'VeryLazy',
+    enabled = vim.fn.has 'nvim-0.10.0' == 1,
   },
   {
     'windwp/nvim-autopairs',
@@ -833,6 +1488,7 @@ require('lazy').setup({
       -- Like many other themes, this one has different styles, and you could load
       -- any other, such as 'tokyonight-storm', 'tokyonight-moon', or 'tokyonight-day'.
       vim.cmd.colorscheme 'tokyonight-night'
+      vim.o.termguicolors = true
 
       -- You can configure highlights by doing something like:
       vim.cmd.hi 'Normal guibg=NONE ctermbg=NONE'
@@ -910,7 +1566,29 @@ require('lazy').setup({
   {
     'ThePrimeagen/vim-be-good',
   },
-
+  {
+    'mbbill/undotree',
+  },
+  -- INFO: don't need this because I can use the diagnostics quick fix key map from above
+  -- {
+  --   'rachartier/tiny-inline-diagnostic.nvim',
+  --   event = 'VeryLazy', -- Or `LspAttach`
+  --   config = function()
+  --     require('tiny-inline-diagnostic').setup()
+  --     vim.diagnostic.config { virtual_text = false }
+  --   end,
+  -- },
+  -- {
+  --   'rachartier/tiny-code-action.nvim',
+  --   dependencies = {
+  --     { 'nvim-lua/plenary.nvim' },
+  --     { 'nvim-telescope/telescope.nvim' },
+  --   },
+  --   event = 'LspAttach',
+  --   config = function()
+  --     require('tiny-code-action').setup()
+  --   end,
+  -- },
   -- The following two comments only work if you have downloaded the kickstart repo, not just copy pasted the
   -- init.lua. If you want these files, they are in the repository, so you can just download them and
   -- place them in the correct locations.

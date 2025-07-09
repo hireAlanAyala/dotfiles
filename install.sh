@@ -6,6 +6,7 @@
 echo "Setting up development environment"
 
 # TODO: detect the OS and install nix
+# when installing for the first time, use this https://crates.io/crates/nix-installer
 
 # activates hm config
 # TODO: allow passing the user as an argument

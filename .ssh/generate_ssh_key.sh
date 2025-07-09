@@ -61,6 +61,10 @@ echo "\n"
 
 #TODO:
 # add the private key to ~/.ssh with a chmod of 600. DO NOT ADD KEY TO .config/.ssh
+#
+# TODO:: write a step to add the new key to the ssh key store
+# eval "$(ssh-agent -s)"
+# ssh-add ~/.ssh/azure_hpg
 
 # Clean up: Keep the public key in /tmp but remove the private key after use
 rm "$private_key_path"

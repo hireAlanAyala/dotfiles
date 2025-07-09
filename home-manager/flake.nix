@@ -30,6 +30,10 @@
 
           # Optionally use extraSpecialArgs
           # to pass through arguments to home.nix
+          # extraSpecialArgs = {
+          #   inherit (nixpkgs) lib;
+          #   inherit home-manager;
+          # };
         };
 
         # I can add another user with different values here

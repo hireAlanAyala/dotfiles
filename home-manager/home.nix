@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ config, pkgs, lib, home-manager, ... }:
 
 # TODO: 
 # - add chatgpt command
@@ -13,6 +13,7 @@
 # - use a remote server to create a client - server development environment
 # - add commands for OS level logging (must be able to log to a file and the terminal at the same time)
 # - add OS level note taking
+# - ensure zsh is the added to sudo nano /etc/shells and set as the login shell on install chsh -s $(which zsh)
 
 {
   # This value determines the Home Manager release that your configuration is
@@ -26,6 +27,9 @@
 
   home.packages = with pkgs; [
     (callPackage ../derivations/win32yank.nix { })
+    (callPackage ../derivations/aichat.nix {})
+    (callPackage ../derivations/discordo.nix {})
+    (writeShellScriptBin "claude" (builtins.readFile ../scripts/claude_code.sh))
     (writeShellScriptBin "wrapped_nvim" (builtins.readFile ../scripts/wrapped_nvim.sh))
     
     # INFO: How to debug duplicate packages
@@ -35,14 +39,41 @@
     # which <package-name> (shows the path of the package, should come from nix-profile)
     # if you don't want to risk removing a package from apt, you can ensure the package is
     # referenced from nix instead of apt like this: export PATH="$HOME/.nix-profile/bin:$PATH"
+
+    irssi
+    spotify-player
     
+    direnv
+    tree
     zellij
+    go
+    air
     nodejs_20
     nodePackages.typescript
     nodePackages.typescript-language-server
     nodePackages.nodemon
+    pnpm
+    
+    python3Packages.git-filter-repo
+    
+    azure-functions-core-tools
+    azure-cli
+    dotnetCorePackages.dotnet_8.sdk
+    netcoredbg
+    # dotnet-sdk_8
+    fsautocomplete
+    
     docker
+    docker-compose
     postgresql_15
+    sqlite
+
+    temurin-bin # java openJDK
+    clojure
+    leiningen
+    
+    # replibyte careful this is installed locally using the native linux package manager | also been added to bin
+    jq # sed but for json
     fzf
     bat
     zoxide
@@ -52,7 +83,12 @@
     htop
     sops
     yq
+    cloc
+    imagemagick
+    visidata
     # TODO: add node packages ->  eslint, prettier, vite-create
+
+    arduino-cli
 
     # # It is sometimes useful to fine-tune packages, for example, by applying
     # # overrides. You can do that directly here, just don't forget the
@@ -88,10 +124,20 @@
   # if you don't want to manage your shell through Home Manager.
   home.sessionVariables = {
     EDITOR = "nvim";
+    # WARNING: This only applies to programs launched from home-manager,
+    # not the whole system
+    SHELL = "${pkgs.zsh}/bin/zsh"; 
   };
+
+  home.sessionPath = [
+    "$HOME/.nix-profile/bin"
+    "/nix/var/nix/profiles/default/bin"
+    "$HOME/.local/bin"
+  ];
 
   # Let Home Manager install and manage itself.
   programs.home-manager.enable = true;
+
   # Docs for programs config httd:s://nix-community.github.io/home-manager/options.html#opt-home.packages
 
   # PKG configurations
@@ -107,5 +153,6 @@
     ../programs/helix.nix
     ../programs/git.nix
     ../programs/neovim.nix
+    ../programs/tmux.nix
   ];
 }
