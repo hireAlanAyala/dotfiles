@@ -31,6 +31,7 @@ export EDITOR=nvim
 export TERM="xterm-256color"
 
 # ---------------------- Aliases ------------------------
+alias wsl="/mnt/c/Windows/System32/wsl.exe"
 alias v="nvim"
 alias path="bash ~/.config/zsh/scripts/path.sh"
 alias onedrive='cd /mnt/c/Users/AlanAyala/Documents/work/scripts/Upload\ New\ Storyboard\ Products\ \(NEW\)\ -\ Copy && wnpm run prod && cd -'
