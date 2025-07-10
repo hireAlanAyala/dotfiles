@@ -16,6 +16,9 @@
 # - ensure zsh is the added to sudo nano /etc/shells and set as the login shell on install chsh -s $(which zsh)
 
 {
+  # Allow unfree packages globally
+  nixpkgs.config.allowUnfree = true;
+
   # This value determines the Home Manager release that your configuration is
   # compatible with. This helps avoid breakage when a new Home Manager release
   # introduces backwards incompatible changes.
@@ -26,11 +29,77 @@
   home.stateVersion = "23.05"; # Please read the comment before changing.
 
   home.packages = with pkgs; [
+    # Custom derivations and scripts
     (callPackage ../derivations/win32yank.nix { })
-    (callPackage ../derivations/aichat.nix {})
     (callPackage ../derivations/discordo.nix {})
+    (callPackage ../derivations/extract-otp-secrets.nix {})
     (writeShellScriptBin "claude" (builtins.readFile ../scripts/claude_code.sh))
     (writeShellScriptBin "wrapped_nvim" (builtins.readFile ../scripts/wrapped_nvim.sh))
+    (writeShellScriptBin "show-2fa" (builtins.readFile ../scripts/show_all_2fa.sh))
+    
+    # Development languages and runtimes
+    go
+    nodejs_20
+    python3Packages.git-filter-repo
+    temurin-bin # java openJDK
+    clojure
+    leiningen
+    lua
+    
+    # Node.js ecosystem
+    nodePackages.typescript
+    nodePackages.typescript-language-server
+    nodePackages.nodemon
+    pnpm
+    
+    # .NET ecosystem
+    dotnetCorePackages.dotnet_8.sdk
+    netcoredbg
+    # dotnet-sdk_8
+    fsautocomplete
+    
+    # Cloud and DevOps
+    azure-functions-core-tools
+    azure-cli
+    docker
+    docker-compose
+    
+    # Development tools
+    air
+    direnv
+    tree
+    sops
+    keychain
+    cloc
+    
+    # Databases
+    postgresql_15
+    sqlite
+    
+    # CLI utilities
+    jq # sed but for json
+    fzf
+    bat
+    zoxide
+    ripgrep
+    yq
+    htop
+    zbar # QR code reader
+    _1password-cli
+    
+    # Media and graphics
+    mpv
+    imagemagick
+    
+    # Communication and entertainment
+    irssi
+    spotify-player
+    
+    # Data tools
+    visidata
+    
+    # Hardware
+    arduino-cli
     
     # INFO: How to debug duplicate packages
     # sometimes a package already exists from the OS package manager
@@ -39,56 +108,10 @@
     # which <package-name> (shows the path of the package, should come from nix-profile)
     # if you don't want to risk removing a package from apt, you can ensure the package is
     # referenced from nix instead of apt like this: export PATH="$HOME/.nix-profile/bin:$PATH"
-
-    irssi
-    spotify-player
     
-    direnv
-    tree
-    go
-    air
-    nodejs_20
-    nodePackages.typescript
-    nodePackages.typescript-language-server
-    nodePackages.nodemon
-    pnpm
-    
-    python3Packages.git-filter-repo
-    
-    azure-functions-core-tools
-    azure-cli
-    dotnetCorePackages.dotnet_8.sdk
-    netcoredbg
-    # dotnet-sdk_8
-    fsautocomplete
-    
-    docker
-    docker-compose
-    postgresql_15
-    sqlite
-
-    temurin-bin # java openJDK
-    clojure
-    leiningen
-    
-    # replibyte careful this is installed locally using the native linux package manager | also been added to bin
-    jq # sed but for json
-    fzf
-    bat
-    zoxide
-    ripgrep
-    lua
-    mpv
-    htop
-    sops
-    yq
-    cloc
-    imagemagick
-    visidata
     # TODO: add node packages ->  eslint, prettier, vite-create
-
-    arduino-cli
-
+    # replibyte careful this is installed locally using the native linux package manager | also been added to bin
+    
     # # It is sometimes useful to fine-tune packages, for example, by applying
     # # overrides. You can do that directly here, just don't forget the
     # # parentheses. Maybe you want to install Nerd Fonts with a limited number of

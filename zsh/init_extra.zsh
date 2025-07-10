@@ -41,15 +41,41 @@ alias wgit="/mnt/c/Program\ Files/nodejs/npx"
 alias wpython="/mnt/c/ProgramData/Microsoft/Windows/Start\ Menu/Programs/Python\ 3.11"
 alias clip="/mnt/c/Windows/System32/clip.exe"
 alias hm='zsh ~/.config/zsh/scripts/hm.zsh'
-# alias ai="node ~/documents/terminal_ai/index.js"
-alias ai="aichat"
 alias fucking="sudo env PATH=$PATH"
-# SSH Key Management
 alias gen-ssh-key="bash ~/.config/.ssh/generate_ssh_key.sh"
-alias ssh-keyman="bash ~/.config/ssh/ssh-keyman.sh"
-alias rotate-keys="bash ~/.config/ssh/rotate-keys.sh"
-alias deploy-keys="bash ~/.config/ssh/deploy-keys.sh"
-alias backup-ssh="bash ~/.config/ssh/backup-restore.sh"
+alias gpg-restart="pkill -f gpg-agent; pkill -f gpg; gpg-connect-agent /bye"
+
+# 2FA aliases using SOPS + nix-shell isolation
+alias 2fa="show-2fa"
+alias totp="show-2fa"
+# Individual service shortcuts
+totp-get() {
+    local service="$1"
+    nix-shell -p oath-toolkit yq --run "
+        secret=\$(sops -d ~/.config/secrets.yaml | yq .totp_secrets.$service)
+        if [[ -n \"\$secret\" && \"\$secret\" != \"null\" ]]; then
+            oathtool --totp --base32 \"\$secret\"
+        else
+            echo \"Secret not found for: $service\"
+            exit 1
+        fi
+    "
+}
+
+# SSH Agent with keychain - auto-discover private keys
+if command -v keychain &> /dev/null; then
+    # Auto-discover private keys in ~/.ssh
+    local ssh_keys=()
+    for key in ~/.ssh/*; do
+        if [[ -f "$key" && ! "$key" =~ \.(pub|old)$ && ! "$(basename "$key")" =~ ^(known_hosts|config|authorized_keys)$ ]]; then
+            ssh_keys+=($(basename "$key"))
+        fi
+    done
+    
+    if [ ${#ssh_keys[@]} -gt 0 ]; then
+        eval $(keychain --eval --quiet "${ssh_keys[@]}")
+    fi
+fi
 alias tinit="~/.config/tmux/tmux-init.sh"
 
 # Directories
