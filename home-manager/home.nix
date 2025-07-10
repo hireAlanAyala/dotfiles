@@ -133,35 +133,6 @@
     #   org.gradle.daemon.idletimeout=3600000
     # '';
 
-    # WSL global configuration (applies to all distributions)
-    ".wslconfig" = {
-      target = "/mnt/c/Users/AlanAyala/.wslconfig";
-      text = ''
-        [wsl2]
-        memory=12GB
-        processors=8
-        swap=4GB
-        localhostForwarding=true
-        dns=8.8.8.8
-      '';
-    };
-
-    # WSL distribution-specific configuration
-    "wsl.conf" = {
-      target = "/etc/wsl.conf";
-      text = ''
-        [automount]
-        enabled = true
-        root = /mnt/
-        options = "metadata,umask=22,fmask=11"
-        mountFsTab = true
-
-        [interop]
-        enabled = true
-        # setting this to true causes executables to collide between windows/linux
-        appendWindowsPath = false
-      '';
-    };
   };
 
   # You can also manage environment variables but you will have to manually
@@ -205,5 +176,8 @@
     ../programs/git.nix
     ../programs/neovim.nix
     ../programs/tmux.nix
+    # System modules
+    ../modules/symlinks.nix
+    ../modules/wsl.nix
   ];
 }

@@ -3,6 +3,9 @@
 # WSL
 enable system d (think it will need a fresh nix install)
 
+# claude code
+install with nix instead of npm
+
 ## Development Workflow
 - **Config validation**: Test configurations in isolation before applying
 
