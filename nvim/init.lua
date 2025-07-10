@@ -148,6 +148,22 @@ end, {})
 -- [[ Basic Keymaps ]]
 --  See `:help vim.keymap.set()`
 
+-- Function to copy buffer paths to clipboard
+local function copy_path(type)
+  local paths = {
+    full = vim.fn.expand('%:p'),
+    relative = vim.fn.expand('%'),
+    filename = vim.fn.expand('%:t')
+  }
+  vim.fn.setreg('+', paths[type])
+  print('Copied: ' .. paths[type])
+end
+
+-- Copy path keymaps
+vim.keymap.set('n', '<leader>cp', function() copy_path('full') end, { desc = 'Copy full path' })
+vim.keymap.set('n', '<leader>cr', function() copy_path('relative') end, { desc = 'Copy relative path' })
+vim.keymap.set('n', '<leader>cf', function() copy_path('filename') end, { desc = 'Copy filename' })
+
 -- Clear highlights on search when pressing <Esc> in normal mode
 --  See `:help hlsearch`
 vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')

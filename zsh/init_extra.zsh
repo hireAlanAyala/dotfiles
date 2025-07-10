@@ -45,10 +45,8 @@ alias hm='zsh ~/.config/zsh/scripts/hm.zsh'
 alias fucking="sudo env PATH=$PATH"
 alias gen-ssh-key="bash ~/.config/.ssh/generate_ssh_key.sh"
 alias gpg-restart="pkill -f gpg-agent; pkill -f gpg; gpg-connect-agent /bye"
-
-# 2FA aliases using SOPS + nix-shell isolation
 alias 2fa="show-2fa"
-alias totp="show-2fa"
+
 # Individual service shortcuts
 totp-get() {
     local service="$1"

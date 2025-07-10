@@ -1,5 +1,8 @@
 # Dotfiles Project Improvement Suggestions
 
+# WSL
+enable system d (think it will need a fresh nix install)
+
 ## Development Workflow
 - **Config validation**: Test configurations in isolation before applying
 
