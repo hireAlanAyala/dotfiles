@@ -6,6 +6,7 @@
   home.file = {
     # WSL global configuration (applies to all distributions)
     ".wslconfig" = {
+      # WARNING: changes to this obj must be applied to windows file manually
       target = "/mnt/c/Users/AlanAyala/.wslconfig";
       text = ''
         [wsl2]
