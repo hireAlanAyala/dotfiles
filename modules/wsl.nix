@@ -21,6 +21,7 @@
         dnsProxy=true
         autoMemoryReclaim=gradual
         dns=8.8.8.8
+        ipv6=true
         
         # Connectivity troubleshooting
         # ignoredPorts=4000,3000,8080

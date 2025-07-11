@@ -42,6 +42,7 @@
     nodejs_20
     python3Packages.git-filter-repo
     temurin-bin # java openJDK
+    jbang
     clojure
     leiningen
     lua
