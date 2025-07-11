@@ -13,7 +13,30 @@
         processors=8
         swap=4GB
         localhostForwarding=true
+        
+        # Network improvements (24H2 features)
+        networkingMode=mirrored
+        firewall=false
+        dnsTunneling=true
+        dnsProxy=true
+        autoMemoryReclaim=gradual
         dns=8.8.8.8
+        
+        # Connectivity troubleshooting
+        # ignoredPorts=4000,3000,8080
+        
+        # Performance optimizations
+        nestedVirtualization=true
+        sparse=true
+        pageReporting=true
+        vmIdleTimeout=60000
+        
+        # Debugging (can be disabled in production)
+        debugConsole=true
+        # safeMode=true
+        
+        # Better systemd support
+        kernelCommandLine=cgroup_no_v1=all systemd.unified_cgroup_hierarchy=1
       '';
     };
 
@@ -24,13 +47,25 @@
         [automount]
         enabled = true
         root = /mnt/
-        options = "metadata,umask=22,fmask=11"
+        options = "metadata,uid=1000,gid=1000,umask=022,fmask=111,case=off"
         mountFsTab = true
+        crossDistro = true
 
         [interop]
         enabled = true
         # setting this to true causes executables to collide between windows/linux
         appendWindowsPath = false
+
+        [boot]
+        systemd = true
+
+        [user]
+        default = alan
+
+        [network]
+        generateHosts = false
+        generateResolvConf = true
+        hostname = alan-wsl
       '';
     };
   };

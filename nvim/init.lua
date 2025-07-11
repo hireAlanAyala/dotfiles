@@ -207,14 +207,14 @@ vim.o.compatible = false
 
 -- vim.keymap.del('t', '<Tab>')
 
--- Keybinds to make split navigation easier.
--- Use CTRL+<hjkl> to switch between windows
+-- vim-tmux-navigator keymaps for seamless navigation between nvim and tmux panes
+-- These work with the tmux vim-tmux-navigator plugin for unified navigation
 --
 --  See `:help wincmd` for a list of all window commands
-vim.keymap.set('n', '<C-h>', '<C-w><C-h>', { desc = 'Move focus to the left window' })
-vim.keymap.set('n', '<C-l>', '<C-w><C-l>', { desc = 'Move focus to the right window' })
-vim.keymap.set('n', '<C-j>', '<C-w><C-j>', { desc = 'Move focus to the lower window' })
-vim.keymap.set('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper window' })
+vim.keymap.set('n', '<C-h>', '<cmd>TmuxNavigateLeft<cr>', { desc = 'Navigate left (nvim/tmux)' })
+vim.keymap.set('n', '<C-l>', '<cmd>TmuxNavigateRight<cr>', { desc = 'Navigate right (nvim/tmux)' })
+vim.keymap.set('n', '<C-j>', '<cmd>TmuxNavigateDown<cr>', { desc = 'Navigate down (nvim/tmux)' })
+vim.keymap.set('n', '<C-k>', '<cmd>TmuxNavigateUp<cr>', { desc = 'Navigate up (nvim/tmux)' })
 
 -- TODO: add permanent marks
 -- TODO: on quit add a timestamped
@@ -305,6 +305,11 @@ require('lazy').setup({
     end,
   },
 
+  -- vim-tmux-navigator for seamless navigation between nvim and tmux panes
+  {
+    'christoomey/vim-tmux-navigator',
+    lazy = false,
+  },
 
   -- NOTE: Plugins can also be added by using a table,
   -- with the first argument being the link and the following
