@@ -91,28 +91,28 @@ vim.g.session_directory = '~/.config/nvim/sessions/'
 
 -- Auto session management for tmux resurrect
 local function auto_session()
-  local session_dir = vim.fn.expand('~/.config/nvim/sessions/')
+  local session_dir = vim.fn.expand '~/.config/nvim/sessions/'
   if vim.fn.isdirectory(session_dir) == 0 then
     vim.fn.mkdir(session_dir, 'p')
   end
-  
+
   -- Get current tmux session name for session file
   local tmux_session = vim.fn.system('tmux display-message -p "#S"'):gsub('\n', '')
   if tmux_session == '' then
     tmux_session = 'default'
   end
-  
+
   local session_file = session_dir .. tmux_session .. '.vim'
-  
+
   -- Auto save session on exit
   vim.api.nvim_create_autocmd('VimLeavePre', {
     callback = function()
-      if vim.fn.argc() == 0 then  -- Only save if no arguments passed
+      if vim.fn.argc() == 0 then -- Only save if no arguments passed
         vim.cmd('mksession! ' .. session_file)
       end
-    end
+    end,
   })
-  
+
   -- Auto restore session if no files opened
   if vim.fn.argc() == 0 and vim.fn.filereadable(session_file) == 1 then
     vim.defer_fn(function()
@@ -128,16 +128,16 @@ end
 
 -- Manual session save command
 vim.api.nvim_create_user_command('SaveSession', function()
-  local session_dir = vim.fn.expand('~/.config/nvim/sessions/')
+  local session_dir = vim.fn.expand '~/.config/nvim/sessions/'
   if vim.fn.isdirectory(session_dir) == 0 then
     vim.fn.mkdir(session_dir, 'p')
   end
-  
+
   local tmux_session = vim.fn.system('tmux display-message -p "#S"'):gsub('\n', '')
   if tmux_session == '' then
     tmux_session = 'default'
   end
-  
+
   local session_file = session_dir .. tmux_session .. '.vim'
   vim.cmd('mksession! ' .. session_file)
   print('Session saved: ' .. session_file)
@@ -151,18 +151,24 @@ end, {})
 -- Function to copy buffer paths to clipboard
 local function copy_path(type)
   local paths = {
-    full = vim.fn.expand('%:p'),
-    relative = vim.fn.expand('%'),
-    filename = vim.fn.expand('%:t')
+    full = vim.fn.expand '%:p',
+    relative = vim.fn.expand '%',
+    filename = vim.fn.expand '%:t',
   }
   vim.fn.setreg('+', paths[type])
   print('Copied: ' .. paths[type])
 end
 
 -- Copy path keymaps
-vim.keymap.set('n', '<leader>cp', function() copy_path('full') end, { desc = 'Copy full path' })
-vim.keymap.set('n', '<leader>cr', function() copy_path('relative') end, { desc = 'Copy relative path' })
-vim.keymap.set('n', '<leader>cf', function() copy_path('filename') end, { desc = 'Copy filename' })
+vim.keymap.set('n', '<leader>cp', function()
+  copy_path 'full'
+end, { desc = 'Copy full path' })
+vim.keymap.set('n', '<leader>cr', function()
+  copy_path 'relative'
+end, { desc = 'Copy relative path' })
+vim.keymap.set('n', '<leader>cf', function()
+  copy_path 'filename'
+end, { desc = 'Copy filename' })
 
 -- Clear highlights on search when pressing <Esc> in normal mode
 --  See `:help hlsearch`
@@ -173,8 +179,8 @@ vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagn
 
 -- Image preview keybinding - opens images with Windows default viewer
 vim.keymap.set('n', '<leader>ip', function()
-  local file = vim.fn.expand('%:p')
-  if file:match('%.png$') or file:match('%.jpg$') or file:match('%.jpeg$') or file:match('%.gif$') or file:match('%.webp$') or file:match('%.bmp$') then
+  local file = vim.fn.expand '%:p'
+  if file:match '%.png$' or file:match '%.jpg$' or file:match '%.jpeg$' or file:match '%.gif$' or file:match '%.webp$' or file:match '%.bmp$' then
     -- Convert WSL path to Windows path
     local windows_path = vim.fn.system('wslpath -w "' .. file .. '"'):gsub('\n', '')
     -- Open with Windows default image viewer
@@ -787,10 +793,36 @@ require('lazy').setup({
         defaults = {
           mappings = {},
           file_ignore_patterns = { 'node_modules' },
+          vimgrep_arguments = {
+            'rg',
+            '--color=never',
+            '--no-heading',
+            '--with-filename',
+            '--line-number',
+            '--column',
+            '--smart-case',
+            '--hidden',
+            '--glob=!node_modules',
+          },
         },
         pickers = {
           find_files = {
             hidden = true,
+            find_command = { 'rg', '--files', '--hidden', '--no-ignore', '--glob', '!node_modules' },
+          },
+          live_grep = {
+            vimgrep_arguments = {
+              'rg',
+              '--color=never',
+              '--no-heading',
+              '--with-filename',
+              '--line-number',
+              '--column',
+              '--smart-case',
+              '--hidden',
+              '--no-ignore',
+              '--glob=!node_modules',
+            },
           },
           quickfix = {
             mappings = {
@@ -1113,14 +1145,15 @@ require('lazy').setup({
       'mfussenegger/nvim-dap',
       'nvim-neotest/nvim-nio',
       'theHamsta/nvim-dap-virtual-text',
-      {
-        'folke/neodev.nvim',
-        config = function()
-          require('neodev').setup {
-            library = { plugins = { 'nvim-dap-ui' }, types = true },
-          }
-        end,
-      },
+      -- no longer eneded
+      -- {
+      --   'folke/neodev.nvim',
+      --   config = function()
+      --     require('neodev').setup {
+      --       library = { plugins = { 'nvim-dap-ui' }, types = true },
+      --     }
+      --   end,
+      -- },
     },
     config = function()
       local dap = require 'dap'
