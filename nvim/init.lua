@@ -824,6 +824,13 @@ require('lazy').setup({
               '--glob=!node_modules',
             },
           },
+          buffers = {
+            mappings = {
+              n = {
+                ['dd'] = 'delete_buffer',
+              },
+            },
+          },
           quickfix = {
             mappings = {
               n = { ['d'] = remove_qf_item },

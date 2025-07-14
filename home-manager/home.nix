@@ -33,9 +33,13 @@
     (callPackage ../derivations/win32yank.nix { })
     (callPackage ../derivations/discordo.nix {})
     (callPackage ../derivations/extract-otp-secrets.nix {})
-    (writeShellScriptBin "claude" (builtins.readFile ../scripts/claude_code.sh))
+    # (callPackage ../derivations/claude_code.nix {})
+    # (writeShellScriptBin "claude" (builtins.readFile ../scripts/claude_code.sh))
     (writeShellScriptBin "wrapped_nvim" (builtins.readFile ../scripts/wrapped_nvim.sh))
     (writeShellScriptBin "show-2fa" (builtins.readFile ../scripts/show_all_2fa.sh))
+
+    # ai
+    claude-code
     
     # Development languages and runtimes
     go

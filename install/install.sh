@@ -14,3 +14,5 @@ echo "Setting up development environment"
 home-manager switch --flake ./home-manager/flake.nix#alan
 
 # TODO: automatically login to gh cli
+#
+# TODO: add zsh to /etc/shells and force zsh as default shell

@@ -1,6 +1,5 @@
 #!/usr/bin/env zsh
 
-echo -e "''${YELLOW_ORANGE}If sourcing this fails you might have to set zsh as the login shell. Ex: sudo nano /etc/shells, add shell then chsh -s $(which zsh)''${RESET}"
 # enables extra zsh glob matching features, and sets behavior to remove things that don't match the glob
 setopt extended_glob null_glob
 
@@ -77,6 +76,17 @@ if command -v keychain &> /dev/null; then
 fi
 alias tinit="~/.config/tmux/tmux-init.sh"
 
+# PATH
+# set PATH so it includes user's private bin if it exists
+if [ -d '$HOME/bin' ] ; then
+    PATH='$HOME/bin:$PATH'
+fi
+
+# set PATH so it includes user's private bin if it exists
+if [ -d '$HOME/.local/bin' ] ; then
+    PATH='$HOME/.local/bin:$PATH'
+fi
+
 # Directories
 export GOBIN="$HOME/.local/bin"
 export GOPATH="$HOME/go/"
@@ -115,12 +125,10 @@ unsetopt HIST_EXPIRE_DUPS_FIRST
 setopt SHARE_HISTORY
 setopt EXTENDED_HISTORY
 
-
-# warning colors for hm alias echo
-YELLOW_ORANGE='\033[38;5;214m'
-RESET='\033[0m'
-
 # allows terminal emulator to show true color
 export COLORTERM=truecolor
 
 autoload -U colors && colors
+
+# Docker Desktop Socket
+export DOCKER_HOST=unix:///home/alan/.docker/desktop/docker.sock
