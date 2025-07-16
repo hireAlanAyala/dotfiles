@@ -791,7 +791,12 @@ require('lazy').setup({
         --  All the info you're looking for is in `:help telescope.setup()`
         --
         defaults = {
-          mappings = {},
+          mappings = {
+            n = {
+              ['n'] = 'move_selection_next',
+              ['N'] = 'move_selection_previous',
+            },
+          },
           file_ignore_patterns = { 'node_modules' },
           vimgrep_arguments = {
             'rg',

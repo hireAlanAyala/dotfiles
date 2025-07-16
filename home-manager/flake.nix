@@ -8,9 +8,13 @@
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    sops-nix = {
+      url = "github:Mic92/sops-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { nixpkgs, home-manager, ... }:
+  outputs = { nixpkgs, home-manager, sops-nix, ... }:
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
@@ -19,6 +23,7 @@
         "alan" = home-manager.lib.homeManagerConfiguration {
           inherit pkgs;
           modules = [
+            sops-nix.homeManagerModules.sops
             ./home.nix
             {
               home = {
@@ -40,6 +45,7 @@
         "wolfy" = home-manager.lib.homeManagerConfiguration {
           inherit pkgs;
           modules = [
+            sops-nix.homeManagerModules.sops
             ./home.nix
             {
               home = {

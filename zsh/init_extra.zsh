@@ -32,7 +32,7 @@ export TERM="xterm-256color"
 # ---------------------- Aliases ------------------------
 alias wsl="/mnt/c/Windows/System32/wsl.exe"
 alias v="nvim"
-alias path="bash ~/.config/zsh/scripts/path.sh"
+alias path="echo -e ${PATH//:/\\n}"
 alias onedrive='cd /mnt/c/Users/AlanAyala/Documents/work/scripts/Upload\ New\ Storyboard\ Products\ \(NEW\)\ -\ Copy && wnpm run prod && cd -'
 alias work="cd /mnt/c/Users/AlanAyala/Documents/work"
 alias wnpm="/mnt/c/Program\ Files/nodejs/npm"
@@ -40,7 +40,6 @@ alias wnpx="/mnt/c/Program\ Files/nodejs/npx"
 alias wgit="/mnt/c/Program\ Files/nodejs/npx"
 alias wpython="/mnt/c/ProgramData/Microsoft/Windows/Start\ Menu/Programs/Python\ 3.11"
 alias clip="/mnt/c/Windows/System32/clip.exe"
-alias hm='zsh ~/.config/zsh/scripts/hm.zsh'
 alias fucking="sudo env PATH=$PATH"
 alias gen-ssh-key="bash ~/.config/.ssh/generate_ssh_key.sh"
 alias gpg-restart="pkill -f gpg-agent; pkill -f gpg; gpg-connect-agent /bye"
@@ -76,16 +75,7 @@ if command -v keychain &> /dev/null; then
 fi
 alias tinit="~/.config/tmux/tmux-init.sh"
 
-# PATH
-# set PATH so it includes user's private bin if it exists
-if [ -d '$HOME/bin' ] ; then
-    PATH='$HOME/bin:$PATH'
-fi
-
-# set PATH so it includes user's private bin if it exists
-if [ -d '$HOME/.local/bin' ] ; then
-    PATH='$HOME/.local/bin:$PATH'
-fi
+# PATH is handled by NIX
 
 # Directories
 export GOBIN="$HOME/.local/bin"

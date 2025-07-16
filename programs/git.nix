@@ -26,7 +26,7 @@
     };
     extraConfig = {
       core = {
-        editor = "hx";
+        editor = "nvim";
         # whitespace = "trailing-space,space-before-tab";
         # excludesfile = "/home/ghedamat/.gitignore_global";
       };
