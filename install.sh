@@ -67,17 +67,10 @@ if [ -d ~/home-manager ]; then
     echo "✅ Backed up existing home-manager directory"
 fi
 
-# Install home-manager using flakes
-echo "Installing Home Manager using flakes..."
-cd ~/.config/home-manager
-
-# Update flake inputs first
-nix flake update
-echo "✅ Flake inputs updated"
-
-# Install and apply Home Manager configuration directly with flakes
-nix run home-manager/master -- switch --flake .#developer
-echo "✅ Home Manager installed and configuration applied"
+# Install Home Manager using dedicated script
+echo "=== Installing Home Manager ==="
+cd ~/.config
+./setup-home-manager.sh
 
 # Source home-manager environment
 if [ -f ~/.nix-profile/etc/profile.d/hm-session-vars.sh ]; then
