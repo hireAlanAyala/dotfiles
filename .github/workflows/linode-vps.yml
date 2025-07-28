@@ -89,10 +89,13 @@ jobs:
         if: github.event.inputs.action == 'provision'
         run: |
           IP="${{ steps.provision.outputs.ip_address }}"
+          echo "Configuring instance at IP: $IP"
           SSH="ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 root@$IP"
           
-          # Wait for SSH (max 5 minutes)
-          timeout 300 bash -c "until $SSH 'echo ready' 2>/dev/null; do sleep 5; done"
+          # Wait for SSH (max 10 minutes)
+          echo "Waiting for SSH to be available at $IP..."
+          timeout 600 bash -c "until $SSH 'echo ready' 2>/dev/null; do echo -n '.'; sleep 10; done"
+          echo "SSH is ready!"
           
           # Configure system
           $SSH << 'EOF'
