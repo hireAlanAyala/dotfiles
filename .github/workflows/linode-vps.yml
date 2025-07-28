@@ -1,0 +1,181 @@
+name: Manage Linode VPS
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'provision'
+        type: choice
+        options:
+          - provision
+          - destroy
+          - status
+      instance_label:
+        description: 'Instance label'
+        required: false
+        default: 'arch-vps'
+      instance_type:
+        description: 'Instance type'
+        required: false
+        default: 'g6-nanode-1'
+      instance_region:
+        description: 'Instance region'
+        required: false
+        default: 'us-east'
+      dns_subdomain:
+        description: 'DNS subdomain (optional, e.g. "myserver" for myserver.yourdomain.com)'
+        required: false
+        default: ''
+
+jobs:
+  manage-vps:
+    runs-on: ubuntu-latest
+    env:
+      LINODE_CLI_TOKEN: ${{ secrets.LINODE_API_TOKEN }}
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup
+        run: pip install linode-cli
+      
+      - name: Generate SSH key if needed
+        id: ssh
+        run: |
+          if [ "${{ github.event.inputs.action }}" = "provision" ]; then
+            ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N "" -C "github-actions@arch-vps"
+            echo "public_key=$(cat ~/.ssh/id_ed25519.pub)" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Check for existing instance
+        if: github.event.inputs.action == 'provision'
+        id: check_existing
+        run: |
+          EXISTING=$(linode-cli linodes list \
+            --label "${{ github.event.inputs.instance_label }}" \
+            --text --no-headers --format "id,ipv4,status" || echo "")
+          
+          if [ -n "$EXISTING" ]; then
+            echo "❌ Instance '${{ github.event.inputs.instance_label }}' already exists:"
+            echo "$EXISTING"
+            echo "exists=true" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "✅ No existing instance found with label '${{ github.event.inputs.instance_label }}'"
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Provision VPS
+        if: github.event.inputs.action == 'provision' && steps.check_existing.outputs.exists != 'true'
+        id: provision
+        run: |
+          # Create instance and get IP
+          IP=$(linode-cli linodes create \
+            --label "${{ github.event.inputs.instance_label }}" \
+            --root_pass "${{ secrets.ROOT_PASSWORD }}" \
+            --type "${{ github.event.inputs.instance_type }}" \
+            --region "${{ github.event.inputs.instance_region }}" \
+            --image "linode/arch" \
+            --authorized_keys "${{ steps.ssh.outputs.public_key }}" \
+            --text --no-headers --format "ipv4")
+          
+          echo "ip_address=$IP" >> $GITHUB_OUTPUT
+          echo "✅ Created ${{ github.event.inputs.instance_label }} at $IP"
+      
+      - name: Configure instance
+        if: github.event.inputs.action == 'provision'
+        run: |
+          IP="${{ steps.provision.outputs.ip_address }}"
+          SSH="ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 root@$IP"
+          
+          # Wait for SSH (max 5 minutes)
+          timeout 300 bash -c "until $SSH 'echo ready' 2>/dev/null; do sleep 5; done"
+          
+          # Configure system
+          $SSH << 'EOF'
+            # Update system
+            pacman -Syu --noconfirm
+            pacman -S --noconfirm base-devel git vim htop tmux python python-pip ufw sudo
+            
+            # Create non-root user
+            useradd -m -s /bin/bash -G wheel archuser
+            echo "archuser:${{ secrets.ROOT_PASSWORD }}" | chpasswd
+            
+            # Configure sudo
+            echo "%wheel ALL=(ALL) ALL" > /etc/sudoers.d/wheel
+            
+            # Copy SSH keys to new user
+            mkdir -p /home/archuser/.ssh
+            cp /root/.ssh/authorized_keys /home/archuser/.ssh/
+            chown -R archuser:archuser /home/archuser/.ssh
+            chmod 700 /home/archuser/.ssh
+            chmod 600 /home/archuser/.ssh/authorized_keys
+            
+            # SSH Hardening
+            # Change SSH port to 2222
+            sed -i 's/^#Port 22/Port 2222/' /etc/ssh/sshd_config
+            sed -i 's/^Port 22/Port 2222/' /etc/ssh/sshd_config
+            
+            # Disable password authentication
+            sed -i 's/^#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+            sed -i 's/^PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+            
+            # Disable root login
+            sed -i 's/^#PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
+            sed -i 's/^PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
+            
+            # Configure firewall
+            ufw --force enable
+            ufw default deny incoming
+            ufw default allow outgoing  
+            ufw allow 2222/tcp comment 'SSH on custom port'
+            
+            # Restart SSH service
+            systemctl restart sshd
+          EOF
+      
+      - name: Destroy VPS
+        if: github.event.inputs.action == 'destroy'
+        environment: destroy-approval
+        run: |
+          linode-cli linodes delete $(linode-cli linodes list \
+            --label "${{ github.event.inputs.instance_label }}" \
+            --text --no-headers --format "id") || echo "No instance found"
+      
+      - name: Show VPS Status
+        if: github.event.inputs.action == 'status'
+        run: linode-cli linodes list
+      
+      - name: Output connection details
+        if: github.event.inputs.action == 'provision'
+        run: |
+          echo "## 🔐 Connection Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **IP Address**: ${{ steps.provision.outputs.ip_address }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **SSH Port**: 2222 (custom)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Username**: archuser (with sudo)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Root login**: Disabled" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Connect using:" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "ssh -p 2222 -i path/to/id_ed25519 archuser@${{ steps.provision.outputs.ip_address }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          
+          # Create connection script
+          cat > ~/.ssh/connect-${{ github.event.inputs.instance_label }}.sh << 'SCRIPT'
+          #!/bin/bash
+          ssh -p 2222 -i "$(dirname "$0")/id_ed25519" archuser@${{ steps.provision.outputs.ip_address }} "$@"
+          SCRIPT
+          chmod +x ~/.ssh/connect-${{ github.event.inputs.instance_label }}.sh
+
+      - name: Save SSH key as artifact
+        if: github.event.inputs.action == 'provision'
+        uses: actions/upload-artifact@v3
+        with:
+          name: ssh-keys-${{ github.event.inputs.instance_label }}
+          path: |
+            ~/.ssh/id_ed25519
+            ~/.ssh/id_ed25519.pub
+            ~/.ssh/connect-${{ github.event.inputs.instance_label }}.sh
+          retention-days: 30

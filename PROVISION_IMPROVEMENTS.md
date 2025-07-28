@@ -1,0 +1,4 @@
+- trigger a files backup
+- update tinyurl to point to new instance
+- create pull script for ssh into new instance
+- add restore from rsync
