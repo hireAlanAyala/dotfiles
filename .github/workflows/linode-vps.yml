@@ -193,6 +193,11 @@ jobs:
               }
             fi
             
+            # Remove temporary port 22 access now that SSH is on 2222
+            echo "=== Removing temporary port 22 access ==="
+            ufw delete allow 22/tcp
+            ufw status verbose
+            
             echo "=== Configuration complete at $(date) ==="
           EOF
       
@@ -216,28 +221,51 @@ jobs:
           
           echo "⏳ Waiting for instance to be fully deleted..."
           
+          # Initial wait to ensure deletion starts
+          sleep 10
+          
           # Poll until instance is gone (max 5 minutes)
-          SECONDS=0
+          SECONDS=10
+          FOUND_DELETING=false
+          
           while [ $SECONDS -lt 300 ]; do
-            # Check if instance still exists
-            if ! linode-cli linodes view "$INSTANCE_ID" &>/dev/null; then
-              echo "✅ Instance successfully deleted after $SECONDS seconds"
-              break
-            fi
+            # Check instance status
+            STATUS=$(linode-cli linodes view "$INSTANCE_ID" --format "status" --text --no-headers 2>&1 || echo "")
             
-            # Get current status if still exists
-            STATUS=$(linode-cli linodes view "$INSTANCE_ID" --format "status" --text --no-headers 2>/dev/null || echo "deleting")
-            echo "   Status: $STATUS (elapsed: ${SECONDS}s)"
+            if [[ "$STATUS" == *"not found"* ]] || [[ "$STATUS" == *"404"* ]] || [ -z "$STATUS" ]; then
+              # Instance not found - but wait a bit more to ensure it's really gone
+              echo "   Instance not found in API (elapsed: ${SECONDS}s)"
+              
+              # Double-check by listing all instances
+              if ! linode-cli linodes list --text --no-headers | grep -q "$INSTANCE_ID"; then
+                echo "   Verified: Instance ID $INSTANCE_ID no longer in instance list"
+                
+                # Wait additional time to ensure cleanup is complete
+                echo "   Waiting 20 more seconds for complete cleanup..."
+                sleep 20
+                
+                # Final check
+                if ! linode-cli linodes list --text --no-headers | grep -q "$INSTANCE_ID"; then
+                  echo "✅ Instance successfully deleted after $((SECONDS + 20)) seconds"
+                  break
+                fi
+              fi
+            elif [[ "$STATUS" == "deleting" ]] || [[ "$STATUS" == "shutting_down" ]]; then
+              FOUND_DELETING=true
+              echo "   Status: $STATUS (elapsed: ${SECONDS}s)"
+            else
+              echo "   Status: $STATUS (elapsed: ${SECONDS}s)"
+            fi
             
             sleep 5
           done
           
-          # Final verification
-          if linode-cli linodes view "$INSTANCE_ID" &>/dev/null; then
-            echo "⚠️ Warning: Instance may still be deleting after 5 minutes"
+          # Final verification with list command
+          if linode-cli linodes list --text --no-headers | grep -q "$INSTANCE_ID"; then
+            echo "⚠️ Warning: Instance still appears in list after 5 minutes"
             exit 1
           else
-            echo "✅ Deletion confirmed - instance no longer exists"
+            echo "✅ Deletion confirmed - instance no longer in Linode account"
           fi
       
       - name: Show VPS Status
@@ -264,6 +292,54 @@ jobs:
           ssh -p 2222 -i "$(dirname "$0")/id_ed25519" archuser@${{ steps.provision.outputs.ip_address }} "$@"
           SCRIPT
           chmod +x ~/.ssh/connect-${{ github.event.inputs.instance_label }}.sh
+          
+          # Create README for the artifact
+          cat > ~/.ssh/README.md << 'README'
+          # SSH Connection Files for ${{ github.event.inputs.instance_label }}
+          
+          ## Quick Start
+          ```bash
+          # Make files executable and secure
+          chmod 600 id_ed25519
+          chmod +x connect-${{ github.event.inputs.instance_label }}.sh
+          
+          # Connect to your VPS
+          ./connect-${{ github.event.inputs.instance_label }}.sh
+          ```
+          
+          ## Manual Connection
+          ```bash
+          ssh -p 2222 -i id_ed25519 archuser@${{ steps.provision.outputs.ip_address }}
+          ```
+          
+          ## Connection Details
+          - **Host**: ${{ steps.provision.outputs.ip_address }}
+          - **Port**: 2222 (custom SSH port)
+          - **User**: archuser (has sudo access)
+          - **Auth**: SSH key only (passwords disabled)
+          
+          ## Files in this Archive
+          - `id_ed25519` - Private SSH key (KEEP SECURE!)
+          - `id_ed25519.pub` - Public SSH key
+          - `connect-${{ github.event.inputs.instance_label }}.sh` - Connection helper script
+          - `README.md` - This file
+          
+          ## Security Notes
+          - Keep the private key (`id_ed25519`) secure
+          - Never share your private key
+          - This is your ONLY way to access the VPS
+          - Root login is disabled for security
+          
+          ## If You Lose Access
+          - Use Linode's Lish console (web-based terminal)
+          - Or destroy and recreate the VPS
+          
+          ## Troubleshooting
+          If connection fails:
+          1. Check file permissions: `ls -la id_ed25519` (should be -rw-------)
+          2. Verify IP is reachable: `ping ${{ steps.provision.outputs.ip_address }}`
+          3. Check if using correct port: `-p 2222`
+          README
 
       - name: Save SSH key as artifact
         if: github.event.inputs.action == 'provision'
@@ -274,4 +350,5 @@ jobs:
             ~/.ssh/id_ed25519
             ~/.ssh/id_ed25519.pub
             ~/.ssh/connect-${{ github.event.inputs.instance_label }}.sh
+            ~/.ssh/README.md
           retention-days: 30
