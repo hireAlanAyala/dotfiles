@@ -60,8 +60,6 @@ jobs:
     
     steps:
       - uses: actions/checkout@v4
-        with:
-          path: .config
       
       - name: Setup
         run: |
@@ -359,10 +357,21 @@ jobs:
           
           echo "=== Preparing system for Nix installation ==="
           
-          # Copy the .config directory to the VPS
-          echo "Copying configuration files..."
-          scp -r -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 -P ${{ env.SSH_PORT }} \
-            .config ${{ env.USERNAME }}@$IP:~/
+          # Clone the entire config repository to get everything including symlinks
+          echo "Cloning configuration repository..."
+          
+          $SSH_USER << 'GITCLONE'
+            # Clone the config repo directly to get all files and proper symlink handling
+            cd ~
+            if [ -d ".config" ]; then
+              mv .config .config.backup.$(date +%s)
+            fi
+            
+            git clone https://github.com/AlanAyy/config.git .config
+            
+            echo "=== Configuration repository cloned ==="
+            ls -la ~/.config/
+          GITCLONE
           
           # Install Nix and Home Manager as the developer user
           $SSH_USER << 'NIXINSTALL'
