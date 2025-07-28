@@ -32,6 +32,7 @@ on:
 jobs:
   manage-vps:
     runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.action == 'destroy' && 'destroy-approval' || 'production' }}
     env:
       LINODE_CLI_TOKEN: ${{ secrets.LINODE_API_TOKEN }}
     
@@ -138,7 +139,6 @@ jobs:
       
       - name: Destroy VPS
         if: github.event.inputs.action == 'destroy'
-        environment: destroy-approval
         run: |
           linode-cli linodes delete $(linode-cli linodes list \
             --label "${{ github.event.inputs.instance_label }}" \
