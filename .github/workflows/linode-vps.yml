@@ -37,7 +37,7 @@ jobs:
       LINODE_CLI_TOKEN: ${{ secrets.LINODE_API_TOKEN }}
     
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
       - name: Setup
         run: pip install linode-cli
@@ -171,7 +171,7 @@ jobs:
 
       - name: Save SSH key as artifact
         if: github.event.inputs.action == 'provision'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ssh-keys-${{ github.event.inputs.instance_label }}
           path: |
