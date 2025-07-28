@@ -367,7 +367,7 @@ jobs:
               mv .config .config.backup.$(date +%s)
             fi
             
-            git clone https://github.com/AlanAyy/config.git .config
+            git clone https://github.com/${{ github.repository }}.git .config
             
             echo "=== Configuration repository cloned ==="
             ls -la ~/.config/
