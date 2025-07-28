@@ -16,7 +16,7 @@ runs:
       shell: bash
       run: |
         pip install linode-cli
-        VERSION=$(linode-cli --version)
+        VERSION=$(linode-cli --version | head -1)
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "✅ Linode CLI installed: $VERSION"
       env:
