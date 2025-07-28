@@ -69,7 +69,7 @@ if command -v keychain &> /dev/null; then
     # Auto-discover private keys in ~/.ssh
     local ssh_keys=()
     for key in ~/.ssh/*; do
-        if [[ -f "$key" && ! "$key" =~ \.(pub|old)$ && ! "$(basename "$key")" =~ ^(known_hosts|config|authorized_keys)$ ]]; then
+        if [[ -f "$key" && ! "$key" =~ \.(pub|old|backup)$ && ! "$(basename "$key")" =~ ^(known_hosts|config|authorized_keys)$ ]]; then
             ssh_keys+=($(basename "$key"))
         fi
     done
