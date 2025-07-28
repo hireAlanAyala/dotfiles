@@ -20,15 +20,15 @@
       pkgs = nixpkgs.legacyPackages.${system};
     in {
       homeConfigurations = {
-        "alan" = home-manager.lib.homeManagerConfiguration {
+        "developer" = home-manager.lib.homeManagerConfiguration {
           inherit pkgs;
           modules = [
             sops-nix.homeManagerModules.sops
             ./home.nix
             {
               home = {
-                username = "alan";
-                homeDirectory = "/home/alan";
+                username = "developer";
+                homeDirectory = "/home/developer";
               };
             }
           ];

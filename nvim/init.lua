@@ -14,7 +14,7 @@ vim.g.have_nerd_font = true
 
 --  NOTE: For more options, you can see `:help option-list`
 
-vim.o.shell = '/home/alan/.nix-profile/bin/zsh -i'
+vim.o.shell = os.getenv('HOME') .. '/.nix-profile/bin/zsh -i'
 vim.env.NVIM = '1' -- allows zshrc to disable zle when open in nvim
 vim.env.PATH = vim.env.PATH .. ':' .. os.getenv 'HOME' .. '/.nix-profile/bin'
 -- helps mason find the dotnet env

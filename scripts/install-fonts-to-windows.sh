@@ -2,7 +2,7 @@
 # Install Nix-managed fonts to Windows
 # This script copies and installs fonts from Nix Home Manager to Windows
 
-FONTS_SOURCE="/home/alan/.nix-profile/share/fonts/truetype/NerdFonts"
+FONTS_SOURCE="$HOME/.nix-profile/share/fonts/truetype/NerdFonts"
 
 install_fonts() {
     if [ ! -d "$FONTS_SOURCE" ]; then
@@ -68,7 +68,6 @@ install_fonts() {
             # Check if font is already installed in either location
             if ((Test-Path \$systemTarget) -or (Test-Path \$userTarget)) {
                 \$location = if (Test-Path \$systemTarget) { \"system\" } else { \"user\" }
-                Write-Host \"Skipped (already installed in \$location): \$fontFile\"
                 \$skipped++
                 return
             }

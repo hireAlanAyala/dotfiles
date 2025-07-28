@@ -18,18 +18,21 @@
 
   home.packages = with pkgs; [
     # Custom derivations and scripts
-    (callPackage ../derivations/win32yank.nix { })
     (callPackage ../derivations/discordo.nix {})
     (callPackage ../derivations/extract-otp-secrets.nix {})
     (writeShellScriptBin "wrapped_nvim" (builtins.readFile ../scripts/wrapped_nvim.sh))
     (writeShellScriptBin "show-2fa" (builtins.readFile ../scripts/show_all_2fa.sh))
     (writeShellScriptBin "sync-windows-configs" (builtins.readFile ../scripts/sync-windows-configs.sh))
     (writeShellScriptBin "hm" (builtins.readFile ../scripts/hm.sh))
-    (writeShellScriptBin "mouse-jiggle" (builtins.readFile ../scripts/mouse-jiggle.sh))
+    #(writeShellScriptBin "mouse-jiggle" (builtins.readFile ../scripts/mouse-jiggle.sh))
+
+    # core
+    gcc
+    unzip
 
     # ai
     claude-code
-    
+
     # Development languages and runtimes
     go
     nodejs_20
@@ -111,6 +114,26 @@
       # keys to decrypt
       hpg_plus_supabase_access_token = {};
     };
+  };
+
+  # GPG configuration for SOPS automation
+  programs.gpg = {
+    enable = true;
+    settings = {
+      use-agent = true;
+      pinentry-mode = "loopback";
+    };
+  };
+
+  services.gpg-agent = {
+    enable = true;
+    defaultCacheTtl = 28800;  # 8 hours
+    maxCacheTtl = 86400;      # 24 hours
+    enableSshSupport = true;
+    extraConfig = ''
+      allow-loopback-pinentry
+      pinentry-program ${pkgs.pinentry-tty}/bin/pinentry-tty
+    '';
   };
 
   home.sessionVariables = {

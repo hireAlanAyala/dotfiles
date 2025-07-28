@@ -24,6 +24,11 @@ export GPG_TTY
 # use esc to enter vi mode
 set -o vi
 
+# Enable zle and bind Ctrl+V to edit command line in editor
+autoload -U edit-command-line
+zle -N edit-command-line
+bindkey '^e' edit-command-line
+
 export VISUAL=nvim
 export EDITOR=nvim
 # export TERM="screen-256color"
@@ -121,4 +126,4 @@ export COLORTERM=truecolor
 autoload -U colors && colors
 
 # Docker Desktop Socket
-export DOCKER_HOST=unix:///home/alan/.docker/desktop/docker.sock
+export DOCKER_HOST=unix://$HOME/.docker/desktop/docker.sock

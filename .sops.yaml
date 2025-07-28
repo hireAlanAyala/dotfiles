@@ -1,0 +1,7 @@
+keys:
+  - &mykey 1677AD4523100C75
+creation_rules:
+  - path_regex: \.yaml$
+    key_groups:
+    - pgp:
+      - *mykey

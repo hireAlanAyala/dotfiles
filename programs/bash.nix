@@ -23,12 +23,12 @@
           PATH='$HOME/.local/bin:$PATH'
       fi
 
-      if [ -e /home/alan/.nix-profile/etc/profile.d/nix.sh ]; then . /home/alan/.nix-profile/etc/profile.d/nix.sh; fi # added by Nix installer
+      if [ -e $HOME/.nix-profile/etc/profile.d/nix.sh ]; then . $HOME/.nix-profile/etc/profile.d/nix.sh; fi # added by Nix installer
 
       # forces zsh as default shell
       zsh
       chsh -s $(which zsh)
-      export DOCKER_HOST=unix:///home/alan/.docker/desktop/docker.sock
+      export DOCKER_HOST=unix://$HOME/.docker/desktop/docker.sock
       export BUN_INSTALL="$HOME/.bun"
       export PATH=$BUN_INSTALL/bin:$PATH
     '';

@@ -6,8 +6,8 @@
 # windows cannot follow linux created symlinks
 # source: https://blog.trailofbits.com/2024/02/12/why-windows-cant-follow-wsl-symlinks/
 
-CONFIG_DIR="/home/alan/.config/windows-configs"
-WINDOWS_USER="AlanAyala"
+CONFIG_DIR="$HOME/.config/windows-configs"
+WINDOWS_USER="AlanWalker"
 
 # Configuration mappings: source_file:target_path
 declare -A CONFIGS=(

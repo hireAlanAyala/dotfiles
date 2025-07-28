@@ -4,7 +4,7 @@
 echo "Current login shell: $(getent passwd $(whoami) | cut -d: -f7)"
 cd ~/.config || exit 1
 git add .
-home-manager switch --flake "./home-manager#alan"
+home-manager switch --flake "./home-manager#developer"
 
 if [ $? -eq 0 ]; then
     # Only source .zshrc if we're actually in zsh
@@ -29,13 +29,6 @@ if [ $? -eq 0 ]; then
         echo "⚠️  Font installation failed or required manual intervention"
     fi
     
-    # Start mouse-jiggle script
-    echo "Starting mouse-jiggle script..."
-    if bash ~/.config/scripts/mouse-jiggle.sh > /dev/null 2>&1 &; then
-        echo "✅ Mouse-jiggle script started in background!"
-    else
-        echo "⚠️  Failed to start mouse-jiggle script"
-    fi
 else
     echo -e "❌ Home Manager switch failed"
     exit 1
