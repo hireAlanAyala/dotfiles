@@ -359,18 +359,6 @@ jobs:
           
           echo "=== Preparing system for Nix installation ==="
           
-          # First, prepare the system as root
-          $SSH_ROOT << 'EOF'
-            # Create nix build users and group
-            groupadd -r nixbld
-            for i in {1..10}; do
-              useradd -c "Nix build user $i" -d /var/empty -g nixbld -G nixbld -M -N -r -s /sbin/nologin nixbld$i
-            done
-            
-            # Install additional dependencies for Nix
-            pacman -S --noconfirm xz
-          EOF
-          
           # Copy the .config directory to the VPS
           echo "Copying configuration files..."
           scp -r -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 -P ${{ env.SSH_PORT }} \
@@ -421,9 +409,19 @@ jobs:
             
             # Show what's installed
             echo "PATH after home-manager: $PATH"
-            which git || echo "git not in PATH"
-            which go || echo "go not in PATH"
-            which node || echo "node not in PATH"
+            
+            # Source home-manager environment for immediate use
+            . ~/.nix-profile/etc/profile.d/hm-session-vars.sh 2>/dev/null || true
+            
+            echo "=== Installed development tools ==="
+            which git && git --version || echo "git not available"
+            which go && go version || echo "go not available"  
+            which node && node --version || echo "node not available"
+            which python3 && python3 --version || echo "python3 not available"
+            which docker && docker --version || echo "docker not available"
+            
+            echo "=== Home Manager packages ==="
+            home-manager packages | head -20 || echo "Could not list packages"
           NIXINSTALL
           
       - name: Setup SSH keys and GPG (if secrets available)
