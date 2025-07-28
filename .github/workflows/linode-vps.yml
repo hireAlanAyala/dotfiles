@@ -72,6 +72,8 @@ jobs:
         if: github.event.inputs.action == 'provision' && steps.check_existing.outputs.exists != 'true'
         id: provision
         run: |
+          echo "=== Starting VPS provision at $(date) ==="
+          
           # Create instance and get IP
           IP=$(linode-cli linodes create \
             --label "${{ github.event.inputs.instance_label }}" \
@@ -84,6 +86,7 @@ jobs:
           
           echo "ip_address=$IP" >> $GITHUB_OUTPUT
           echo "✅ Created ${{ github.event.inputs.instance_label }} at $IP"
+          echo "=== VPS created at $(date) ==="
       
       - name: Configure instance
         if: github.event.inputs.action == 'provision'
@@ -99,9 +102,23 @@ jobs:
           
           # Configure system
           $SSH << 'EOF'
-            # Update system
-            pacman -Syu --noconfirm
-            pacman -S --noconfirm base-devel git vim htop tmux python python-pip ufw sudo
+            set -x  # Enable command tracing
+            
+            echo "=== Starting configuration at $(date) ==="
+            
+            # Enable parallel downloads for faster package installation
+            sed -i 's/^#ParallelDownloads.*/ParallelDownloads = 5/' /etc/pacman.conf
+            
+            # Skip full system update, just sync package database
+            echo "Syncing package database..."
+            time pacman -Sy --noconfirm
+            
+            # Install only essential packages first
+            echo "Installing essential packages..."
+            time pacman -S --noconfirm sudo ufw
+            
+            # Install development tools (can be done later if needed)
+            # pacman -S --noconfirm base-devel git vim htop tmux python python-pip
             
             # Create non-root user
             useradd -m -s /bin/bash -G wheel archuser
