@@ -177,19 +177,6 @@ vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
 -- Diagnostic keymaps
 vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic [Q]uickfix list' })
 
--- Image preview keybinding - opens images with Windows default viewer
-vim.keymap.set('n', '<leader>ip', function()
-  local file = vim.fn.expand '%:p'
-  if file:match '%.png$' or file:match '%.jpg$' or file:match '%.jpeg$' or file:match '%.gif$' or file:match '%.webp$' or file:match '%.bmp$' then
-    -- Convert WSL path to Windows path
-    local windows_path = vim.fn.system('wslpath -w "' .. file .. '"'):gsub('\n', '')
-    -- Open with Windows default image viewer
-    vim.fn.system('cmd.exe /c start "" "' .. windows_path .. '"')
-    vim.notify('Opening image: ' .. vim.fn.fnamemodify(file, ':t'))
-  else
-    vim.notify('Not an image file', vim.log.levels.WARN)
-  end
-end, { desc = '[I]mage [P]review' })
 
 -- Exit terminal mode in the builtin terminal with a shortcut that is a bit easier
 -- for people to discover. Otherwise, you normally need to press <C-\><C-n>, which

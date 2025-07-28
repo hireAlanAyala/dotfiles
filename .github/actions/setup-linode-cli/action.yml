@@ -1,0 +1,31 @@
+name: 'Setup Linode CLI'
+description: 'Install and configure Linode CLI with authentication'
+inputs:
+  linode_token:
+    description: 'Linode API token'
+    required: true
+outputs:
+  cli_version:
+    description: 'Installed CLI version'
+    value: ${{ steps.install.outputs.version }}
+runs:
+  using: 'composite'
+  steps:
+    - name: Install Linode CLI
+      id: install
+      shell: bash
+      run: |
+        pip install linode-cli
+        VERSION=$(linode-cli --version)
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "✅ Linode CLI installed: $VERSION"
+      env:
+        LINODE_CLI_TOKEN: ${{ inputs.linode_token }}
+    
+    - name: Verify CLI authentication
+      shell: bash
+      run: |
+        linode-cli --version || exit 1
+        echo "✅ Linode CLI authentication verified"
+      env:
+        LINODE_CLI_TOKEN: ${{ inputs.linode_token }}

@@ -1,0 +1,79 @@
+name: 'Provision Linode Instance'
+description: 'Create and configure a new Linode VPS instance'
+inputs:
+  instance_label:
+    description: 'Instance label'
+    required: true
+  instance_type:
+    description: 'Instance type'
+    required: true
+    default: 'g6-standard-2'
+  instance_region:
+    description: 'Instance region'
+    required: true
+    default: 'us-east'
+  root_password:
+    description: 'Root password'
+    required: true
+  ssh_public_key:
+    description: 'SSH public key for authentication'
+    required: true
+  linode_token:
+    description: 'Linode API token'
+    required: true
+outputs:
+  ip_address:
+    description: 'IP address of the created instance'
+    value: ${{ steps.create.outputs.ip_address }}
+  instance_id:
+    description: 'Instance ID'
+    value: ${{ steps.create.outputs.instance_id }}
+runs:
+  using: 'composite'
+  steps:
+    - name: Check for existing instance
+      id: check_existing
+      shell: bash
+      run: |
+        EXISTING=$(linode-cli linodes list \
+          --label "${{ inputs.instance_label }}" \
+          --text --no-headers --format "id,ipv4,status" || echo "")
+        
+        if [ -n "$EXISTING" ]; then
+          echo "❌ Instance '${{ inputs.instance_label }}' already exists:"
+          echo "$EXISTING"
+          echo "exists=true" >> $GITHUB_OUTPUT
+          exit 1
+        else
+          echo "✅ No existing instance found with label '${{ inputs.instance_label }}'"
+          echo "exists=false" >> $GITHUB_OUTPUT
+        fi
+      env:
+        LINODE_CLI_TOKEN: ${{ inputs.linode_token }}
+
+    - name: Create instance
+      if: steps.check_existing.outputs.exists != 'true'
+      id: create
+      shell: bash
+      run: |
+        echo "=== Starting VPS provision at $(date) ==="
+        
+        # Create instance and get details
+        RESULT=$(linode-cli linodes create \
+          --label "${{ inputs.instance_label }}" \
+          --root_pass "${{ inputs.root_password }}" \
+          --type "${{ inputs.instance_type }}" \
+          --region "${{ inputs.instance_region }}" \
+          --image "linode/arch" \
+          --authorized_keys "${{ inputs.ssh_public_key }}" \
+          --text --no-headers --format "id,ipv4")
+        
+        INSTANCE_ID=$(echo "$RESULT" | cut -f1)
+        IP_ADDRESS=$(echo "$RESULT" | cut -f2)
+        
+        echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+        echo "ip_address=$IP_ADDRESS" >> $GITHUB_OUTPUT
+        echo "✅ Created ${{ inputs.instance_label }} (ID: $INSTANCE_ID) at $IP_ADDRESS"
+        echo "=== VPS created at $(date) ==="
+      env:
+        LINODE_CLI_TOKEN: ${{ inputs.linode_token }}

@@ -67,13 +67,14 @@ if [ -d ~/home-manager ]; then
     echo "✅ Backed up existing home-manager directory"
 fi
 
-# Setup GPG and SSH keys before Home Manager (if available)
-echo "=== Setting up GPG and SSH keys ==="
+# Setup GPG keys before Home Manager (if available)
+echo "=== Setting up GPG keys ==="
 cd ~/.config
-if [ -f ./scripts/setup-gpg-ssh.sh ]; then
-    ./scripts/setup-gpg-ssh.sh || echo "GPG/SSH setup completed with some warnings"
+if [ -f ./provision/setup-gpg-ssh.sh ]; then
+    # Call without SSH setup (GPG only)
+    ./provision/setup-gpg-ssh.sh || echo "GPG setup completed with some warnings"
 else
-    echo "⚠️  GPG/SSH setup script not found, continuing without GPG setup"
+    echo "⚠️  GPG setup script not found, continuing without GPG setup"
 fi
 
 # Install Home Manager using dedicated script
@@ -84,6 +85,15 @@ echo "=== Installing Home Manager ==="
 if [ -f ~/.nix-profile/etc/profile.d/hm-session-vars.sh ]; then
     . ~/.nix-profile/etc/profile.d/hm-session-vars.sh
     echo "✅ Home Manager environment sourced"
+fi
+
+# Setup SSH keys after Home Manager (if script exists)
+echo ""
+echo "=== Setting up SSH keys ==="
+if [ -f ~/.ssh/setup_all_ssh_keys.sh ]; then
+    ~/.ssh/setup_all_ssh_keys.sh --all || echo "SSH key setup completed with some warnings"
+else
+    echo "⚠️  SSH setup script not found, skipping SSH key setup"
 fi
 
 # Show what's installed

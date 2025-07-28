@@ -1,0 +1,94 @@
+name: 'Configure System'
+description: 'Configure system with security hardening and user setup'
+inputs:
+  ip_address:
+    description: 'IP address of the instance'
+    required: true
+  ssh_private_key_path:
+    description: 'Path to SSH private key'
+    required: true
+    default: '~/.ssh/id_ed25519'
+  username:
+    description: 'Username to create'
+    required: true
+    default: 'developer'
+  ssh_port:
+    description: 'SSH port to configure'
+    required: true
+    default: '2222'
+  root_password:
+    description: 'Password for the user'
+    required: true
+  ssh_wait_timeout:
+    description: 'Timeout for SSH connection'
+    required: true
+    default: '600'
+  essential_packages:
+    description: 'Essential packages to install'
+    required: true
+    default: 'sudo ufw git curl xz age sops gnupg'
+  security_packages:
+    description: 'Security packages to install'
+    required: true
+    default: 'fail2ban rkhunter lynis'
+  swap_size:
+    description: 'Swap file size'
+    required: true
+    default: '4G'
+runs:
+  using: 'composite'
+  steps:
+    - name: Wait for SSH availability
+      shell: bash
+      run: |
+        IP="${{ inputs.ip_address }}"
+        SSH="ssh -o StrictHostKeyChecking=no -i ${{ inputs.ssh_private_key_path }} root@$IP"
+        
+        echo "Waiting for SSH to be available at $IP..."
+        timeout ${{ inputs.ssh_wait_timeout }} bash -c "until $SSH 'echo ready' 2>/dev/null; do echo -n '.'; sleep 10; done"
+        echo "SSH is ready!"
+
+    - name: Upload provision scripts
+      shell: bash
+      run: |
+        IP="${{ inputs.ip_address }}"
+        
+        # Upload all provision scripts
+        scp -o StrictHostKeyChecking=no -i ${{ inputs.ssh_private_key_path }} \
+          provision/*.sh root@$IP:/tmp/
+        
+        # Make scripts executable
+        ssh -o StrictHostKeyChecking=no -i ${{ inputs.ssh_private_key_path }} root@$IP \
+          "chmod +x /tmp/*.sh"
+
+    - name: Run system setup
+      shell: bash
+      run: |
+        IP="${{ inputs.ip_address }}"
+        SSH="ssh -o StrictHostKeyChecking=no -i ${{ inputs.ssh_private_key_path }} root@$IP"
+        
+        $SSH "USERNAME='${{ inputs.username }}' ROOT_PASSWORD='${{ inputs.root_password }}' ESSENTIAL_PACKAGES='${{ inputs.essential_packages }}' SWAP_SIZE='${{ inputs.swap_size }}' /tmp/system-setup.sh"
+
+    - name: Run SSH hardening
+      shell: bash
+      run: |
+        IP="${{ inputs.ip_address }}"
+        SSH="ssh -o StrictHostKeyChecking=no -i ${{ inputs.ssh_private_key_path }} root@$IP"
+        
+        $SSH "SSH_PORT='${{ inputs.ssh_port }}' USERNAME='${{ inputs.username }}' /tmp/ssh-hardening.sh"
+
+    - name: Run security hardening
+      shell: bash
+      run: |
+        IP="${{ inputs.ip_address }}"
+        SSH="ssh -o StrictHostKeyChecking=no -i ${{ inputs.ssh_private_key_path }} root@$IP"
+        
+        $SSH "SSH_PORT='${{ inputs.ssh_port }}' SECURITY_PACKAGES='${{ inputs.security_packages }}' /tmp/security-hardening.sh"
+
+    - name: Cleanup temporary files
+      shell: bash
+      run: |
+        IP="${{ inputs.ip_address }}"
+        SSH="ssh -o StrictHostKeyChecking=no -i ${{ inputs.ssh_private_key_path }} root@$IP"
+        
+        $SSH "rm -f /tmp/*.sh"
