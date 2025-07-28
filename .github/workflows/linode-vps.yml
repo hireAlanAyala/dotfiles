@@ -28,6 +28,10 @@ on:
         description: 'DNS subdomain (optional, e.g. "myserver" for myserver.yourdomain.com)'
         required: false
         default: ''
+      post_provision_script_url:
+        description: 'URL to post-provision setup script (optional)'
+        required: false
+        default: ''
 
 env:
   # User configuration
@@ -39,8 +43,13 @@ env:
   DELETION_WAIT_TIMEOUT: 300  # 5 minutes
   
   # Package lists
-  ESSENTIAL_PACKAGES: "sudo ufw"
-  DEV_PACKAGES: "base-devel git vim neovim htop tmux nodejs npm python python-pip docker"
+  ESSENTIAL_PACKAGES: "sudo ufw git curl xz"
+  SECURITY_PACKAGES: "fail2ban rkhunter lynis"
+  # Dev packages now managed by Nix/Home Manager
+  
+  # System configuration
+  SWAP_SIZE: "4G"  # Swap file size (empty to skip)
+  ENABLE_BACKUPS: "false"  # Enable Linode backups ($2/month for Nanode)
 
 jobs:
   manage-vps:
@@ -51,9 +60,14 @@ jobs:
     
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: .config
       
       - name: Setup
-        run: pip install linode-cli
+        run: |
+          pip install linode-cli
+          # Verify CLI is working
+          linode-cli --version || exit 1
       
       - name: Generate SSH key if needed
         id: ssh
@@ -130,17 +144,23 @@ jobs:
             echo "Installing essential packages..."
             time pacman -S --noconfirm ${{ env.ESSENTIAL_PACKAGES }}
             
-            # Install development tools for coding server
-            echo "Installing development tools..."
-            time pacman -S --noconfirm ${{ env.DEV_PACKAGES }}
-            
             # Create non-root user
-            useradd -m -s /bin/bash -G wheel,docker ${{ env.USERNAME }}
+            useradd -m -s /bin/bash -G wheel ${{ env.USERNAME }}
             echo "${{ env.USERNAME }}:${{ secrets.ROOT_PASSWORD }}" | chpasswd
             
-            # Enable Docker service
-            systemctl enable docker
-            systemctl start docker
+            # Configure swap file for development workloads
+            if [ -n "${{ env.SWAP_SIZE }}" ]; then
+              echo "Creating ${{ env.SWAP_SIZE }} swap file..."
+              fallocate -l ${{ env.SWAP_SIZE }} /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=4096
+              chmod 600 /swapfile
+              mkswap /swapfile
+              swapon /swapfile
+              echo '/swapfile none swap sw 0 0' >> /etc/fstab
+              
+              # Adjust swappiness for development server
+              echo 'vm.swappiness=10' >> /etc/sysctl.d/99-swappiness.conf
+              sysctl -p /etc/sysctl.d/99-swappiness.conf
+            fi
             
             # Configure sudo
             echo "%wheel ALL=(ALL) ALL" > /etc/sudoers.d/wheel
@@ -216,7 +236,243 @@ jobs:
             ufw delete allow 22/tcp
             ufw status verbose
             
+            # Security Hardening
+            echo "=== Installing security packages ==="
+            time pacman -S --noconfirm ${{ env.SECURITY_PACKAGES }}
+            
+            # Configure fail2ban for SSH protection
+            echo "=== Configuring fail2ban ==="
+            cat > /etc/fail2ban/jail.local << 'FAIL2BAN'
+            [DEFAULT]
+            bantime = 3600
+            findtime = 600
+            maxretry = 3
+            destemail = root@localhost
+            action = %(action_mwl)s
+            
+            [sshd]
+            enabled = true
+            port = ${{ env.SSH_PORT }}
+            filter = sshd
+            logpath = /var/log/auth.log
+            maxretry = 3
+            bantime = 3600
+            FAIL2BAN
+            
+            systemctl enable fail2ban
+            systemctl start fail2ban
+            
+            # Configure automatic security updates
+            echo "=== Setting up automatic security updates ==="
+            
+            # Create systemd service for security updates
+            cat > /etc/systemd/system/security-updates.service << 'SERVICE'
+            [Unit]
+            Description=Automatic Security Updates
+            After=network.target
+            
+            [Service]
+            Type=oneshot
+            ExecStart=/usr/bin/pacman -Syu --noconfirm
+            StandardOutput=journal
+            StandardError=journal
+            SERVICE
+            
+            # Create systemd timer for daily security updates
+            cat > /etc/systemd/system/security-updates.timer << 'TIMER'
+            [Unit]
+            Description=Daily Security Updates
+            Persistent=true
+            
+            [Timer]
+            OnCalendar=daily
+            RandomizedDelaySec=1h
+            Persistent=true
+            
+            [Install]
+            WantedBy=timers.target
+            TIMER
+            
+            systemctl daemon-reload
+            systemctl enable security-updates.timer
+            systemctl start security-updates.timer
+            
+            # Additional hardening
+            echo "=== Applying additional security hardening ==="
+            
+            # Kernel hardening via sysctl
+            cat >> /etc/sysctl.d/99-security.conf << 'SYSCTL'
+            # IP Spoofing protection
+            net.ipv4.conf.all.rp_filter = 1
+            net.ipv4.conf.default.rp_filter = 1
+            
+            # Ignore ICMP redirects
+            net.ipv4.conf.all.accept_redirects = 0
+            net.ipv6.conf.all.accept_redirects = 0
+            
+            # Ignore send redirects
+            net.ipv4.conf.all.send_redirects = 0
+            
+            # Disable source packet routing
+            net.ipv4.conf.all.accept_source_route = 0
+            net.ipv6.conf.all.accept_source_route = 0
+            
+            # Log Martians
+            net.ipv4.conf.all.log_martians = 1
+            
+            # Ignore ICMP ping requests
+            net.ipv4.icmp_echo_ignore_broadcasts = 1
+            
+            # Ignore Directed pings
+            net.ipv4.icmp_ignore_bogus_error_responses = 1
+            
+            # Enable TCP/IP SYN cookies
+            net.ipv4.tcp_syncookies = 1
+            net.ipv4.tcp_synack_retries = 2
+            SYSCTL
+            
+            sysctl -p /etc/sysctl.d/99-security.conf
+            
+            # Set secure permissions on sensitive files
+            chmod 600 /etc/ssh/sshd_config
+            chmod 700 /root
+            chmod 644 /etc/passwd
+            chmod 644 /etc/group
+            chmod 600 /etc/shadow
+            chmod 600 /etc/gshadow
+            
+            # Show security status
+            echo "=== Security configuration summary ==="
+            fail2ban-client status
+            systemctl list-timers security-updates.timer
+            ufw status verbose
+            
             echo "=== Configuration complete at $(date) ==="
+          EOF
+          
+      - name: Install Nix and Home Manager
+        if: github.event.inputs.action == 'provision'
+        run: |
+          IP="${{ steps.provision.outputs.ip_address }}"
+          SSH_ROOT="ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 root@$IP"
+          SSH_USER="ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 -p ${{ env.SSH_PORT }} ${{ env.USERNAME }}@$IP"
+          
+          echo "=== Preparing system for Nix installation ==="
+          
+          # First, prepare the system as root
+          $SSH_ROOT << 'EOF'
+            # Create nix build users and group
+            groupadd -r nixbld
+            for i in {1..10}; do
+              useradd -c "Nix build user $i" -d /var/empty -g nixbld -G nixbld -M -N -r -s /sbin/nologin nixbld$i
+            done
+            
+            # Install additional dependencies for Nix
+            pacman -S --noconfirm xz
+          EOF
+          
+          # Copy the .config directory to the VPS
+          echo "Copying configuration files..."
+          scp -r -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 -P ${{ env.SSH_PORT }} \
+            .config ${{ env.USERNAME }}@$IP:~/
+          
+          # Install Nix and Home Manager as the developer user
+          $SSH_USER << 'NIXINSTALL'
+            set -euo pipefail
+            
+            echo "=== Backing up existing shell configs ==="
+            [ -f ~/.profile ] && mv ~/.profile ~/.profile.backup
+            [ -f ~/.bashrc ] && mv ~/.bashrc ~/.bashrc.backup
+            
+            echo "=== Installing Nix ==="
+            # Install Nix multi-user
+            sh <(curl -L https://nixos.org/nix/install) --daemon --yes
+            
+            # Source Nix environment
+            if [ -e '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' ]; then
+              . '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
+            fi
+            
+            # Add Nix channels
+            echo "=== Setting up Nix channels ==="
+            nix-channel --add https://nixos.org/channels/nixos-unstable nixpkgs
+            nix-channel --add https://github.com/nix-community/home-manager/archive/master.tar.gz home-manager
+            nix-channel --update
+            
+            # Enable flakes and nix-command
+            mkdir -p ~/.config/nix
+            echo "experimental-features = nix-command flakes" > ~/.config/nix/nix.conf
+            
+            echo "=== Installing Home Manager ==="
+            # Move any existing home-manager directory out of the way
+            [ -d ~/home-manager ] && mv ~/home-manager ~/home-manager.backup
+            
+            # Install home-manager
+            nix-shell '<home-manager>' -A install
+            
+            # Update flake inputs
+            cd ~/.config/home-manager
+            nix flake update
+            
+            # Switch to the home-manager configuration
+            home-manager switch --flake .#${{ env.USERNAME }}
+            
+            echo "=== Configuration complete ==="
+            
+            # Show what's installed
+            echo "PATH after home-manager: $PATH"
+            which git || echo "git not in PATH"
+            which go || echo "go not in PATH"
+            which node || echo "node not in PATH"
+          NIXINSTALL
+          
+      - name: Setup SSH keys and GPG (if secrets available)
+        if: github.event.inputs.action == 'provision'
+        continue-on-error: true
+        run: |
+          IP="${{ steps.provision.outputs.ip_address }}"
+          SSH_USER="ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 -p ${{ env.SSH_PORT }} ${{ env.USERNAME }}@$IP"
+          
+          # Check if we have GPG key in secrets
+          if [ -n "${{ secrets.GPG_PRIVATE_KEY }}" ]; then
+            echo "=== Setting up GPG ==="
+            $SSH_USER << 'GPGSETUP'
+              # Import GPG key
+              echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --import
+              
+              # Trust the key
+              KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep sec | awk '{print $2}' | cut -d'/' -f2)
+              echo "${KEY_ID}:6:" | gpg --import-ownertrust
+            GPGSETUP
+          else
+            echo "No GPG key found in secrets, skipping GPG setup"
+          fi
+          
+          # Run SSH key setup if the script exists
+          $SSH_USER << 'SSHSETUP'
+            if [ -f ~/.ssh/setup_all_ssh_keys.sh ]; then
+              echo "=== Setting up SSH keys ==="
+              export GPG_TTY=$(tty)
+              ~/.ssh/setup_all_ssh_keys.sh --all || echo "SSH key setup completed with some errors"
+            else
+              echo "No SSH setup script found, skipping"
+            fi
+          SSHSETUP
+          
+      - name: Run post-provision script
+        if: github.event.inputs.action == 'provision' && github.event.inputs.post_provision_script_url != ''
+        run: |
+          IP="${{ steps.provision.outputs.ip_address }}"
+          SSH="ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 -p ${{ env.SSH_PORT }} ${{ env.USERNAME }}@$IP"
+          
+          echo "Running post-provision script from: ${{ github.event.inputs.post_provision_script_url }}"
+          
+          $SSH << 'EOF'
+            set -e
+            curl -fsSL "${{ github.event.inputs.post_provision_script_url }}" -o /tmp/post_provision.sh
+            chmod +x /tmp/post_provision.sh
+            /tmp/post_provision.sh
+            rm -f /tmp/post_provision.sh
           EOF
       
       - name: Destroy VPS
@@ -288,7 +544,14 @@ jobs:
       
       - name: Show VPS Status
         if: github.event.inputs.action == 'status'
-        run: linode-cli linodes list
+        run: |
+          echo "## 📊 Linode VPS Status" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          linode-cli linodes list --text | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          
+          # Show detailed status in logs
+          linode-cli linodes list
       
       - name: Output connection details
         if: github.event.inputs.action == 'provision'
@@ -299,7 +562,11 @@ jobs:
           echo "- **SSH Port**: ${{ env.SSH_PORT }} (custom)" >> $GITHUB_STEP_SUMMARY
           echo "- **Username**: ${{ env.USERNAME }} (with sudo + docker)" >> $GITHUB_STEP_SUMMARY
           echo "- **Root login**: Disabled" >> $GITHUB_STEP_SUMMARY
-          echo "- **Installed**: Node.js, Python, Docker, Git, Neovim" >> $GITHUB_STEP_SUMMARY
+          echo "- **Package Manager**: Nix + Home Manager (declarative)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Development Tools**: Via home-manager config" >> $GITHUB_STEP_SUMMARY
+          echo "- **Security**: Fail2ban, automatic updates, kernel hardening" >> $GITHUB_STEP_SUMMARY
+          echo "- **Swap**: ${{ env.SWAP_SIZE }} configured" >> $GITHUB_STEP_SUMMARY
+          echo "- **Monthly Cost**: ~\$24/month" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Connect using:" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
@@ -349,6 +616,25 @@ jobs:
           - Never share your private key
           - This is your ONLY way to access the VPS
           - Root login is disabled for security
+          
+          ## Security Features
+          - **Fail2ban**: Protects against brute force attacks (3 attempts = 1 hour ban)
+          - **Automatic Updates**: Daily security updates via systemd timer
+          - **Kernel Hardening**: SYN cookies, IP spoofing protection, etc.
+          - **UFW Firewall**: Only SSH port ${{ env.SSH_PORT }} allowed
+          - **SSH Hardening**: Key-only auth, custom port, no root login
+          
+          ## Development Environment
+          - **Nix Package Manager**: Reproducible, declarative package management
+          - **Home Manager**: User environment managed via Git-tracked configuration
+          - **Tools Included**: Go, Node.js, Python, Docker, CLI tools, and more
+          - **Same as Local**: Identical environment to your local development setup
+          
+          ## First Login Tasks
+          After connecting, you may want to:
+          1. Set up GPG key (if using encrypted configs): Store key in GitHub secrets as GPG_PRIVATE_KEY
+          2. Run SSH key setup: `~/.ssh/setup_all_ssh_keys.sh --all` (if needed)
+          3. Update packages: `home-manager switch` (after config changes)
           
           ## If You Lose Access
           - Use Linode's Lish console (web-based terminal)

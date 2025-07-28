@@ -58,6 +58,7 @@
     # Cloud and DevOps
     azure-functions-core-tools
     azure-cli
+    linode-cli
     docker
     docker-compose
     
