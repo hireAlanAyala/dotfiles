@@ -528,7 +528,7 @@ GPGSETUP
           echo "- **Type**: Linode 4GB (2 vCPU, 4GB RAM, 80GB SSD)" >> $GITHUB_STEP_SUMMARY
           echo "- **IP Address**: ${{ steps.provision.outputs.ip_address }}" >> $GITHUB_STEP_SUMMARY
           echo "- **SSH Port**: ${{ env.SSH_PORT }} (custom)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Username**: ${{ env.USERNAME }} (with sudo + docker)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Username**: ${{ env.USERNAME }} (with sudo)" >> $GITHUB_STEP_SUMMARY
           echo "- **Root login**: Disabled" >> $GITHUB_STEP_SUMMARY
           echo "- **Package Manager**: Nix + Home Manager (declarative)" >> $GITHUB_STEP_SUMMARY
           echo "- **Development Tools**: Via home-manager config" >> $GITHUB_STEP_SUMMARY
@@ -540,7 +540,6 @@ GPGSETUP
           echo '```bash' >> $GITHUB_STEP_SUMMARY
           echo "ssh -p ${{ env.SSH_PORT }} -i path/to/id_ed25519 ${{ env.USERNAME }}@${{ steps.provision.outputs.ip_address }}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          
 
       - name: Save SSH private key as artifact
         if: github.event.inputs.action == 'provision'
