@@ -164,10 +164,6 @@ jobs:
             echo "%wheel ALL=(ALL) ALL" > /etc/sudoers.d/wheel
             chmod 440 /etc/sudoers.d/wheel
             
-            # Temporarily allow passwordless sudo for the developer user (for Nix installation)
-            echo "${{ env.USERNAME }} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/nix-install-temp
-            chmod 440 /etc/sudoers.d/nix-install-temp
-            
             # Copy SSH keys to new user
             mkdir -p /home/${{ env.USERNAME }}/.ssh
             cp /root/.ssh/authorized_keys /home/${{ env.USERNAME }}/.ssh/
@@ -373,8 +369,7 @@ jobs:
             echo "✅ Configuration repository cloned to ~/.config"
           GITCLONE
           
-          # Remove temporary passwordless sudo since manual setup will handle authentication
-          $SSH_USER "sudo rm -f /etc/sudoers.d/nix-install-temp && echo 'Temporary sudo permissions removed'"
+          # Note: The temporary passwordless sudo file (if created) can be removed manually after setup
           
           echo ""
           echo "🎉 VPS provisioned successfully!"
