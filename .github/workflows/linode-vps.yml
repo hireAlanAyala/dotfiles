@@ -397,35 +397,16 @@ jobs:
             # Create temp file with GPG key
             echo '${{ secrets.GPG_PRIVATE_KEY }}' > /tmp/gpg_key.txt
             scp -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 -P ${{ env.SSH_PORT }} \
-              /tmp/gpg_key.txt ${{ env.USERNAME }}@$IP:/tmp/
+              /tmp/gpg_key.txt ${{ env.USERNAME }}@$IP:/tmp/gpg_key.txt
             rm /tmp/gpg_key.txt
             
-            $SSH_USER << 'GPGSETUP'
-            # Import GPG key
-            gpg --import /tmp/gpg_key.txt
-            rm /tmp/gpg_key.txt
-            
-            # Trust the key
-            KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep sec | awk '{print $2}' | cut -d'/' -f2 | head -1)
-            if [ -n "$KEY_ID" ]; then
-              echo "${KEY_ID}:6:" | gpg --import-ownertrust
-              echo "✅ GPG key imported and trusted"
-            fi
-            GPGSETUP
+            # Run the setup script with GPG key
+            $SSH_USER "~/.config/scripts/setup-gpg-ssh.sh /tmp/gpg_key.txt"
           else
-            echo "No GPG key found in secrets, skipping GPG setup"
+            echo "No GPG key found in secrets, running setup without GPG"
+            # Run the setup script without GPG key
+            $SSH_USER "~/.config/scripts/setup-gpg-ssh.sh"
           fi
-          
-          # Run SSH key setup if the script exists
-          $SSH_USER << 'SSHSETUP'
-            if [ -f ~/.ssh/setup_all_ssh_keys.sh ]; then
-              echo "=== Setting up SSH keys ==="
-              export GPG_TTY=$(tty)
-              ~/.ssh/setup_all_ssh_keys.sh --all || echo "SSH key setup completed with some errors"
-            else
-              echo "No SSH setup script found, skipping"
-            fi
-          SSHSETUP
           
       - name: Run post-provision script
         if: github.event.inputs.action == 'provision' && github.event.inputs.post_provision_script_url != ''
