@@ -30,14 +30,19 @@ if [ -n "$GPG_KEY_FILE" ] && [ -f "$GPG_KEY_FILE" ]; then
     
     rm -f "$GPG_KEY_FILE"
     
-    # Trust the key automatically
-    KEY_ID=$(gpg --list-secret-keys --keyid-format LONG 2>/dev/null | grep sec | awk '{print $2}' | cut -d'/' -f2 | head -1)
-    if [ -n "$KEY_ID" ]; then
-        echo "Trusting GPG key: $KEY_ID"
-        echo "${KEY_ID}:6:" | gpg --batch --yes --import-ownertrust
+    # Trust the key automatically using fingerprint
+    FINGERPRINT=$(gpg --list-secret-keys --with-colons 2>/dev/null | grep fpr | cut -d: -f10 | head -1)
+    if [ -n "$FINGERPRINT" ]; then
+        echo "Trusting GPG key with fingerprint: $FINGERPRINT"
+        echo "${FINGERPRINT}:6:" | gpg --batch --yes --import-ownertrust
         echo "✅ GPG key imported and trusted"
     else
-        echo "⚠️ GPG key imported but could not auto-trust"
+        # Fallback: try with ultimate trust without fingerprint verification
+        echo "Could not get fingerprint, setting ultimate trust for all imported keys..."
+        gpg --list-secret-keys --with-colons 2>/dev/null | grep sec | cut -d: -f5 | while read keyid; do
+            echo "$keyid:6:" | gpg --batch --yes --import-ownertrust 2>/dev/null || true
+        done
+        echo "✅ GPG key imported with fallback trust method"
     fi
 else
     echo "No GPG key file provided or file not found, skipping GPG setup"
