@@ -380,6 +380,16 @@ jobs:
           $SSH_USER << 'NIXINSTALL'
             set -euo pipefail
             
+            echo "=== Debugging sudo configuration ==="
+            echo "Current user: $(whoami)"
+            echo "Groups: $(groups)"
+            ls -la /etc/sudoers.d/
+            cat /etc/sudoers.d/nix-install-temp || echo "nix-install-temp file not found"
+            
+            # Test sudo access
+            echo "Testing sudo access..."
+            sudo -n whoami && echo "Passwordless sudo works!" || echo "Passwordless sudo failed!"
+            
             echo "=== Backing up existing shell configs ==="
             [ -f ~/.profile ] && mv ~/.profile ~/.profile.backup
             [ -f ~/.bashrc ] && mv ~/.bashrc ~/.bashrc.backup
