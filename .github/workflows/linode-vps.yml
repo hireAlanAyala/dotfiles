@@ -353,110 +353,41 @@ jobs:
             echo "=== Configuration complete at $(date) ==="
           EOF
           
-      - name: Install Nix and Home Manager
+      - name: Prepare for manual setup
         if: github.event.inputs.action == 'provision'
         run: |
           IP="${{ steps.provision.outputs.ip_address }}"
           SSH_ROOT="ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 root@$IP"
           SSH_USER="ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 -p ${{ env.SSH_PORT }} ${{ env.USERNAME }}@$IP"
           
-          echo "=== Preparing system for Nix installation ==="
+          echo "=== Cloning dotfiles repository ==="
           
-          # Clone the entire config repository to get everything including symlinks
-          echo "Cloning configuration repository..."
-          
+          # Clone the dotfiles repository
           $SSH_USER << 'GITCLONE'
-            # Clone the config repo directly to get all files and proper symlink handling
             cd ~
             if [ -d ".config" ]; then
               mv .config .config.backup.$(date +%s)
             fi
             
             git clone https://github.com/${{ github.repository }}.git .config
-            
-            echo "=== Configuration repository cloned ==="
-            ls -la ~/.config/
+            echo "✅ Configuration repository cloned to ~/.config"
           GITCLONE
           
-          # Install Nix and Home Manager as the developer user (passwordless sudo already configured)
-          $SSH_USER << 'NIXINSTALL'
-            set -euo pipefail
-            
-            echo "=== Debugging sudo configuration ==="
-            echo "Current user: $(whoami)"
-            echo "Groups: $(groups)"
-            
-            # Test sudo access
-            echo "Testing passwordless sudo access..."
-            if sudo -n whoami 2>/dev/null; then
-              echo "✅ Passwordless sudo works!"
-            else
-              echo "❌ Passwordless sudo failed!"
-              echo "Checking sudo configuration..."
-              sudo -l 2>/dev/null || echo "Cannot check sudo permissions"
-            fi
-            
-            echo "=== Backing up existing shell configs ==="
-            [ -f ~/.profile ] && mv ~/.profile ~/.profile.backup
-            [ -f ~/.bashrc ] && mv ~/.bashrc ~/.bashrc.backup
-            
-            echo "=== Installing Nix ==="
-            # Force multi-user installation with passwordless sudo
-            echo "Installing multi-user Nix..."
-            sh <(curl -L https://nixos.org/nix/install) --daemon --yes
-            
-            # Source Nix environment
-            if [ -e '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' ]; then
-              . '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
-            fi
-            
-            # Add Nix channels
-            echo "=== Setting up Nix channels ==="
-            nix-channel --add https://nixos.org/channels/nixos-unstable nixpkgs
-            nix-channel --add https://github.com/nix-community/home-manager/archive/master.tar.gz home-manager
-            nix-channel --update
-            
-            # Enable flakes and nix-command
-            mkdir -p ~/.config/nix
-            echo "experimental-features = nix-command flakes" > ~/.config/nix/nix.conf
-            
-            echo "=== Installing Home Manager ==="
-            # Move any existing home-manager directory out of the way
-            [ -d ~/home-manager ] && mv ~/home-manager ~/home-manager.backup
-            
-            # Install home-manager
-            nix-shell '<home-manager>' -A install
-            
-            # Update flake inputs
-            cd ~/.config/home-manager
-            nix flake update
-            
-            # Switch to the home-manager configuration
-            home-manager switch --flake .#${{ env.USERNAME }}
-            
-            echo "=== Configuration complete ==="
-            
-            # Show what's installed
-            echo "PATH after home-manager: $PATH"
-            
-            # Source home-manager environment for immediate use
-            . ~/.nix-profile/etc/profile.d/hm-session-vars.sh 2>/dev/null || true
-            
-            echo "=== Installed development tools ==="
-            which git && git --version || echo "git not available"
-            which go && go version || echo "go not available"  
-            which node && node --version || echo "node not available"
-            which python3 && python3 --version || echo "python3 not available"
-            which docker && docker --version || echo "docker not available"
-            
-            echo "=== Home Manager packages ==="
-            home-manager packages | head -20 || echo "Could not list packages"
-            
-            # Remove temporary passwordless sudo configuration
-            echo "=== Cleaning up temporary sudo permissions ==="
-            sudo rm -f /etc/sudoers.d/nix-install-temp
-            echo "Temporary sudo permissions removed"
-          NIXINSTALL
+          # Remove temporary passwordless sudo since manual setup will handle authentication
+          $SSH_USER "sudo rm -f /etc/sudoers.d/nix-install-temp && echo 'Temporary sudo permissions removed'"
+          
+          echo ""
+          echo "🎉 VPS provisioned successfully!"
+          echo "📝 Next steps for manual setup:"
+          echo ""
+          echo "1. Connect to your VPS:"
+          echo "   ssh -p ${{ env.SSH_PORT }} -i path/to/id_ed25519 ${{ env.USERNAME }}@$IP"
+          echo ""
+          echo "2. Run the install script:"
+          echo "   cd ~/.config && ./install.sh"
+          echo ""
+          echo "3. Optional: Set up GPG and SSH keys as needed"
+          echo ""
           
       - name: Setup SSH keys and GPG (if secrets available)
         if: github.event.inputs.action == 'provision'
@@ -663,10 +594,19 @@ jobs:
           - **Same as Local**: Identical environment to your local development setup
           
           ## First Login Tasks
-          After connecting, you may want to:
-          1. Set up GPG key (if using encrypted configs): Store key in GitHub secrets as GPG_PRIVATE_KEY
-          2. Run SSH key setup: `~/.ssh/setup_all_ssh_keys.sh --all` (if needed)
-          3. Update packages: `home-manager switch` (after config changes)
+          After connecting:
+          1. **Run the install script**: `cd ~/.config && ./install.sh`
+          2. **Restart your shell**: `source ~/.bashrc` or reconnect
+          3. **Optional**: Set up GPG key (if using encrypted configs)
+          4. **Optional**: Run SSH key setup: `~/.ssh/setup_all_ssh_keys.sh --all`
+          
+          ## Updating Your Environment
+          To update packages or configuration:
+          ```bash
+          cd ~/.config
+          git pull
+          home-manager switch --flake .#developer
+          ```
           
           ## If You Lose Access
           - Use Linode's Lish console (web-based terminal)
