@@ -135,34 +135,110 @@ jobs:
             chmod 600 /home/archuser/.ssh/authorized_keys
             
             # SSH Hardening
+            echo "=== Configuring SSH ==="
+            
+            # Backup original config
+            cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup
+            
+            # Test current SSH config
+            sshd -t || echo "Initial SSH config has issues"
+            
             # Change SSH port to 2222
-            sed -i 's/^#Port 22/Port 2222/' /etc/ssh/sshd_config
-            sed -i 's/^Port 22/Port 2222/' /etc/ssh/sshd_config
+            if grep -q "^#Port 22" /etc/ssh/sshd_config; then
+              sed -i 's/^#Port 22/Port 2222/' /etc/ssh/sshd_config
+            elif grep -q "^Port 22" /etc/ssh/sshd_config; then
+              sed -i 's/^Port 22/Port 2222/' /etc/ssh/sshd_config
+            else
+              echo "Port 2222" >> /etc/ssh/sshd_config
+            fi
             
             # Disable password authentication
-            sed -i 's/^#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
-            sed -i 's/^PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+            sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
             
             # Disable root login
-            sed -i 's/^#PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
-            sed -i 's/^PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
+            sed -i 's/^#*PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
             
-            # Configure firewall
+            # Test the new configuration
+            echo "Testing SSH configuration..."
+            if ! sshd -t; then
+              echo "SSH configuration test failed! Restoring backup..."
+              cp /etc/ssh/sshd_config.backup /etc/ssh/sshd_config
+              exit 1
+            fi
+            
+            # Configure firewall BEFORE restarting SSH
+            echo "=== Configuring firewall ==="
             ufw --force enable
             ufw default deny incoming
             ufw default allow outgoing  
+            ufw allow 22/tcp comment 'SSH on default port (temporary)'
             ufw allow 2222/tcp comment 'SSH on custom port'
             
             # Restart SSH service
-            systemctl restart sshd
+            echo "=== Restarting SSH service ==="
+            # Try both service names (Arch might use either)
+            if systemctl is-active sshd &>/dev/null; then
+              systemctl restart sshd || {
+                echo "SSH restart failed! Checking status..."
+                systemctl status sshd
+                journalctl -xeu sshd.service | tail -20
+                # Don't exit, continue with setup
+              }
+            else
+              systemctl restart ssh || {
+                echo "SSH restart failed! Checking status..."
+                systemctl status ssh
+                journalctl -xeu ssh.service | tail -20
+                # Don't exit, continue with setup
+              }
+            fi
+            
+            echo "=== Configuration complete at $(date) ==="
           EOF
       
       - name: Destroy VPS
         if: github.event.inputs.action == 'destroy'
         run: |
-          linode-cli linodes delete $(linode-cli linodes list \
+          # Get instance ID
+          INSTANCE_ID=$(linode-cli linodes list \
             --label "${{ github.event.inputs.instance_label }}" \
-            --text --no-headers --format "id") || echo "No instance found"
+            --text --no-headers --format "id" || echo "")
+          
+          if [ -z "$INSTANCE_ID" ]; then
+            echo "❌ No instance found with label: ${{ github.event.inputs.instance_label }}"
+            exit 0
+          fi
+          
+          echo "🗑️ Initiating deletion of instance ID: $INSTANCE_ID"
+          
+          # Start deletion
+          linode-cli linodes delete "$INSTANCE_ID"
+          
+          echo "⏳ Waiting for instance to be fully deleted..."
+          
+          # Poll until instance is gone (max 5 minutes)
+          SECONDS=0
+          while [ $SECONDS -lt 300 ]; do
+            # Check if instance still exists
+            if ! linode-cli linodes view "$INSTANCE_ID" &>/dev/null; then
+              echo "✅ Instance successfully deleted after $SECONDS seconds"
+              break
+            fi
+            
+            # Get current status if still exists
+            STATUS=$(linode-cli linodes view "$INSTANCE_ID" --format "status" --text --no-headers 2>/dev/null || echo "deleting")
+            echo "   Status: $STATUS (elapsed: ${SECONDS}s)"
+            
+            sleep 5
+          done
+          
+          # Final verification
+          if linode-cli linodes view "$INSTANCE_ID" &>/dev/null; then
+            echo "⚠️ Warning: Instance may still be deleting after 5 minutes"
+            exit 1
+          else
+            echo "✅ Deletion confirmed - instance no longer exists"
+          fi
       
       - name: Show VPS Status
         if: github.event.inputs.action == 'status'
