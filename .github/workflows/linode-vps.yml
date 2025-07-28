@@ -162,9 +162,11 @@ jobs:
             
             # Configure sudo
             echo "%wheel ALL=(ALL) ALL" > /etc/sudoers.d/wheel
+            chmod 440 /etc/sudoers.d/wheel
             
             # Temporarily allow passwordless sudo for the developer user (for Nix installation)
             echo "${{ env.USERNAME }} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/nix-install-temp
+            chmod 440 /etc/sudoers.d/nix-install-temp
             
             # Copy SSH keys to new user
             mkdir -p /home/${{ env.USERNAME }}/.ssh
@@ -383,19 +385,24 @@ jobs:
             echo "=== Debugging sudo configuration ==="
             echo "Current user: $(whoami)"
             echo "Groups: $(groups)"
-            ls -la /etc/sudoers.d/
-            cat /etc/sudoers.d/nix-install-temp || echo "nix-install-temp file not found"
             
             # Test sudo access
-            echo "Testing sudo access..."
-            sudo -n whoami && echo "Passwordless sudo works!" || echo "Passwordless sudo failed!"
+            echo "Testing passwordless sudo access..."
+            if sudo -n whoami 2>/dev/null; then
+              echo "✅ Passwordless sudo works!"
+            else
+              echo "❌ Passwordless sudo failed!"
+              echo "Checking sudo configuration..."
+              sudo -l 2>/dev/null || echo "Cannot check sudo permissions"
+            fi
             
             echo "=== Backing up existing shell configs ==="
             [ -f ~/.profile ] && mv ~/.profile ~/.profile.backup
             [ -f ~/.bashrc ] && mv ~/.bashrc ~/.bashrc.backup
             
             echo "=== Installing Nix ==="
-            # Install Nix multi-user with passwordless sudo
+            # Force multi-user installation with passwordless sudo
+            echo "Installing multi-user Nix..."
             sh <(curl -L https://nixos.org/nix/install) --daemon --yes
             
             # Source Nix environment
