@@ -411,7 +411,7 @@ jobs:
               echo "${KEY_ID}:6:" | gpg --import-ownertrust
               echo "✅ GPG key imported and trusted"
             fi
-GPGSETUP
+            GPGSETUP
           else
             echo "No GPG key found in secrets, skipping GPG setup"
           fi
