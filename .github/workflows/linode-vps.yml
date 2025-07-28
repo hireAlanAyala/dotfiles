@@ -43,7 +43,7 @@ env:
   DELETION_WAIT_TIMEOUT: 300  # 5 minutes
   
   # Package lists
-  ESSENTIAL_PACKAGES: "sudo ufw git curl xz"
+  ESSENTIAL_PACKAGES: "sudo ufw git curl xz age sops gnupg"
   SECURITY_PACKAGES: "fail2ban rkhunter lynis"
   # Dev packages now managed by Nix/Home Manager
   

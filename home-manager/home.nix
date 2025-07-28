@@ -66,7 +66,6 @@
     air
     direnv
     tree
-    sops
     keychain
     cloc
     
