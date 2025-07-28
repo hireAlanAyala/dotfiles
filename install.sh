@@ -67,9 +67,17 @@ if [ -d ~/home-manager ]; then
     echo "✅ Backed up existing home-manager directory"
 fi
 
+# Setup GPG and SSH keys before Home Manager (if available)
+echo "=== Setting up GPG and SSH keys ==="
+cd ~/.config
+if [ -f ./scripts/setup-gpg-ssh.sh ]; then
+    ./scripts/setup-gpg-ssh.sh || echo "GPG/SSH setup completed with some warnings"
+else
+    echo "⚠️  GPG/SSH setup script not found, continuing without GPG setup"
+fi
+
 # Install Home Manager using dedicated script
 echo "=== Installing Home Manager ==="
-cd ~/.config
 ./setup-home-manager.sh
 
 # Source home-manager environment
