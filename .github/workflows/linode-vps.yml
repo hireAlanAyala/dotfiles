@@ -163,6 +163,9 @@ jobs:
             # Configure sudo
             echo "%wheel ALL=(ALL) ALL" > /etc/sudoers.d/wheel
             
+            # Temporarily allow passwordless sudo for the developer user (for Nix installation)
+            echo "${{ env.USERNAME }} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/nix-install-temp
+            
             # Copy SSH keys to new user
             mkdir -p /home/${{ env.USERNAME }}/.ssh
             cp /root/.ssh/authorized_keys /home/${{ env.USERNAME }}/.ssh/
@@ -373,7 +376,7 @@ jobs:
             ls -la ~/.config/
           GITCLONE
           
-          # Install Nix and Home Manager as the developer user
+          # Install Nix and Home Manager as the developer user (passwordless sudo already configured)
           $SSH_USER << 'NIXINSTALL'
             set -euo pipefail
             
@@ -382,7 +385,7 @@ jobs:
             [ -f ~/.bashrc ] && mv ~/.bashrc ~/.bashrc.backup
             
             echo "=== Installing Nix ==="
-            # Install Nix multi-user
+            # Install Nix multi-user with passwordless sudo
             sh <(curl -L https://nixos.org/nix/install) --daemon --yes
             
             # Source Nix environment
@@ -431,6 +434,11 @@ jobs:
             
             echo "=== Home Manager packages ==="
             home-manager packages | head -20 || echo "Could not list packages"
+            
+            # Remove temporary passwordless sudo configuration
+            echo "=== Cleaning up temporary sudo permissions ==="
+            sudo rm -f /etc/sudoers.d/nix-install-temp
+            echo "Temporary sudo permissions removed"
           NIXINSTALL
           
       - name: Setup SSH keys and GPG (if secrets available)
