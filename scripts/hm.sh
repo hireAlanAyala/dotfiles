@@ -13,22 +13,6 @@ if [ $? -eq 0 ]; then
     fi
     echo -e "✅ Home Manager updated successfully!"
     
-    # Sync Windows configurations
-    echo "Syncing Windows configurations..."
-    if bash ~/.config/scripts/sync-windows-configs.sh --all; then
-        echo "✅ Windows configurations synced successfully!"
-    else
-        echo "⚠️  Some Windows configurations failed to sync"
-    fi
-    
-    # Install fonts to Windows
-    echo "Installing fonts to Windows..."
-    if bash ~/.config/scripts/install-fonts-to-windows.sh; then
-        echo "✅ Fonts installed to Windows successfully!"
-    else
-        echo "⚠️  Font installation failed or required manual intervention"
-    fi
-    
 else
     echo -e "❌ Home Manager switch failed"
     exit 1

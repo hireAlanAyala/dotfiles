@@ -35,16 +35,8 @@ export EDITOR=nvim
 export TERM="xterm-256color"
 
 # ---------------------- Aliases ------------------------
-alias wsl="/mnt/c/Windows/System32/wsl.exe"
 alias v="nvim"
 alias path="echo -e ${PATH//:/\\n}"
-alias onedrive='cd /mnt/c/Users/AlanAyala/Documents/work/scripts/Upload\ New\ Storyboard\ Products\ \(NEW\)\ -\ Copy && wnpm run prod && cd -'
-alias work="cd /mnt/c/Users/AlanAyala/Documents/work"
-alias wnpm="/mnt/c/Program\ Files/nodejs/npm"
-alias wnpx="/mnt/c/Program\ Files/nodejs/npx"
-alias wgit="/mnt/c/Program\ Files/nodejs/npx"
-alias wpython="/mnt/c/ProgramData/Microsoft/Windows/Start\ Menu/Programs/Python\ 3.11"
-alias clip="/mnt/c/Windows/System32/clip.exe"
 alias fucking="sudo env PATH=$PATH"
 alias gen-ssh-key="bash ~/.config/.ssh/generate_ssh_key.sh"
 alias gpg-restart="pkill -f gpg-agent; pkill -f gpg; gpg-connect-agent /bye"
@@ -90,9 +82,6 @@ export GOPROXY="https://proxy.golang.org"
 # clojure
 export PATH=$PATH:~/.local/share/nvim/lazy/vim-iced/bin
 
-wcd() {
-    cd $(wslpath "$1")
-}
 
 # start ssh agent if not running
 if [ -z "$SSH_AUTH_SOCK" ] || ! ps -p "$SSH_AGENT_PID" > /dev/null 2>&1; then

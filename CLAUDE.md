@@ -2,12 +2,12 @@
 
 ## Overview
 
-This is a **personal dotfiles configuration repository** built around **Nix Home Manager** for managing development environment configurations in a declarative way. The codebase is designed for a Linux/WSL development environment and follows a modular architecture with extensive customization for development workflows.
+This is a **personal dotfiles configuration repository** built around **Nix Home Manager** for managing development environment configurations in a declarative way. The codebase is designed for a Linux development environment and follows a modular architecture with extensive customization for development workflows.
 
 ## Codebase Type
 - **Personal Dotfiles Repository** - Configuration management for development environment
 - **Nix/Home Manager Based** - Declarative system configuration
-- **WSL/Linux Focused** - Optimized for Windows Subsystem for Linux development
+- **Linux Focused** - Optimized for Linux development
 - **Multi-language Development** - Supports Go, Node.js, Python, Java, Clojure, C#/.NET
 
 ## Architecture Overview
@@ -40,7 +40,7 @@ This is a **personal dotfiles configuration repository** built around **Nix Home
 
 3. **Custom Derivations** (`derivations/`)
    - Custom Nix packages not available in nixpkgs
-   - Examples: `aichat.nix`, `claude_code.nix`, `discordo.nix`, `win32yank.nix`
+   - Examples: `aichat.nix`, `claude_code.nix`, `discordo.nix`
    - Built and installed as part of the home-manager configuration
 
 4. **Scripts** (`scripts/`)
@@ -58,7 +58,7 @@ This is a **personal dotfiles configuration repository** built around **Nix Home
 ### Primary: Nix Home Manager
 - **Declarative Configuration**: All packages declared in `home.nix`
 - **Reproducible Builds**: Locked dependencies via `flake.lock`
-- **Cross-platform**: Works on Linux, macOS, and WSL
+- **Cross-platform**: Works on Linux and macOS
 - **Rollback Support**: `home-manager generations` for environment history
 
 ### Package Categories
@@ -147,11 +147,6 @@ This is a **personal dotfiles configuration repository** built around **Nix Home
 3. Available as command after `hm`
 
 ## Notable Features
-
-### WSL Integration
-- Windows clipboard support via `win32yank`
-- Windows filesystem access via `wcd()` function
-- Windows Node.js/npm integration with `wnpm`, `wnpx` aliases
 
 ### Multi-Environment Support
 - Personal and work configurations

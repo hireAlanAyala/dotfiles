@@ -22,7 +22,6 @@
     (callPackage ../derivations/extract-otp-secrets.nix {})
     (writeShellScriptBin "wrapped_nvim" (builtins.readFile ../scripts/wrapped_nvim.sh))
     (writeShellScriptBin "show-2fa" (builtins.readFile ../scripts/show_all_2fa.sh))
-    (writeShellScriptBin "sync-windows-configs" (builtins.readFile ../scripts/sync-windows-configs.sh))
     (writeShellScriptBin "hm" (builtins.readFile ../scripts/hm.sh))
     #(writeShellScriptBin "mouse-jiggle" (builtins.readFile ../scripts/mouse-jiggle.sh))
 
@@ -178,6 +177,5 @@
     ../programs/tmux.nix
     # System modules
     ../modules/symlinks.nix
-    ../modules/wsl.nix
   ];
 }
