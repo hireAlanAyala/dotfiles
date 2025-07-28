@@ -15,11 +15,11 @@ on:
       instance_label:
         description: 'Instance label'
         required: false
-        default: 'arch-vps'
+        default: 'dev-server'
       instance_type:
         description: 'Instance type'
         required: false
-        default: 'g6-nanode-1'
+        default: 'g6-standard-2'
       instance_region:
         description: 'Instance region'
         required: false
@@ -28,6 +28,19 @@ on:
         description: 'DNS subdomain (optional, e.g. "myserver" for myserver.yourdomain.com)'
         required: false
         default: ''
+
+env:
+  # User configuration
+  USERNAME: developer
+  SSH_PORT: 2222
+  
+  # Timeouts
+  SSH_WAIT_TIMEOUT: 600  # 10 minutes
+  DELETION_WAIT_TIMEOUT: 300  # 5 minutes
+  
+  # Package lists
+  ESSENTIAL_PACKAGES: "sudo ufw"
+  DEV_PACKAGES: "base-devel git vim neovim htop tmux nodejs npm python python-pip docker"
 
 jobs:
   manage-vps:
@@ -95,9 +108,9 @@ jobs:
           echo "Configuring instance at IP: $IP"
           SSH="ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 root@$IP"
           
-          # Wait for SSH (max 10 minutes)
+          # Wait for SSH (max timeout)
           echo "Waiting for SSH to be available at $IP..."
-          timeout 600 bash -c "until $SSH 'echo ready' 2>/dev/null; do echo -n '.'; sleep 10; done"
+          timeout ${{ env.SSH_WAIT_TIMEOUT }} bash -c "until $SSH 'echo ready' 2>/dev/null; do echo -n '.'; sleep 10; done"
           echo "SSH is ready!"
           
           # Configure system
@@ -113,26 +126,31 @@ jobs:
             echo "Syncing package database..."
             time pacman -Sy --noconfirm
             
-            # Install only essential packages first
+            # Install essential packages first
             echo "Installing essential packages..."
-            time pacman -S --noconfirm sudo ufw
+            time pacman -S --noconfirm ${{ env.ESSENTIAL_PACKAGES }}
             
-            # Install development tools (can be done later if needed)
-            # pacman -S --noconfirm base-devel git vim htop tmux python python-pip
+            # Install development tools for coding server
+            echo "Installing development tools..."
+            time pacman -S --noconfirm ${{ env.DEV_PACKAGES }}
             
             # Create non-root user
-            useradd -m -s /bin/bash -G wheel archuser
-            echo "archuser:${{ secrets.ROOT_PASSWORD }}" | chpasswd
+            useradd -m -s /bin/bash -G wheel,docker ${{ env.USERNAME }}
+            echo "${{ env.USERNAME }}:${{ secrets.ROOT_PASSWORD }}" | chpasswd
+            
+            # Enable Docker service
+            systemctl enable docker
+            systemctl start docker
             
             # Configure sudo
             echo "%wheel ALL=(ALL) ALL" > /etc/sudoers.d/wheel
             
             # Copy SSH keys to new user
-            mkdir -p /home/archuser/.ssh
-            cp /root/.ssh/authorized_keys /home/archuser/.ssh/
-            chown -R archuser:archuser /home/archuser/.ssh
-            chmod 700 /home/archuser/.ssh
-            chmod 600 /home/archuser/.ssh/authorized_keys
+            mkdir -p /home/${{ env.USERNAME }}/.ssh
+            cp /root/.ssh/authorized_keys /home/${{ env.USERNAME }}/.ssh/
+            chown -R ${{ env.USERNAME }}:${{ env.USERNAME }} /home/${{ env.USERNAME }}/.ssh
+            chmod 700 /home/${{ env.USERNAME }}/.ssh
+            chmod 600 /home/${{ env.USERNAME }}/.ssh/authorized_keys
             
             # SSH Hardening
             echo "=== Configuring SSH ==="
@@ -143,13 +161,13 @@ jobs:
             # Test current SSH config
             sshd -t || echo "Initial SSH config has issues"
             
-            # Change SSH port to 2222
+            # Change SSH port
             if grep -q "^#Port 22" /etc/ssh/sshd_config; then
-              sed -i 's/^#Port 22/Port 2222/' /etc/ssh/sshd_config
+              sed -i "s/^#Port 22/Port ${{ env.SSH_PORT }}/" /etc/ssh/sshd_config
             elif grep -q "^Port 22" /etc/ssh/sshd_config; then
-              sed -i 's/^Port 22/Port 2222/' /etc/ssh/sshd_config
+              sed -i "s/^Port 22/Port ${{ env.SSH_PORT }}/" /etc/ssh/sshd_config
             else
-              echo "Port 2222" >> /etc/ssh/sshd_config
+              echo "Port ${{ env.SSH_PORT }}" >> /etc/ssh/sshd_config
             fi
             
             # Disable password authentication
@@ -172,7 +190,7 @@ jobs:
             ufw default deny incoming
             ufw default allow outgoing  
             ufw allow 22/tcp comment 'SSH on default port (temporary)'
-            ufw allow 2222/tcp comment 'SSH on custom port'
+            ufw allow ${{ env.SSH_PORT }}/tcp comment 'SSH on custom port'
             
             # Restart SSH service
             echo "=== Restarting SSH service ==="
@@ -224,11 +242,11 @@ jobs:
           # Initial wait to ensure deletion starts
           sleep 10
           
-          # Poll until instance is gone (max 5 minutes)
+          # Poll until instance is gone
           SECONDS=10
           FOUND_DELETING=false
           
-          while [ $SECONDS -lt 300 ]; do
+          while [ $SECONDS -lt ${{ env.DELETION_WAIT_TIMEOUT }} ]; do
             # Check instance status
             STATUS=$(linode-cli linodes view "$INSTANCE_ID" --format "status" --text --no-headers 2>&1 || echo "")
             
@@ -275,21 +293,23 @@ jobs:
       - name: Output connection details
         if: github.event.inputs.action == 'provision'
         run: |
-          echo "## 🔐 Connection Details" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 Development Server Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Type**: Linode 4GB (2 vCPU, 4GB RAM, 80GB SSD)" >> $GITHUB_STEP_SUMMARY
           echo "- **IP Address**: ${{ steps.provision.outputs.ip_address }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **SSH Port**: 2222 (custom)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Username**: archuser (with sudo)" >> $GITHUB_STEP_SUMMARY
+          echo "- **SSH Port**: ${{ env.SSH_PORT }} (custom)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Username**: ${{ env.USERNAME }} (with sudo + docker)" >> $GITHUB_STEP_SUMMARY
           echo "- **Root login**: Disabled" >> $GITHUB_STEP_SUMMARY
+          echo "- **Installed**: Node.js, Python, Docker, Git, Neovim" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Connect using:" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "ssh -p 2222 -i path/to/id_ed25519 archuser@${{ steps.provision.outputs.ip_address }}" >> $GITHUB_STEP_SUMMARY
+          echo "ssh -p ${{ env.SSH_PORT }} -i path/to/id_ed25519 ${{ env.USERNAME }}@${{ steps.provision.outputs.ip_address }}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           
           # Create connection script
           cat > ~/.ssh/connect-${{ github.event.inputs.instance_label }}.sh << 'SCRIPT'
           #!/bin/bash
-          ssh -p 2222 -i "$(dirname "$0")/id_ed25519" archuser@${{ steps.provision.outputs.ip_address }} "$@"
+          ssh -p ${{ env.SSH_PORT }} -i "$(dirname "$0")/id_ed25519" ${{ env.USERNAME }}@${{ steps.provision.outputs.ip_address }} "$@"
           SCRIPT
           chmod +x ~/.ssh/connect-${{ github.event.inputs.instance_label }}.sh
           
@@ -309,13 +329,13 @@ jobs:
           
           ## Manual Connection
           ```bash
-          ssh -p 2222 -i id_ed25519 archuser@${{ steps.provision.outputs.ip_address }}
+          ssh -p ${{ env.SSH_PORT }} -i id_ed25519 ${{ env.USERNAME }}@${{ steps.provision.outputs.ip_address }}
           ```
           
           ## Connection Details
           - **Host**: ${{ steps.provision.outputs.ip_address }}
-          - **Port**: 2222 (custom SSH port)
-          - **User**: archuser (has sudo access)
+          - **Port**: ${{ env.SSH_PORT }} (custom SSH port)
+          - **User**: ${{ env.USERNAME }} (has sudo access)
           - **Auth**: SSH key only (passwords disabled)
           
           ## Files in this Archive
@@ -338,7 +358,7 @@ jobs:
           If connection fails:
           1. Check file permissions: `ls -la id_ed25519` (should be -rw-------)
           2. Verify IP is reachable: `ping ${{ steps.provision.outputs.ip_address }}`
-          3. Check if using correct port: `-p 2222`
+          3. Check if using correct port: `-p ${{ env.SSH_PORT }}`
           README
 
       - name: Save SSH key as artifact
