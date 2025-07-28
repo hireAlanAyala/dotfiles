@@ -394,14 +394,24 @@ jobs:
           # Check if we have GPG key in secrets
           if [ -n "${{ secrets.GPG_PRIVATE_KEY }}" ]; then
             echo "=== Setting up GPG ==="
+            # Create temp file with GPG key
+            echo '${{ secrets.GPG_PRIVATE_KEY }}' > /tmp/gpg_key.txt
+            scp -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 -P ${{ env.SSH_PORT }} \
+              /tmp/gpg_key.txt ${{ env.USERNAME }}@$IP:/tmp/
+            rm /tmp/gpg_key.txt
+            
             $SSH_USER << 'GPGSETUP'
               # Import GPG key
-              echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --import
+              gpg --import /tmp/gpg_key.txt
+              rm /tmp/gpg_key.txt
               
               # Trust the key
-              KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep sec | awk '{print $2}' | cut -d'/' -f2)
-              echo "${KEY_ID}:6:" | gpg --import-ownertrust
-            GPGSETUP
+              KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep sec | awk '{print $2}' | cut -d'/' -f2 | head -1)
+              if [ -n "$KEY_ID" ]; then
+                echo "${KEY_ID}:6:" | gpg --import-ownertrust
+                echo "✅ GPG key imported and trusted"
+              fi
+GPGSETUP
           else
             echo "No GPG key found in secrets, skipping GPG setup"
           fi
@@ -531,97 +541,11 @@ jobs:
           echo "ssh -p ${{ env.SSH_PORT }} -i path/to/id_ed25519 ${{ env.USERNAME }}@${{ steps.provision.outputs.ip_address }}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           
-          # Create connection script
-          cat > ~/.ssh/connect-${{ github.event.inputs.instance_label }}.sh << 'SCRIPT'
-          #!/bin/bash
-          ssh -p ${{ env.SSH_PORT }} -i "$(dirname "$0")/id_ed25519" ${{ env.USERNAME }}@${{ steps.provision.outputs.ip_address }} "$@"
-          SCRIPT
-          chmod +x ~/.ssh/connect-${{ github.event.inputs.instance_label }}.sh
-          
-          # Create README for the artifact
-          cat > ~/.ssh/README.md << 'README'
-          # SSH Connection Files for ${{ github.event.inputs.instance_label }}
-          
-          ## Quick Start
-          ```bash
-          # Make files executable and secure
-          chmod 600 id_ed25519
-          chmod +x connect-${{ github.event.inputs.instance_label }}.sh
-          
-          # Connect to your VPS
-          ./connect-${{ github.event.inputs.instance_label }}.sh
-          ```
-          
-          ## Manual Connection
-          ```bash
-          ssh -p ${{ env.SSH_PORT }} -i id_ed25519 ${{ env.USERNAME }}@${{ steps.provision.outputs.ip_address }}
-          ```
-          
-          ## Connection Details
-          - **Host**: ${{ steps.provision.outputs.ip_address }}
-          - **Port**: ${{ env.SSH_PORT }} (custom SSH port)
-          - **User**: ${{ env.USERNAME }} (has sudo access)
-          - **Auth**: SSH key only (passwords disabled)
-          
-          ## Files in this Archive
-          - `id_ed25519` - Private SSH key (KEEP SECURE!)
-          - `id_ed25519.pub` - Public SSH key
-          - `connect-${{ github.event.inputs.instance_label }}.sh` - Connection helper script
-          - `README.md` - This file
-          
-          ## Security Notes
-          - Keep the private key (`id_ed25519`) secure
-          - Never share your private key
-          - This is your ONLY way to access the VPS
-          - Root login is disabled for security
-          
-          ## Security Features
-          - **Fail2ban**: Protects against brute force attacks (3 attempts = 1 hour ban)
-          - **Automatic Updates**: Daily security updates via systemd timer
-          - **Kernel Hardening**: SYN cookies, IP spoofing protection, etc.
-          - **UFW Firewall**: Only SSH port ${{ env.SSH_PORT }} allowed
-          - **SSH Hardening**: Key-only auth, custom port, no root login
-          
-          ## Development Environment
-          - **Nix Package Manager**: Reproducible, declarative package management
-          - **Home Manager**: User environment managed via Git-tracked configuration
-          - **Tools Included**: Go, Node.js, Python, Docker, CLI tools, and more
-          - **Same as Local**: Identical environment to your local development setup
-          
-          ## First Login Tasks
-          After connecting:
-          1. **Run the install script**: `cd ~/.config && ./install.sh`
-          2. **Restart your shell**: `source ~/.bashrc` or reconnect
-          3. **Optional**: Set up GPG key (if using encrypted configs)
-          4. **Optional**: Run SSH key setup: `~/.ssh/setup_all_ssh_keys.sh --all`
-          
-          ## Updating Your Environment
-          To update packages or configuration:
-          ```bash
-          cd ~/.config
-          git pull
-          home-manager switch --flake .#developer
-          ```
-          
-          ## If You Lose Access
-          - Use Linode's Lish console (web-based terminal)
-          - Or destroy and recreate the VPS
-          
-          ## Troubleshooting
-          If connection fails:
-          1. Check file permissions: `ls -la id_ed25519` (should be -rw-------)
-          2. Verify IP is reachable: `ping ${{ steps.provision.outputs.ip_address }}`
-          3. Check if using correct port: `-p ${{ env.SSH_PORT }}`
-          README
 
-      - name: Save SSH key as artifact
+      - name: Save SSH private key as artifact
         if: github.event.inputs.action == 'provision'
         uses: actions/upload-artifact@v4
         with:
-          name: ssh-keys-${{ github.event.inputs.instance_label }}
-          path: |
-            ~/.ssh/id_ed25519
-            ~/.ssh/id_ed25519.pub
-            ~/.ssh/connect-${{ github.event.inputs.instance_label }}.sh
-            ~/.ssh/README.md
+          name: ssh-private-key-${{ github.event.inputs.instance_label }}
+          path: ~/.ssh/id_ed25519
           retention-days: 30
