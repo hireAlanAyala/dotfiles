@@ -13,3 +13,6 @@ gh/
 pulse/
 systemd/
 
+# Go telemetry data
+go/telemetry/
+
