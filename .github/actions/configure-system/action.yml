@@ -81,7 +81,12 @@ runs:
       shell: bash
       run: |
         IP="${{ inputs.ip_address }}"
-        SSH="ssh -o StrictHostKeyChecking=no -i ${{ inputs.ssh_private_key_path }} root@$IP"
+        # After SSH hardening, we need to use the new port
+        SSH="ssh -o StrictHostKeyChecking=no -i ${{ inputs.ssh_private_key_path }} -p ${{ inputs.ssh_port }} root@$IP"
+        
+        echo "Waiting for SSH to be available on new port ${{ inputs.ssh_port }}..."
+        timeout 60 bash -c "until $SSH 'echo ready' 2>/dev/null; do echo -n '.'; sleep 5; done"
+        echo "SSH is ready on port ${{ inputs.ssh_port }}!"
         
         $SSH "SSH_PORT='${{ inputs.ssh_port }}' SECURITY_PACKAGES='${{ inputs.security_packages }}' /tmp/security-hardening.sh"
 
@@ -89,6 +94,7 @@ runs:
       shell: bash
       run: |
         IP="${{ inputs.ip_address }}"
-        SSH="ssh -o StrictHostKeyChecking=no -i ${{ inputs.ssh_private_key_path }} root@$IP"
+        # Use the new SSH port
+        SSH="ssh -o StrictHostKeyChecking=no -i ${{ inputs.ssh_private_key_path }} -p ${{ inputs.ssh_port }} root@$IP"
         
         $SSH "rm -f /tmp/*.sh"
