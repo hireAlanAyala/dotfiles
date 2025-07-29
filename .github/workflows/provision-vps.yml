@@ -128,3 +128,16 @@ jobs:
         run: |
           echo "✅ VPS provisioned at: ${{ steps.provision.outputs.ip_address }}"
           echo "ssh -p ${{ inputs.ssh_port }} -i path/to/id_ed25519 ${{ inputs.username }}@${{ steps.provision.outputs.ip_address }}"
+          
+          # Add to job summary
+          echo "## ✅ VPS Provisioned Successfully" >> $GITHUB_STEP_SUMMARY
+          echo "- **IP Address**: ${{ steps.provision.outputs.ip_address }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **SSH Port**: ${{ inputs.ssh_port }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Username**: ${{ inputs.username }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Connect with:" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "# After downloading the SSH key artifact:" >> $GITHUB_STEP_SUMMARY
+          echo "chmod 600 ~/Downloads/id_ed25519" >> $GITHUB_STEP_SUMMARY
+          echo "ssh -p ${{ inputs.ssh_port }} -i ~/Downloads/id_ed25519 ${{ inputs.username }}@${{ steps.provision.outputs.ip_address }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

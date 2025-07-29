@@ -57,6 +57,16 @@ jobs:
           echo "## 🎯 Workflow Path: **${{ github.event.inputs.action }}**" >> $GITHUB_STEP_SUMMARY
           echo "- Instance: ${{ env.INSTANCE_LABEL }}" >> $GITHUB_STEP_SUMMARY
           echo "- Region: ${{ env.INSTANCE_REGION }}" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ github.event.inputs.action }}" = "provision" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### SSH Connection" >> $GITHUB_STEP_SUMMARY
+            echo "Download the SSH key artifact and connect with:" >> $GITHUB_STEP_SUMMARY
+            echo '```bash' >> $GITHUB_STEP_SUMMARY
+            echo "chmod 600 ~/Downloads/id_ed25519" >> $GITHUB_STEP_SUMMARY
+            echo "ssh -p ${{ env.SSH_PORT }} -i ~/Downloads/id_ed25519 ${{ env.USERNAME }}@<IP_ADDRESS>" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
 
   provision:
     name: Provision VPS - ${{ needs.setup.outputs.instance_label }}
