@@ -45,13 +45,6 @@ jobs:
       deletion_wait_timeout: ${{ env.DELETION_WAIT_TIMEOUT }}
     
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Linode CLI
-        uses: ./.github/actions/setup-linode-cli
-        with:
-          linode_token: ${{ secrets.LINODE_API_TOKEN }}
-      
       - name: Validate environment
         run: |
           echo "✅ Setup complete"

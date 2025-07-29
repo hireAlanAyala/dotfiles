@@ -43,6 +43,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Setup Linode CLI
+        uses: ./.github/actions/setup-linode-cli
+        with:
+          linode_token: ${{ secrets.linode_api_token }}
+      
       - name: Generate SSH key
         id: ssh
         run: |
