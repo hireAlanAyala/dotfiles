@@ -87,13 +87,33 @@ if [ -f ~/.nix-profile/etc/profile.d/hm-session-vars.sh ]; then
     echo "✅ Home Manager environment sourced"
 fi
 
-# Setup SSH keys after Home Manager (if script exists)
+# Setup SSH keys after Home Manager
 echo ""
 echo "=== Setting up SSH keys ==="
-if [ -f ~/.ssh/setup_all_ssh_keys.sh ]; then
-    ~/.ssh/setup_all_ssh_keys.sh --all || echo "SSH key setup completed with some warnings"
+~/.ssh/setup_all_ssh_keys.sh --all || echo "SSH key setup completed with some warnings"
+
+# Setup zsh as default shell
+echo ""
+echo "=== Setting up zsh as default shell ==="
+if command -v zsh >/dev/null; then
+    ZSH_PATH=$(which zsh)
+    
+    # Add zsh to /etc/shells if not already there
+    if ! grep -q "$ZSH_PATH" /etc/shells 2>/dev/null; then
+        echo "Adding $ZSH_PATH to /etc/shells..."
+        echo "$ZSH_PATH" | sudo tee -a /etc/shells
+    fi
+    
+    # Change default shell to zsh
+    if [ "$SHELL" != "$ZSH_PATH" ]; then
+        echo "Changing default shell to zsh..."
+        chsh -s "$ZSH_PATH"
+        echo "✅ Default shell changed to zsh"
+    else
+        echo "✅ Default shell is already zsh"
+    fi
 else
-    echo "⚠️  SSH setup script not found, skipping SSH key setup"
+    echo "⚠️  zsh not found, skipping shell setup"
 fi
 
 # Show what's installed
@@ -112,9 +132,10 @@ echo ""
 echo "🎉 Installation complete!"
 echo ""
 echo "📝 Next steps:"
-echo "1. Restart your shell or run: source ~/.bashrc"
-echo "2. Optional: Set up GPG keys for encrypted configs"
-echo "3. Optional: Run SSH key setup: ~/.ssh/setup_all_ssh_keys.sh --all"
+echo "1. IMPORTANT: Log out and log back in (or restart your terminal) for zsh to become default"
+echo "2. Or manually switch to zsh now: source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && zsh"
+echo "3. Optional: Set up GPG keys for encrypted configs"
+echo "4. Optional: Run SSH key setup: ~/.ssh/setup_all_ssh_keys.sh --all"
 echo ""
 echo "To update your configuration in the future:"
 echo "  cd ~/.config && git pull && home-manager switch --flake .#developer"
