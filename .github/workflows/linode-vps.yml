@@ -1,5 +1,5 @@
-name: Manage Linode VPS - ${{ inputs.action || 'manual' }}
-run-name: ${{ inputs.action }} VPS '${{ inputs.action == 'provision' && 'dev-server' || 'dev-server' }}' by @${{ github.actor }}
+name: Manage Linode VPS
+run-name: ${{ github.event.inputs.action }} VPS 'dev-server' by @${{ github.actor }}
 
 on:
   workflow_dispatch:
