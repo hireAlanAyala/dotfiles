@@ -11,32 +11,16 @@ on:
         options:
           - provision
           - destroy
-          - status
-      instance_label:
-        description: 'Instance label'
-        required: false
-        default: 'dev-server'
-      instance_type:
-        description: 'Instance type'
-        required: false
-        default: 'g6-standard-2'
-      instance_region:
-        description: 'Instance region'
-        required: false
-        default: 'us-east'
-      dns_subdomain:
-        description: 'DNS subdomain (optional, e.g. "myserver" for myserver.yourdomain.com)'
-        required: false
-        default: ''
-      post_provision_script_url:
-        description: 'URL to post-provision setup script (optional)'
-        required: false
-        default: ''
 
 env:
   # User configuration
   USERNAME: developer
   SSH_PORT: 2222
+  
+  # Instance configuration (hardcoded)
+  INSTANCE_LABEL: dev-server
+  INSTANCE_TYPE: g6-standard-2
+  INSTANCE_REGION: us-east
   
   # Timeouts
   SSH_WAIT_TIMEOUT: 600  # 10 minutes
@@ -44,488 +28,58 @@ env:
   
   # Package lists
   ESSENTIAL_PACKAGES: "sudo ufw git curl xz age sops gnupg"
-  SECURITY_PACKAGES: "fail2ban rkhunter lynis"
-  # Dev packages now managed by Nix/Home Manager
-  
-  # System configuration
-  SWAP_SIZE: "4G"  # Swap file size (empty to skip)
-  ENABLE_BACKUPS: "false"  # Enable Linode backups ($2/month for Nanode)
+  SECURITY_PACKAGES: "fail2ban"
 
 jobs:
-  manage-vps:
+  setup:
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.action == 'destroy' && 'destroy-approval' || 'production' }}
-    env:
-      LINODE_CLI_TOKEN: ${{ secrets.LINODE_API_TOKEN }}
+    outputs:
+      action: ${{ github.event.inputs.action }}
+      instance_label: ${{ env.INSTANCE_LABEL }}
+      instance_type: ${{ env.INSTANCE_TYPE }}
+      instance_region: ${{ env.INSTANCE_REGION }}
+      username: ${{ env.USERNAME }}
+      ssh_port: ${{ env.SSH_PORT }}
+      essential_packages: ${{ env.ESSENTIAL_PACKAGES }}
+      security_packages: ${{ env.SECURITY_PACKAGES }}
+      deletion_wait_timeout: ${{ env.DELETION_WAIT_TIMEOUT }}
     
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup
-        run: |
-          pip install linode-cli
-          # Verify CLI is working
-          linode-cli --version || exit 1
-      
-      - name: Generate SSH key if needed
-        id: ssh
-        run: |
-          if [ "${{ github.event.inputs.action }}" = "provision" ]; then
-            ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N "" -C "github-actions@arch-vps"
-            echo "public_key=$(cat ~/.ssh/id_ed25519.pub)" >> $GITHUB_OUTPUT
-          fi
-      
-      - name: Check for existing instance
-        if: github.event.inputs.action == 'provision'
-        id: check_existing
-        run: |
-          EXISTING=$(linode-cli linodes list \
-            --label "${{ github.event.inputs.instance_label }}" \
-            --text --no-headers --format "id,ipv4,status" || echo "")
-          
-          if [ -n "$EXISTING" ]; then
-            echo "❌ Instance '${{ github.event.inputs.instance_label }}' already exists:"
-            echo "$EXISTING"
-            echo "exists=true" >> $GITHUB_OUTPUT
-            exit 1
-          else
-            echo "✅ No existing instance found with label '${{ github.event.inputs.instance_label }}'"
-            echo "exists=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Provision VPS
-        if: github.event.inputs.action == 'provision' && steps.check_existing.outputs.exists != 'true'
-        id: provision
-        run: |
-          echo "=== Starting VPS provision at $(date) ==="
-          
-          # Create instance and get IP
-          IP=$(linode-cli linodes create \
-            --label "${{ github.event.inputs.instance_label }}" \
-            --root_pass "${{ secrets.ROOT_PASSWORD }}" \
-            --type "${{ github.event.inputs.instance_type }}" \
-            --region "${{ github.event.inputs.instance_region }}" \
-            --image "linode/arch" \
-            --authorized_keys "${{ steps.ssh.outputs.public_key }}" \
-            --text --no-headers --format "ipv4")
-          
-          echo "ip_address=$IP" >> $GITHUB_OUTPUT
-          echo "✅ Created ${{ github.event.inputs.instance_label }} at $IP"
-          echo "=== VPS created at $(date) ==="
-      
-      - name: Configure instance
-        if: github.event.inputs.action == 'provision'
-        run: |
-          IP="${{ steps.provision.outputs.ip_address }}"
-          echo "Configuring instance at IP: $IP"
-          SSH="ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 root@$IP"
-          
-          # Wait for SSH (max timeout)
-          echo "Waiting for SSH to be available at $IP..."
-          timeout ${{ env.SSH_WAIT_TIMEOUT }} bash -c "until $SSH 'echo ready' 2>/dev/null; do echo -n '.'; sleep 10; done"
-          echo "SSH is ready!"
-          
-          # Configure system
-          $SSH << 'EOF'
-            set -x  # Enable command tracing
-            
-            echo "=== Starting configuration at $(date) ==="
-            
-            # Enable parallel downloads for faster package installation
-            sed -i 's/^#ParallelDownloads.*/ParallelDownloads = 5/' /etc/pacman.conf
-            
-            # Skip full system update, just sync package database
-            echo "Syncing package database..."
-            time pacman -Sy --noconfirm
-            
-            # Install essential packages first
-            echo "Installing essential packages..."
-            time pacman -S --noconfirm ${{ env.ESSENTIAL_PACKAGES }}
-            
-            # Create non-root user
-            useradd -m -s /bin/bash -G wheel ${{ env.USERNAME }}
-            echo "${{ env.USERNAME }}:${{ secrets.ROOT_PASSWORD }}" | chpasswd
-            
-            # Configure swap file for development workloads
-            if [ -n "${{ env.SWAP_SIZE }}" ]; then
-              echo "Creating ${{ env.SWAP_SIZE }} swap file..."
-              fallocate -l ${{ env.SWAP_SIZE }} /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=4096
-              chmod 600 /swapfile
-              mkswap /swapfile
-              swapon /swapfile
-              echo '/swapfile none swap sw 0 0' >> /etc/fstab
-              
-              # Adjust swappiness for development server
-              echo 'vm.swappiness=10' >> /etc/sysctl.d/99-swappiness.conf
-              sysctl -p /etc/sysctl.d/99-swappiness.conf
-            fi
-            
-            # Configure sudo
-            echo "%wheel ALL=(ALL) ALL" > /etc/sudoers.d/wheel
-            chmod 440 /etc/sudoers.d/wheel
-            
-            # Copy SSH keys to new user
-            mkdir -p /home/${{ env.USERNAME }}/.ssh
-            cp /root/.ssh/authorized_keys /home/${{ env.USERNAME }}/.ssh/
-            chown -R ${{ env.USERNAME }}:${{ env.USERNAME }} /home/${{ env.USERNAME }}/.ssh
-            chmod 700 /home/${{ env.USERNAME }}/.ssh
-            chmod 600 /home/${{ env.USERNAME }}/.ssh/authorized_keys
-            
-            # SSH Hardening
-            echo "=== Configuring SSH ==="
-            
-            # Backup original config
-            cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup
-            
-            # Test current SSH config
-            sshd -t || echo "Initial SSH config has issues"
-            
-            # Change SSH port
-            if grep -q "^#Port 22" /etc/ssh/sshd_config; then
-              sed -i "s/^#Port 22/Port ${{ env.SSH_PORT }}/" /etc/ssh/sshd_config
-            elif grep -q "^Port 22" /etc/ssh/sshd_config; then
-              sed -i "s/^Port 22/Port ${{ env.SSH_PORT }}/" /etc/ssh/sshd_config
-            else
-              echo "Port ${{ env.SSH_PORT }}" >> /etc/ssh/sshd_config
-            fi
-            
-            # Disable password authentication
-            sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
-            
-            # Disable root login
-            sed -i 's/^#*PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
-            
-            # Test the new configuration
-            echo "Testing SSH configuration..."
-            if ! sshd -t; then
-              echo "SSH configuration test failed! Restoring backup..."
-              cp /etc/ssh/sshd_config.backup /etc/ssh/sshd_config
-              exit 1
-            fi
-            
-            # Configure firewall BEFORE restarting SSH
-            echo "=== Configuring firewall ==="
-            ufw --force enable
-            ufw default deny incoming
-            ufw default allow outgoing  
-            ufw allow 22/tcp comment 'SSH on default port (temporary)'
-            ufw allow ${{ env.SSH_PORT }}/tcp comment 'SSH on custom port'
-            
-            # Restart SSH service
-            echo "=== Restarting SSH service ==="
-            # Try both service names (Arch might use either)
-            if systemctl is-active sshd &>/dev/null; then
-              systemctl restart sshd || {
-                echo "SSH restart failed! Checking status..."
-                systemctl status sshd
-                journalctl -xeu sshd.service | tail -20
-                # Don't exit, continue with setup
-              }
-            else
-              systemctl restart ssh || {
-                echo "SSH restart failed! Checking status..."
-                systemctl status ssh
-                journalctl -xeu ssh.service | tail -20
-                # Don't exit, continue with setup
-              }
-            fi
-            
-            # Remove temporary port 22 access now that SSH is on 2222
-            echo "=== Removing temporary port 22 access ==="
-            ufw delete allow 22/tcp
-            ufw status verbose
-            
-            # Security Hardening
-            echo "=== Installing security packages ==="
-            time pacman -S --noconfirm ${{ env.SECURITY_PACKAGES }}
-            
-            # Configure fail2ban for SSH protection
-            echo "=== Configuring fail2ban ==="
-            cat > /etc/fail2ban/jail.local << 'FAIL2BAN'
-            [DEFAULT]
-            bantime = 3600
-            findtime = 600
-            maxretry = 3
-            destemail = root@localhost
-            action = %(action_mwl)s
-            
-            [sshd]
-            enabled = true
-            port = ${{ env.SSH_PORT }}
-            filter = sshd
-            logpath = /var/log/auth.log
-            maxretry = 3
-            bantime = 3600
-            FAIL2BAN
-            
-            systemctl enable fail2ban
-            systemctl start fail2ban
-            
-            # Configure automatic security updates
-            echo "=== Setting up automatic security updates ==="
-            
-            # Create systemd service for security updates
-            cat > /etc/systemd/system/security-updates.service << 'SERVICE'
-            [Unit]
-            Description=Automatic Security Updates
-            After=network.target
-            
-            [Service]
-            Type=oneshot
-            ExecStart=/usr/bin/pacman -Syu --noconfirm
-            StandardOutput=journal
-            StandardError=journal
-            SERVICE
-            
-            # Create systemd timer for daily security updates
-            cat > /etc/systemd/system/security-updates.timer << 'TIMER'
-            [Unit]
-            Description=Daily Security Updates
-            Persistent=true
-            
-            [Timer]
-            OnCalendar=daily
-            RandomizedDelaySec=1h
-            Persistent=true
-            
-            [Install]
-            WantedBy=timers.target
-            TIMER
-            
-            systemctl daemon-reload
-            systemctl enable security-updates.timer
-            systemctl start security-updates.timer
-            
-            # Additional hardening
-            echo "=== Applying additional security hardening ==="
-            
-            # Kernel hardening via sysctl
-            cat >> /etc/sysctl.d/99-security.conf << 'SYSCTL'
-            # IP Spoofing protection
-            net.ipv4.conf.all.rp_filter = 1
-            net.ipv4.conf.default.rp_filter = 1
-            
-            # Ignore ICMP redirects
-            net.ipv4.conf.all.accept_redirects = 0
-            net.ipv6.conf.all.accept_redirects = 0
-            
-            # Ignore send redirects
-            net.ipv4.conf.all.send_redirects = 0
-            
-            # Disable source packet routing
-            net.ipv4.conf.all.accept_source_route = 0
-            net.ipv6.conf.all.accept_source_route = 0
-            
-            # Log Martians
-            net.ipv4.conf.all.log_martians = 1
-            
-            # Ignore ICMP ping requests
-            net.ipv4.icmp_echo_ignore_broadcasts = 1
-            
-            # Ignore Directed pings
-            net.ipv4.icmp_ignore_bogus_error_responses = 1
-            
-            # Enable TCP/IP SYN cookies
-            net.ipv4.tcp_syncookies = 1
-            net.ipv4.tcp_synack_retries = 2
-            SYSCTL
-            
-            sysctl -p /etc/sysctl.d/99-security.conf
-            
-            # Set secure permissions on sensitive files
-            chmod 600 /etc/ssh/sshd_config
-            chmod 700 /root
-            chmod 644 /etc/passwd
-            chmod 644 /etc/group
-            chmod 600 /etc/shadow
-            chmod 600 /etc/gshadow
-            
-            # Show security status
-            echo "=== Security configuration summary ==="
-            fail2ban-client status
-            systemctl list-timers security-updates.timer
-            ufw status verbose
-            
-            echo "=== Configuration complete at $(date) ==="
-          EOF
-          
-      - name: Prepare for manual setup
-        if: github.event.inputs.action == 'provision'
-        run: |
-          IP="${{ steps.provision.outputs.ip_address }}"
-          SSH_ROOT="ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 root@$IP"
-          SSH_USER="ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 -p ${{ env.SSH_PORT }} ${{ env.USERNAME }}@$IP"
-          
-          echo "=== Cloning dotfiles repository ==="
-          
-          # Clone the dotfiles repository
-          $SSH_USER << 'GITCLONE'
-            cd ~
-            if [ -d ".config" ]; then
-              mv .config .config.backup.$(date +%s)
-            fi
-            
-            git clone https://github.com/${{ github.repository }}.git .config
-            echo "✅ Configuration repository cloned to ~/.config"
-          GITCLONE
-          
-          # Note: The temporary passwordless sudo file (if created) can be removed manually after setup
-          
-          echo ""
-          echo "🎉 VPS provisioned successfully!"
-          echo "📝 Next steps for manual setup:"
-          echo ""
-          echo "1. Connect to your VPS:"
-          echo "   ssh -p ${{ env.SSH_PORT }} -i path/to/id_ed25519 ${{ env.USERNAME }}@$IP"
-          echo ""
-          echo "2. Run the install script:"
-          echo "   cd ~/.config && ./install.sh"
-          echo ""
-          echo "3. Optional: Set up GPG and SSH keys as needed"
-          echo ""
-          
-      - name: Setup SSH keys and GPG (if secrets available)
-        if: github.event.inputs.action == 'provision'
-        continue-on-error: true
-        run: |
-          IP="${{ steps.provision.outputs.ip_address }}"
-          SSH_USER="ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 -p ${{ env.SSH_PORT }} ${{ env.USERNAME }}@$IP"
-          
-          # Check if we have GPG key in secrets
-          if [ -n "${{ secrets.GPG_PRIVATE_KEY }}" ]; then
-            echo "=== Setting up GPG ==="
-            # Create temp file with GPG key
-            echo '${{ secrets.GPG_PRIVATE_KEY }}' > /tmp/gpg_key.txt
-            scp -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 -P ${{ env.SSH_PORT }} \
-              /tmp/gpg_key.txt ${{ env.USERNAME }}@$IP:/tmp/gpg_key.txt
-            rm /tmp/gpg_key.txt
-            
-            # Run the setup script with GPG key
-            $SSH_USER "~/.config/scripts/setup-gpg-ssh.sh /tmp/gpg_key.txt"
-          else
-            echo "No GPG key found in secrets, running setup without GPG"
-            # Run the setup script without GPG key
-            $SSH_USER "~/.config/scripts/setup-gpg-ssh.sh"
-          fi
-          
-      - name: Run post-provision script
-        if: github.event.inputs.action == 'provision' && github.event.inputs.post_provision_script_url != ''
-        run: |
-          IP="${{ steps.provision.outputs.ip_address }}"
-          SSH="ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 -p ${{ env.SSH_PORT }} ${{ env.USERNAME }}@$IP"
-          
-          echo "Running post-provision script from: ${{ github.event.inputs.post_provision_script_url }}"
-          
-          $SSH << 'EOF'
-            set -e
-            curl -fsSL "${{ github.event.inputs.post_provision_script_url }}" -o /tmp/post_provision.sh
-            chmod +x /tmp/post_provision.sh
-            /tmp/post_provision.sh
-            rm -f /tmp/post_provision.sh
-          EOF
-      
-      - name: Destroy VPS
-        if: github.event.inputs.action == 'destroy'
-        run: |
-          # Get instance ID
-          INSTANCE_ID=$(linode-cli linodes list \
-            --label "${{ github.event.inputs.instance_label }}" \
-            --text --no-headers --format "id" || echo "")
-          
-          if [ -z "$INSTANCE_ID" ]; then
-            echo "❌ No instance found with label: ${{ github.event.inputs.instance_label }}"
-            exit 0
-          fi
-          
-          echo "🗑️ Initiating deletion of instance ID: $INSTANCE_ID"
-          
-          # Start deletion
-          linode-cli linodes delete "$INSTANCE_ID"
-          
-          echo "⏳ Waiting for instance to be fully deleted..."
-          
-          # Initial wait to ensure deletion starts
-          sleep 10
-          
-          # Poll until instance is gone
-          SECONDS=10
-          FOUND_DELETING=false
-          
-          while [ $SECONDS -lt ${{ env.DELETION_WAIT_TIMEOUT }} ]; do
-            # Check instance status
-            STATUS=$(linode-cli linodes view "$INSTANCE_ID" --format "status" --text --no-headers 2>&1 || echo "")
-            
-            if [[ "$STATUS" == *"not found"* ]] || [[ "$STATUS" == *"404"* ]] || [ -z "$STATUS" ]; then
-              # Instance not found - but wait a bit more to ensure it's really gone
-              echo "   Instance not found in API (elapsed: ${SECONDS}s)"
-              
-              # Double-check by listing all instances
-              if ! linode-cli linodes list --text --no-headers | grep -q "$INSTANCE_ID"; then
-                echo "   Verified: Instance ID $INSTANCE_ID no longer in instance list"
-                
-                # Wait additional time to ensure cleanup is complete
-                echo "   Waiting 20 more seconds for complete cleanup..."
-                sleep 20
-                
-                # Final check
-                if ! linode-cli linodes list --text --no-headers | grep -q "$INSTANCE_ID"; then
-                  echo "✅ Instance successfully deleted after $((SECONDS + 20)) seconds"
-                  break
-                fi
-              fi
-            elif [[ "$STATUS" == "deleting" ]] || [[ "$STATUS" == "shutting_down" ]]; then
-              FOUND_DELETING=true
-              echo "   Status: $STATUS (elapsed: ${SECONDS}s)"
-            else
-              echo "   Status: $STATUS (elapsed: ${SECONDS}s)"
-            fi
-            
-            sleep 5
-          done
-          
-          # Final verification with list command
-          if linode-cli linodes list --text --no-headers | grep -q "$INSTANCE_ID"; then
-            echo "⚠️ Warning: Instance still appears in list after 5 minutes"
-            exit 1
-          else
-            echo "✅ Deletion confirmed - instance no longer in Linode account"
-          fi
-      
-      - name: Show VPS Status
-        if: github.event.inputs.action == 'status'
-        run: |
-          echo "## 📊 Linode VPS Status" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          linode-cli linodes list --text | tee -a $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          
-          # Show detailed status in logs
-          linode-cli linodes list
-      
-      - name: Output connection details
-        if: github.event.inputs.action == 'provision'
-        run: |
-          echo "## 🚀 Development Server Details" >> $GITHUB_STEP_SUMMARY
-          echo "- **Type**: Linode 4GB (2 vCPU, 4GB RAM, 80GB SSD)" >> $GITHUB_STEP_SUMMARY
-          echo "- **IP Address**: ${{ steps.provision.outputs.ip_address }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **SSH Port**: ${{ env.SSH_PORT }} (custom)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Username**: ${{ env.USERNAME }} (with sudo)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Root login**: Disabled" >> $GITHUB_STEP_SUMMARY
-          echo "- **Package Manager**: Nix + Home Manager (declarative)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Development Tools**: Via home-manager config" >> $GITHUB_STEP_SUMMARY
-          echo "- **Security**: Fail2ban, automatic updates, kernel hardening" >> $GITHUB_STEP_SUMMARY
-          echo "- **Swap**: ${{ env.SWAP_SIZE }} configured" >> $GITHUB_STEP_SUMMARY
-          echo "- **Monthly Cost**: ~\$24/month" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Connect using:" >> $GITHUB_STEP_SUMMARY
-          echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "ssh -p ${{ env.SSH_PORT }} -i path/to/id_ed25519 ${{ env.USERNAME }}@${{ steps.provision.outputs.ip_address }}" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-
-      - name: Save SSH private key as artifact
-        if: github.event.inputs.action == 'provision'
-        uses: actions/upload-artifact@v4
+      - name: Setup Linode CLI
+        uses: ./.github/actions/setup-linode-cli
         with:
-          name: ssh-private-key-${{ github.event.inputs.instance_label }}
-          path: ~/.ssh/id_ed25519
-          retention-days: 30
+          linode_token: ${{ secrets.LINODE_API_TOKEN }}
+      
+      - name: Validate environment
+        run: |
+          echo "✅ Setup complete"
+          echo "Action: ${{ github.event.inputs.action }}"
+          echo "Instance: ${{ env.INSTANCE_LABEL }}"
+
+  provision:
+    needs: setup
+    if: needs.setup.outputs.action == 'provision'
+    uses: ./.github/workflows/provision-vps.yml
+    with:
+      instance_label: ${{ needs.setup.outputs.instance_label }}
+      instance_type: ${{ needs.setup.outputs.instance_type }}
+      instance_region: ${{ needs.setup.outputs.instance_region }}
+      username: ${{ needs.setup.outputs.username }}
+      ssh_port: ${{ needs.setup.outputs.ssh_port }}
+      essential_packages: ${{ needs.setup.outputs.essential_packages }}
+      security_packages: ${{ needs.setup.outputs.security_packages }}
+    secrets:
+      linode_api_token: ${{ secrets.LINODE_API_TOKEN }}
+      root_password: ${{ secrets.ROOT_PASSWORD }}
+
+  destroy:
+    needs: setup
+    if: needs.setup.outputs.action == 'destroy'
+    uses: ./.github/workflows/destroy-vps.yml
+    with:
+      instance_label: ${{ needs.setup.outputs.instance_label }}
+      deletion_wait_timeout: ${{ needs.setup.outputs.deletion_wait_timeout }}
+    secrets:
+      linode_api_token: ${{ secrets.LINODE_API_TOKEN }}

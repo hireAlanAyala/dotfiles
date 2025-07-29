@@ -31,23 +31,7 @@ if ! id "$USERNAME" &>/dev/null; then
     fi
 fi
 
-# Configure swap file for development workloads
-if [ -n "$SWAP_SIZE" ]; then
-    echo "Creating $SWAP_SIZE swap file..."
-    fallocate -l "$SWAP_SIZE" /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=4096
-    chmod 600 /swapfile
-    mkswap /swapfile
-    swapon /swapfile
-    
-    # Add to fstab if not already present
-    if ! grep -q '/swapfile' /etc/fstab; then
-        echo '/swapfile none swap sw 0 0' >> /etc/fstab
-    fi
-    
-    # Adjust swappiness for development server
-    echo 'vm.swappiness=10' >> /etc/sysctl.d/99-swappiness.conf
-    sysctl -p /etc/sysctl.d/99-swappiness.conf
-fi
+# Swap configuration removed for simplicity
 
 # Configure sudo
 echo "%wheel ALL=(ALL) ALL" > /etc/sudoers.d/wheel

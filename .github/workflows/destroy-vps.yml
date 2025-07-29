@@ -1,0 +1,89 @@
+name: Destroy VPS
+
+on:
+  workflow_call:
+    inputs:
+      instance_label:
+        required: true
+        type: string
+      deletion_wait_timeout:
+        required: true
+        type: string
+    secrets:
+      linode_api_token:
+        required: true
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Destroy VPS
+        env:
+          LINODE_CLI_TOKEN: ${{ secrets.linode_api_token }}
+        run: |
+          # Get instance ID
+          INSTANCE_ID=$(linode-cli linodes list \
+            --label "${{ inputs.instance_label }}" \
+            --text --no-headers --format "id" || echo "")
+          
+          if [ -z "$INSTANCE_ID" ]; then
+            echo "❌ No instance found with label: ${{ inputs.instance_label }}"
+            exit 0
+          fi
+          
+          echo "🗑️ Initiating deletion of instance ID: $INSTANCE_ID"
+          
+          # Start deletion
+          linode-cli linodes delete "$INSTANCE_ID"
+          
+          echo "⏳ Waiting for instance to be fully deleted..."
+          
+          # Initial wait to ensure deletion starts
+          sleep 10
+          
+          # Poll until instance is gone
+          SECONDS=10
+          FOUND_DELETING=false
+          
+          while [ $SECONDS -lt ${{ inputs.deletion_wait_timeout }} ]; do
+            # Check instance status
+            STATUS=$(linode-cli linodes view "$INSTANCE_ID" --format "status" --text --no-headers 2>&1 || echo "")
+            
+            if [[ "$STATUS" == *"not found"* ]] || [[ "$STATUS" == *"404"* ]] || [ -z "$STATUS" ]; then
+              # Instance not found - but wait a bit more to ensure it's really gone
+              echo "   Instance not found in API (elapsed: ${SECONDS}s)"
+              
+              # Double-check by listing all instances
+              if ! linode-cli linodes list --text --no-headers | grep -q "$INSTANCE_ID"; then
+                echo "   Verified: Instance ID $INSTANCE_ID no longer in instance list"
+                
+                # Wait additional time to ensure cleanup is complete
+                echo "   Waiting 20 more seconds for complete cleanup..."
+                sleep 20
+                
+                # Final check
+                if ! linode-cli linodes list --text --no-headers | grep -q "$INSTANCE_ID"; then
+                  echo "✅ Instance successfully deleted after $((SECONDS + 20)) seconds"
+                  break
+                fi
+              fi
+            elif [[ "$STATUS" == "deleting" ]] || [[ "$STATUS" == "shutting_down" ]]; then
+              FOUND_DELETING=true
+              echo "   Status: $STATUS (elapsed: ${SECONDS}s)"
+            else
+              echo "   Status: $STATUS (elapsed: ${SECONDS}s)"
+            fi
+            
+            sleep 5
+          done
+          
+          # Final verification with list command
+          if linode-cli linodes list --text --no-headers | grep -q "$INSTANCE_ID"; then
+            echo "⚠️ Warning: Instance still appears in list after 5 minutes"
+            exit 1
+          else
+            echo "✅ Deletion confirmed - instance no longer in Linode account"
+          fi

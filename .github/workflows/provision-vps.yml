@@ -1,0 +1,102 @@
+name: Provision VPS
+
+on:
+  workflow_call:
+    inputs:
+      instance_label:
+        required: true
+        type: string
+      instance_type:
+        required: true
+        type: string
+      instance_region:
+        required: true
+        type: string
+      username:
+        required: true
+        type: string
+      ssh_port:
+        required: true
+        type: string
+      essential_packages:
+        required: true
+        type: string
+      security_packages:
+        required: true
+        type: string
+    secrets:
+      linode_api_token:
+        required: true
+      root_password:
+        required: true
+    outputs:
+      ip_address:
+        description: 'IP address of provisioned instance'
+        value: ${{ jobs.provision.outputs.ip_address }}
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    outputs:
+      ip_address: ${{ steps.provision.outputs.ip_address }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Generate SSH key
+        id: ssh
+        run: |
+          ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N "" -C "github-actions@arch-vps"
+          echo "public_key=$(cat ~/.ssh/id_ed25519.pub)" >> $GITHUB_OUTPUT
+      
+      - name: Provision instance
+        id: provision
+        uses: ./.github/actions/provision-instance
+        with:
+          instance_label: ${{ inputs.instance_label }}
+          instance_type: ${{ inputs.instance_type }}
+          instance_region: ${{ inputs.instance_region }}
+          root_password: ${{ secrets.root_password }}
+          ssh_public_key: ${{ steps.ssh.outputs.public_key }}
+          linode_token: ${{ secrets.linode_api_token }}
+      
+      - name: Configure system
+        uses: ./.github/actions/configure-system
+        with:
+          ip_address: ${{ steps.provision.outputs.ip_address }}
+          username: ${{ inputs.username }}
+          ssh_port: ${{ inputs.ssh_port }}
+          root_password: ${{ secrets.root_password }}
+          ssh_wait_timeout: '600'
+          essential_packages: ${{ inputs.essential_packages }}
+          security_packages: ${{ inputs.security_packages }}
+      
+      - name: Setup dotfiles
+        run: |
+          IP="${{ steps.provision.outputs.ip_address }}"
+          SSH_USER="ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 -p ${{ inputs.ssh_port }} ${{ inputs.username }}@$IP"
+          
+          echo "=== Cloning dotfiles repository ==="
+          
+          # Clone the dotfiles repository
+          $SSH_USER << 'EOF'
+            cd ~
+            if [ -d ".config" ]; then
+              mv .config .config.backup.$(date +%s)
+            fi
+            
+            git clone https://github.com/${{ github.repository }}.git .config
+            echo "✅ Configuration repository cloned to ~/.config"
+          EOF
+      
+      - name: Save SSH private key as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ssh-private-key-${{ inputs.instance_label }}
+          path: ~/.ssh/id_ed25519
+          retention-days: 30
+      
+      - name: Output connection details
+        run: |
+          echo "✅ VPS provisioned at: ${{ steps.provision.outputs.ip_address }}"
+          echo "ssh -p ${{ inputs.ssh_port }} -i path/to/id_ed25519 ${{ inputs.username }}@${{ steps.provision.outputs.ip_address }}"

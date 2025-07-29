@@ -31,10 +31,6 @@ inputs:
     description: 'Security packages to install'
     required: true
     default: 'fail2ban rkhunter lynis'
-  swap_size:
-    description: 'Swap file size'
-    required: true
-    default: '4G'
 runs:
   using: 'composite'
   steps:
@@ -72,7 +68,7 @@ runs:
           set -x
           
           # Run system setup
-          USERNAME='${{ inputs.username }}' ROOT_PASSWORD='${{ inputs.root_password }}' ESSENTIAL_PACKAGES='${{ inputs.essential_packages }}' SWAP_SIZE='${{ inputs.swap_size }}' /tmp/system-setup.sh
+          USERNAME='${{ inputs.username }}' ROOT_PASSWORD='${{ inputs.root_password }}' ESSENTIAL_PACKAGES='${{ inputs.essential_packages }}' /tmp/system-setup.sh
           
           # Run SSH hardening  
           SSH_PORT='${{ inputs.ssh_port }}' USERNAME='${{ inputs.username }}' /tmp/ssh-hardening.sh
