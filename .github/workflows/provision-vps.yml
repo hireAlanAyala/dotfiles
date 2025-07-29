@@ -29,6 +29,8 @@ on:
         required: true
       root_password:
         required: true
+      gpg_private_key:
+        required: false
     outputs:
       ip_address:
         description: 'IP address of provisioned instance'
@@ -93,6 +95,27 @@ jobs:
             git clone https://github.com/${{ github.repository }}.git .config
             echo "✅ Configuration repository cloned to ~/.config"
           EOF
+      
+      - name: Setup GPG keys
+        continue-on-error: true
+        run: |
+          IP="${{ steps.provision.outputs.ip_address }}"
+          SSH_USER="ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 -p ${{ inputs.ssh_port }} ${{ inputs.username }}@$IP"
+          
+          # Check if we have GPG key in secrets
+          if [ -n "${{ secrets.gpg_private_key }}" ]; then
+            echo "=== Setting up GPG ==="
+            # Create temp file with GPG key
+            echo '${{ secrets.gpg_private_key }}' > /tmp/gpg_key.txt
+            scp -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 -P ${{ inputs.ssh_port }} \
+              /tmp/gpg_key.txt ${{ inputs.username }}@$IP:/tmp/gpg_key.txt
+            rm /tmp/gpg_key.txt
+            
+            # Run the setup script with GPG key
+            $SSH_USER "~/.config/provision/setup-gpg-ssh.sh /tmp/gpg_key.txt"
+          else
+            echo "No GPG key found in secrets, skipping GPG setup"
+          fi
       
       - name: Save SSH private key as artifact
         uses: actions/upload-artifact@v4
