@@ -1,4 +1,5 @@
-name: Manage Linode VPS
+name: Manage Linode VPS - ${{ inputs.action || 'manual' }}
+run-name: ${{ inputs.action }} VPS '${{ inputs.action == 'provision' && 'dev-server' || 'dev-server' }}' by @${{ github.actor }}
 
 on:
   workflow_dispatch:
@@ -32,6 +33,7 @@ env:
 
 jobs:
   setup:
+    name: Setup - ${{ github.event.inputs.action }}
     runs-on: ubuntu-latest
     outputs:
       action: ${{ github.event.inputs.action }}
@@ -50,8 +52,14 @@ jobs:
           echo "✅ Setup complete"
           echo "Action: ${{ github.event.inputs.action }}"
           echo "Instance: ${{ env.INSTANCE_LABEL }}"
+          
+          # Add to job summary
+          echo "## 🎯 Workflow Path: **${{ github.event.inputs.action }}**" >> $GITHUB_STEP_SUMMARY
+          echo "- Instance: ${{ env.INSTANCE_LABEL }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Region: ${{ env.INSTANCE_REGION }}" >> $GITHUB_STEP_SUMMARY
 
   provision:
+    name: Provision VPS - ${{ needs.setup.outputs.instance_label }}
     needs: setup
     if: needs.setup.outputs.action == 'provision'
     uses: ./.github/workflows/provision-vps.yml
@@ -68,6 +76,7 @@ jobs:
       root_password: ${{ secrets.ROOT_PASSWORD }}
 
   destroy:
+    name: Destroy VPS - ${{ needs.setup.outputs.instance_label }}
     needs: setup
     if: needs.setup.outputs.action == 'destroy'
     uses: ./.github/workflows/destroy-vps.yml
