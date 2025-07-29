@@ -61,40 +61,27 @@ runs:
         ssh -o StrictHostKeyChecking=no -i ${{ inputs.ssh_private_key_path }} root@$IP \
           "chmod +x /tmp/*.sh"
 
-    - name: Run system setup
+    - name: Complete all configuration in single session
       shell: bash
       run: |
         IP="${{ inputs.ip_address }}"
         SSH="ssh -o StrictHostKeyChecking=no -i ${{ inputs.ssh_private_key_path }} root@$IP"
         
-        $SSH "USERNAME='${{ inputs.username }}' ROOT_PASSWORD='${{ inputs.root_password }}' ESSENTIAL_PACKAGES='${{ inputs.essential_packages }}' SWAP_SIZE='${{ inputs.swap_size }}' /tmp/system-setup.sh"
-
-    - name: Run SSH hardening
-      shell: bash
-      run: |
-        IP="${{ inputs.ip_address }}"
-        SSH="ssh -o StrictHostKeyChecking=no -i ${{ inputs.ssh_private_key_path }} root@$IP"
-        
-        $SSH "SSH_PORT='${{ inputs.ssh_port }}' USERNAME='${{ inputs.username }}' /tmp/ssh-hardening.sh"
-
-    - name: Run security hardening
-      shell: bash
-      run: |
-        IP="${{ inputs.ip_address }}"
-        # After SSH hardening, root login is disabled, so we need to connect as the regular user
-        SSH_USER="ssh -o StrictHostKeyChecking=no -i ${{ inputs.ssh_private_key_path }} -p ${{ inputs.ssh_port }} ${{ inputs.username }}@$IP"
-        
-        echo "Waiting for SSH to be available on new port ${{ inputs.ssh_port }} for user ${{ inputs.username }}..."
-        timeout 60 bash -c "until $SSH_USER 'echo ready' 2>/dev/null; do echo -n '.'; sleep 5; done"
-        echo "SSH is ready on port ${{ inputs.ssh_port }} for user ${{ inputs.username }}!"
-        
-        $SSH_USER "sudo SSH_PORT='${{ inputs.ssh_port }}' SECURITY_PACKAGES='${{ inputs.security_packages }}' /tmp/security-hardening.sh"
-
-    - name: Cleanup temporary files
-      shell: bash
-      run: |
-        IP="${{ inputs.ip_address }}"
-        # Use the new SSH port and regular user (root login is now disabled)
-        SSH_USER="ssh -o StrictHostKeyChecking=no -i ${{ inputs.ssh_private_key_path }} -p ${{ inputs.ssh_port }} ${{ inputs.username }}@$IP"
-        
-        $SSH_USER "sudo rm -f /tmp/*.sh"
+        # Run all configuration in one session as root, including SSH hardening and security
+        $SSH << EOF
+          set -x
+          
+          # Run system setup
+          USERNAME='${{ inputs.username }}' ROOT_PASSWORD='${{ inputs.root_password }}' ESSENTIAL_PACKAGES='${{ inputs.essential_packages }}' SWAP_SIZE='${{ inputs.swap_size }}' /tmp/system-setup.sh
+          
+          # Run SSH hardening  
+          SSH_PORT='${{ inputs.ssh_port }}' USERNAME='${{ inputs.username }}' /tmp/ssh-hardening.sh
+          
+          # Run security hardening
+          SSH_PORT='${{ inputs.ssh_port }}' SECURITY_PACKAGES='${{ inputs.security_packages }}' /tmp/security-hardening.sh
+          
+          # Cleanup
+          rm -f /tmp/*.sh
+          
+          echo "=== Configuration complete at \$(date) ==="
+        EOF
