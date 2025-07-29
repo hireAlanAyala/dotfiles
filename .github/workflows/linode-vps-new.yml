@@ -193,6 +193,8 @@ jobs:
           linode_token: ${{ secrets.LINODE_API_TOKEN }}
       
       - name: Destroy VPS
+        env:
+          LINODE_CLI_TOKEN: ${{ secrets.LINODE_API_TOKEN }}
         run: |
           # Get instance ID
           INSTANCE_ID=$(linode-cli linodes list \
@@ -272,6 +274,8 @@ jobs:
           linode_token: ${{ secrets.LINODE_API_TOKEN }}
       
       - name: Show VPS Status
+        env:
+          LINODE_CLI_TOKEN: ${{ secrets.LINODE_API_TOKEN }}
         run: |
           echo "## 📊 Linode VPS Status" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY

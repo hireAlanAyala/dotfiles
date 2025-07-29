@@ -22,10 +22,27 @@ runs:
       env:
         LINODE_CLI_TOKEN: ${{ inputs.linode_token }}
     
+    - name: Configure CLI with token
+      shell: bash
+      run: |
+        # Configure CLI non-interactively
+        mkdir -p ~/.config
+        cat > ~/.config/linode-cli << EOF
+        [DEFAULT]
+        default-user = default-cli
+        
+        [default-cli]
+        token = ${{ inputs.linode_token }}
+        region = us-east
+        type = g6-nanode-1
+        image = linode/ubuntu20.04
+        EOF
+        echo "✅ Linode CLI configured with token"
+    
     - name: Verify CLI authentication
       shell: bash
       run: |
-        linode-cli --version || exit 1
+        linode-cli linodes list --text --no-headers > /dev/null || exit 1
         echo "✅ Linode CLI authentication verified"
       env:
         LINODE_CLI_TOKEN: ${{ inputs.linode_token }}
