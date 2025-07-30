@@ -1,0 +1,79 @@
+# Template for syncing environment variables between GitHub Actions and local/Docker testing
+# This shows how to modify your existing linode-vps.yml to use the unified configuration
+
+name: VPS Provisioning (Unified Config)
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'provision'
+        type: choice
+        options:
+        - provision
+        - destroy
+
+jobs:
+  provision-vps:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # NEW: Source unified configuration
+      - name: Load unified configuration
+        run: |
+          source provision/config.env
+          # Export all config variables to GitHub Actions environment
+          {
+            echo "USERNAME=$USERNAME"
+            echo "SSH_PORT=$SSH_PORT"
+            echo "INSTANCE_LABEL=$INSTANCE_LABEL"
+            echo "INSTANCE_TYPE=$INSTANCE_TYPE"
+            echo "INSTANCE_REGION=$INSTANCE_REGION"
+            echo "ESSENTIAL_PACKAGES=$ESSENTIAL_PACKAGES"
+            echo "SECURITY_PACKAGES=$SECURITY_PACKAGES"
+            echo "SSH_WAIT_TIMEOUT=$SSH_WAIT_TIMEOUT"
+            echo "DELETION_WAIT_TIMEOUT=$DELETION_WAIT_TIMEOUT"
+            echo "RUNTIME_ENV=github-actions"
+          } >> $GITHUB_ENV
+
+      # Existing Linode setup...
+      - name: Setup Linode CLI
+        uses: ./.github/actions/setup-linode-cli
+        with:
+          linode_token: ${{ secrets.LINODE_API_TOKEN }}
+
+      - name: Generate SSH Key
+        run: |
+          ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N ""
+          echo "SSH_PUBLIC_KEY=$(cat ~/.ssh/id_ed25519.pub)" >> $GITHUB_ENV
+
+      # Provision instance using config variables
+      - name: Provision instance
+        uses: ./.github/actions/provision-instance
+        with:
+          instance_label: ${{ env.INSTANCE_LABEL }}
+          instance_type: ${{ env.INSTANCE_TYPE }}
+          region: ${{ env.INSTANCE_REGION }}
+          ssh_public_key: ${{ env.SSH_PUBLIC_KEY }}
+
+      # NEW: Use unified setup script
+      - name: Configure system with unified setup
+        uses: ./.github/actions/configure-system
+        with:
+          server_ip: ${{ steps.provision.outputs.server_ip }}
+          username: ${{ env.USERNAME }}
+          ssh_port: ${{ env.SSH_PORT }}
+          setup_script: "unified-setup.sh"  # Use unified script instead of individual scripts
+          root_password: ${{ secrets.ROOT_PASSWORD }}
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+
+      # Rest of workflow remains the same...
+      - name: Save SSH key as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ssh-key-${{ env.INSTANCE_LABEL }}
+          path: ~/.ssh/id_ed25519
+          retention-days: 30

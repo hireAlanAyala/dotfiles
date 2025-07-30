@@ -28,8 +28,9 @@ fi
 # Disable password authentication
 sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
 
-# Disable root login
-sed -i 's/^#*PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
+# Keep root login with key authentication during provisioning
+# This will be disabled later after verifying user access
+sed -i 's/^#*PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
 
 # Test the new configuration
 echo "Testing SSH configuration..."
@@ -73,3 +74,4 @@ ufw status verbose
 
 echo "✅ SSH hardening completed successfully"
 echo "SSH is now running on port $SSH_PORT with password authentication disabled"
+echo "Root login is still allowed with SSH keys for provisioning"

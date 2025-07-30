@@ -49,9 +49,13 @@ runs:
       run: |
         IP="${{ inputs.ip_address }}"
         
-        # Upload all provision scripts
+        # Upload all provision scripts except ssh-finalize.sh (handled separately)
         scp -o StrictHostKeyChecking=no -i ${{ inputs.ssh_private_key_path }} \
           provision/*.sh root@$IP:/tmp/
+        
+        # Remove ssh-finalize.sh if it was uploaded (we handle it after verification)
+        ssh -o StrictHostKeyChecking=no -i ${{ inputs.ssh_private_key_path }} root@$IP \
+          "rm -f /tmp/ssh-finalize.sh"
         
         # Make scripts executable
         ssh -o StrictHostKeyChecking=no -i ${{ inputs.ssh_private_key_path }} root@$IP \

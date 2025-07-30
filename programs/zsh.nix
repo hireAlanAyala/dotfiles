@@ -17,7 +17,7 @@
         # Your normal Zsh setup, including ZLE
       else
         # Minimal setup for Neovim, avoiding ZLE
-        unsetopt zle
+        # unsetopt zle
       fi
 
     '';

@@ -14,8 +14,7 @@ vim.g.have_nerd_font = true
 
 --  NOTE: For more options, you can see `:help option-list`
 
-vim.o.shell = os.getenv('HOME') .. '/.nix-profile/bin/zsh -i'
-vim.env.NVIM = '1' -- allows zshrc to disable zle when open in nvim
+vim.o.shell = os.getenv 'HOME' .. '/.nix-profile/bin/zsh -i'
 vim.env.PATH = vim.env.PATH .. ':' .. os.getenv 'HOME' .. '/.nix-profile/bin'
 -- helps mason find the dotnet env
 vim.env.DOTNET_ROOT = os.getenv 'HOME' .. '/.nix-profile'
@@ -177,7 +176,6 @@ vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
 -- Diagnostic keymaps
 vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic [Q]uickfix list' })
 
-
 -- Exit terminal mode in the builtin terminal with a shortcut that is a bit easier
 -- for people to discover. Otherwise, you normally need to press <C-\><C-n>, which
 -- is not what someone will guess without a bit more experience.
@@ -189,14 +187,25 @@ vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagn
 -- hide vim terminal mode status line
 vim.o.showmode = false
 
-vim.api.nvim_set_keymap('t', '<Esc>[A', '<Up>', { noremap = true, silent = true })
-vim.api.nvim_set_keymap('t', '<Esc>[B', '<Down>', { noremap = true, silent = true })
-vim.api.nvim_set_keymap('t', '<Esc>[C', '<Right>', { noremap = true, silent = true })
-vim.api.nvim_set_keymap('t', '<Esc>[D', '<Left>', { noremap = true, silent = true })
-
 vim.opt.termguicolors = true
 vim.opt.ttimeoutlen = 50
 vim.o.compatible = false
+
+-- Terminal configuration
+vim.api.nvim_create_autocmd('TermOpen', {
+  pattern = '*',
+  callback = function()
+    -- Disable line numbers in terminal
+    vim.opt_local.number = false
+    vim.opt_local.relativenumber = false
+
+    -- Start in insert mode
+    vim.cmd 'startinsert'
+
+    -- Set terminal buffer options
+    vim.opt_local.scrollback = 10000
+  end,
+})
 
 -- vim.keymap.del('t', '<Tab>')
 

@@ -120,25 +120,13 @@ if command -v sops &> /dev/null; then
     temp_key_file="/tmp/new_ssh_key_$key_name"
     cat "$private_key_path" > "$temp_key_file"
     
-    # Add to SOPS using sops --set
-    if sops --set "[\"ssh_private_key_$key_name\"]" "$(cat "$temp_key_file")" ~/.config/secrets.yaml; then
-        echo -e "${GREEN}✓ Private key added to SOPS secrets.yaml${RESET}"
-        rm -f "$temp_key_file"
-    else
-        echo -e "${YELLOW}Warning: Could not auto-add to SOPS. Manual steps:${RESET}"
-        echo -e "${YELLOW}1. Run: sops ~/.config/secrets.yaml${RESET}"
-        echo -e "${YELLOW}2. Add this entry (private key is in clipboard):${RESET}"
-        echo -e "${YELLOW}ssh_private_key_$key_name: |${RESET}"
-        echo -e "${YELLOW}  {paste private key here}${RESET}"
-        rm -f "$temp_key_file"
-    fi
-else
-    echo -e "${YELLOW}SOPS not found. Manual steps:${RESET}"
+    # Skip automatic SOPS addition due to complexity with multiline content
+    echo -e "${YELLOW}Manual SOPS steps required:${RESET}"
     echo -e "${YELLOW}1. Run: sops ~/.config/secrets.yaml${RESET}"
     echo -e "${YELLOW}2. Add this entry (private key is in clipboard):${RESET}"
     echo -e "${YELLOW}ssh_private_key_$key_name: |${RESET}"
     echo -e "${YELLOW}  {paste private key here}${RESET}"
-fi
+    rm -f "$temp_key_file"
 
 # Auto-add SSH config entry (only for servers and other services with hostnames)
 if [[ "$key_type" == "2" ]]; then

@@ -15,6 +15,27 @@ if [[ "$OSTYPE" != "linux-gnu"* ]]; then
     exit 1
 fi
 
+# Setup 1Password daemon early (before Nix) for secret access
+echo ""
+echo "=== Setting up 1Password CLI daemon ==="
+echo "This provides secure access to secrets during installation..."
+if [ -f ./provision/setup-onepass-daemon.sh ]; then
+    sudo ./provision/setup-onepass-daemon.sh
+    echo "✅ 1Password daemon setup complete"
+    
+    # Source helper functions for use during install
+    source /opt/onepass/client.sh
+    source ./provision/onepass-helpers.sh
+    
+    echo ""
+    echo "🔐 1Password daemon is ready for use during installation"
+    echo "   You can now use: op_interactive_signin, op_safe_get_password, etc."
+    echo "   Example: API_KEY=\$(op_safe_get_password 'My API Key')"
+    echo ""
+else
+    echo "⚠️  1Password daemon setup script not found, continuing without 1Password"
+fi
+
 # Backup existing shell configs
 echo "=== Backing up existing shell configs ==="
 [ -f ~/.profile ] && mv ~/.profile ~/.profile.backup && echo "✅ Backed up ~/.profile"
@@ -132,10 +153,19 @@ echo ""
 echo "🎉 Installation complete!"
 echo ""
 echo "📝 Next steps:"
-echo "1. IMPORTANT: Log out and log back in (or restart your terminal) for zsh to become default"
-echo "2. Or manually switch to zsh now: source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && zsh"
+echo "1. IMPORTANT: Log out and log back in (or restart your terminal) for:"
+echo "   - zsh to become default shell"
+echo "   - 'onepass' group membership to take effect"
+echo "2. Or manually switch now:"
+echo "   source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && newgrp onepass && zsh"
 echo "3. Optional: Set up GPG keys for encrypted configs"
 echo "4. Optional: Run SSH key setup: ~/.ssh/setup_all_ssh_keys.sh --all"
+echo ""
+echo "🔐 1Password daemon is installed and running:"
+echo "  - Access via: source /opt/onepass/client.sh && source ~/.config/provision/onepass-helpers.sh" 
+echo "  - Sign in: op_interactive_signin"
+echo "  - Health check: op_health_check"
+echo "  - Help: op_help"
 echo ""
 echo "To update your configuration in the future:"
 echo "  cd ~/.config && git pull && home-manager switch --flake .#developer"

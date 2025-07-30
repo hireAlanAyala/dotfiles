@@ -60,4 +60,4 @@ for window_id in $windows; do
     done
 done
 
-tmux display-message "Changed session '$session_name' directory to: $path"
+# tmux display-message "Changed session '$session_name' directory to: $path"

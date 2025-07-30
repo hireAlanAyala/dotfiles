@@ -56,6 +56,37 @@ totp-get() {
     "
 }
 
+# 1Password CLI helper functions
+op-quick-signin() {
+    echo "⚠️  Security Warning: Manual 1Password CLI authentication"
+    echo "   Any process under your user can potentially access your 1Password account"
+    echo "   Consider using the 1Password app for better security"
+    echo ""
+    read -q "REPLY?Continue with manual authentication? (y/n): "
+    echo ""
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        eval $(op signin)
+    else
+        echo "Authentication cancelled"
+    fi
+}
+
+op-get-password() {
+    if [[ -z "$1" ]]; then
+        echo "Usage: op-get-password <item-name>"
+        return 1
+    fi
+    op item get "$1" --fields password
+}
+
+op-get-field() {
+    if [[ -z "$1" || -z "$2" ]]; then
+        echo "Usage: op-get-field <item-name> <field-name>"
+        return 1
+    fi
+    op item get "$1" --fields "$2"
+}
+
 # SSH Agent with keychain - auto-discover private keys
 if command -v keychain &> /dev/null; then
     # Auto-discover private keys in ~/.ssh

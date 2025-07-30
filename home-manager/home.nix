@@ -60,6 +60,7 @@
     linode-cli
     docker
     docker-compose
+    ngrok
     
     # Development tools
     air
@@ -175,6 +176,7 @@
     ../programs/git.nix
     ../programs/neovim.nix
     ../programs/tmux.nix
+    ../programs/onepassword.nix
     # System modules
     ../modules/symlinks.nix
   ];

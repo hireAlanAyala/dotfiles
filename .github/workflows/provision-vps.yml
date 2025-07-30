@@ -96,6 +96,37 @@ jobs:
             echo "✅ Configuration repository cloned to ~/.config"
           EOF
       
+      - name: Verify user SSH access
+        run: |
+          IP="${{ steps.provision.outputs.ip_address }}"
+          echo "=== Verifying SSH access for user ${{ inputs.username }} ==="
+          
+          # Test connection as user
+          if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+               -i ~/.ssh/id_ed25519 -p ${{ inputs.ssh_port }} \
+               ${{ inputs.username }}@$IP "echo 'User SSH access verified'"; then
+            echo "✅ User SSH access confirmed"
+          else
+            echo "❌ User SSH access failed!"
+            exit 1
+          fi
+      
+      - name: Finalize SSH security
+        run: |
+          IP="${{ steps.provision.outputs.ip_address }}"
+          SSH_ROOT="ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 root@$IP"
+          
+          echo "=== Finalizing SSH security configuration ==="
+          
+          # Upload finalization script
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 \
+            provision/ssh-finalize.sh root@$IP:/tmp/ssh-finalize.sh
+          
+          # Run finalization as root
+          $SSH_ROOT "chmod +x /tmp/ssh-finalize.sh && USERNAME='${{ inputs.username }}' SSH_PORT='${{ inputs.ssh_port }}' /tmp/ssh-finalize.sh && rm /tmp/ssh-finalize.sh"
+          
+          echo "✅ SSH security finalized - root access now disabled"
+      
       - name: Setup GPG keys
         continue-on-error: true
         run: |
