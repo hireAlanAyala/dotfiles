@@ -1,0 +1,15 @@
+{
+  "name": "com.chromemcp.nativehost",
+  "description": "Node.js Host for Browser Bridge Extension",
+  "path": "C:\\Windows\\System32\\wsl.exe",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://hbdgbgagpkpjffpklnamcljpakneikee/"
+  ],
+  "args": [
+    "-e",
+    "bash",
+    "-c",
+    "cd ~/.npm-global/lib/node_modules/mcp-chrome-bridge/dist && ./run_host.sh"
+  ]
+}

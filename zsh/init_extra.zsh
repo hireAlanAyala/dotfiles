@@ -37,10 +37,13 @@ export TERM="xterm-256color"
 # ---------------------- Aliases ------------------------
 alias v="nvim"
 alias path="echo -e ${PATH//:/\\n}"
-alias fucking="sudo env PATH=$PATH"
+alias fucking='sudo env "PATH=$PATH"'
 alias gen-ssh-key="bash ~/.config/.ssh/generate_ssh_key.sh"
 alias gpg-restart="pkill -f gpg-agent; pkill -f gpg; gpg-connect-agent /bye"
 alias 2fa="show-2fa"
+
+# Docker helpers
+export DOCKER_HOST=unix:///var/run/docker.sock
 
 # Individual service shortcuts
 totp-get() {

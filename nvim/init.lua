@@ -1,20 +1,56 @@
+-- TODO: PACKAGES I MIGHT WANT LATER
+-- vim-move
+-- vim-autoread
+-- noice
+-- diffview
+-- plugin wishlist
+-- quick-scope (highlight f,F motion)
+-- nvim-notify
+-- noice (reokaces the UI for floating messages)
+-- diffview (git diff)
+-- flash
+--
+require 'config.options' -- Add this line
+
 --  NOTE: Must happen before plugins are loaded (otherwise wrong leader will be used)
 vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
--- refreshes buffer for changes. Tries to prevent swap file conflicts
-vim.o.autoread = true
-vim.api.nvim_create_autocmd({ 'BufEnter', 'CursorHold', 'CursorHoldI', 'FocusGained' }, {
-  command = "if mode() != 'c' | checktime | endif",
-  pattern = { '*' },
-})
-
--- Set to true if you have a Nerd Font installed and selected in the terminal
 vim.g.have_nerd_font = true
+
+-- background transparent - apply after colorscheme loads
+local function set_transparency()
+  vim.cmd [[
+    highlight Normal guibg=NONE ctermbg=NONE
+    highlight NonText guibg=NONE ctermbg=NONE
+    highlight SignColumn guibg=NONE ctermbg=NONE
+    highlight NormalFloat guibg=NONE ctermbg=NONE
+    highlight LineNr guibg=NONE ctermbg=NONE
+    highlight CursorLineNr guibg=NONE ctermbg=NONE
+    highlight FoldColumn guibg=NONE ctermbg=NONE
+    highlight VertSplit guibg=NONE ctermbg=NONE
+    highlight StatusLine guibg=NONE ctermbg=NONE
+    highlight StatusLineNC guibg=NONE ctermbg=NONE
+    highlight TabLine guibg=NONE ctermbg=NONE
+    highlight TabLineFill guibg=NONE ctermbg=NONE
+    highlight TabLineSel guibg=NONE ctermbg=NONE
+    highlight Pmenu guibg=NONE ctermbg=NONE
+    highlight PmenuSel guibg=NONE ctermbg=NONE
+    highlight GitSignsAdd guibg=NONE ctermbg=NONE
+    highlight GitSignsChange guibg=NONE ctermbg=NONE
+    highlight GitSignsDelete guibg=NONE ctermbg=NONE
+  ]]
+end
+
+-- Apply transparency now and after colorscheme changes
+set_transparency()
+vim.api.nvim_create_autocmd('ColorScheme', {
+  callback = set_transparency,
+})
 
 --  NOTE: For more options, you can see `:help option-list`
 
-vim.o.shell = os.getenv 'HOME' .. '/.nix-profile/bin/zsh -i'
+vim.o.shell = os.getenv 'HOME' .. '/.nix-profile/bin/zsh'
 vim.env.PATH = vim.env.PATH .. ':' .. os.getenv 'HOME' .. '/.nix-profile/bin'
 -- helps mason find the dotnet env
 vim.env.DOTNET_ROOT = os.getenv 'HOME' .. '/.nix-profile'
@@ -24,17 +60,175 @@ vim.api.nvim_create_user_command('CheckMasonEnv', function()
   vim.notify('Mason Environment:\n' .. mason_env)
 end, {})
 
--- Make line numbers default
+-- basic settings
 vim.opt.number = false
--- You can also add relative line numbers, to help with jumping.
---  Experiment for yourself to see if you like it!
 vim.opt.relativenumber = true
+vim.opt.showmode = false -- Don't show the mode, since it's already in the status line
+vim.opt.wrap = true
 
--- Enable mouse mode, can be useful for resizing splits for example!
+-- indentation
+vim.opt.breakindent = true -- Enable break indent
+vim.opt.tabstop = 2 -- Tab width
+vim.opt.shiftwidth = 2 -- Indent width
+vim.opt.softtabstop = 2 -- Soft tab stop
+vim.opt.expandtab = true -- Use spaces instead of tabs
+vim.opt.smartindent = true -- Smart auto-indenting
+vim.opt.autoindent = true -- Copy indent from current line
+
+-- completion
+vim.opt.updatetime = 250 -- Decrease update time
+vim.opt.timeoutlen = 300 -- Decrease mapped sequence wait time, displays which-key popup sooner
+vim.opt.ttimeoutlen = 50
+
+-- visual settings
+vim.opt.termguicolors = true
+vim.opt.signcolumn = 'yes' -- Keep signcolumn on by default
+vim.opt.list = true -- Sets how neovim will display certain whitespace characters in the editor
+vim.opt.listchars = { tab = '» ', trail = '·', nbsp = '␣' }
+vim.opt.cursorline = true -- Show which line your cursor is on
+-- vim.opt.scrolloff = 1000 -- Minimal number of screen lines to keep above and below the cursor
+vim.opt.scrolloff = 10
+vim.opt.showtabline = 0
+vim.opt.inccommand = 'split' -- Preview substitutions live, as you type!
+vim.opt.showmatch = true -- Highlight matching brackets
+vim.opt.cmdheight = 1 -- Command line height
+vim.opt.completeopt = 'menuone,noinsert,noselect' -- Completion options
+vim.opt.showmode = false -- Don't show mode in command line
+vim.opt.pumheight = 10 -- Popup menu height
+vim.opt.pumblend = 10 -- Popup menu transparency
+vim.opt.winblend = 0 -- Floating window transparency
+vim.opt.conceallevel = 0 -- Don't hide markup
+vim.opt.concealcursor = '' -- Don't hide cursor line markup
+vim.opt.lazyredraw = true -- Don't redraw during macros
+vim.opt.synmaxcol = 300 -- Syntax highlighting limit
+
+-- search settings
+vim.opt.ignorecase = true -- Case-insensitive searching UNLESS \C or one or more capital letters in the search term
+vim.opt.smartcase = true
+vim.opt.hlsearch = false -- disable highlight search
+vim.opt.incsearch = true -- show matches as you type
+vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>') -- Clear highlights on search when pressing <Esc> in normal mode
+
+-- window and tiling
+vim.opt.splitright = true -- Configure how new splits should be opened
+vim.opt.splitbelow = true
+
+-- file handling
+vim.opt.backup = false
+vim.opt.writebackup = false
+vim.opt.swapfile = false
+vim.opt.undofile = true
+vim.opt.undodir = vim.fn.expand '~/.nvim/undodir'
+vim.o.autoread = true
+vim.o.autowrite = true
+
+-- behaviour
+vim.opt.hidden = true
+vim.opt.errorbells = false
+vim.opt.backspace = 'indent,eol,start'
+vim.opt.autochdir = false
+vim.opt.iskeyword:append '-'
+vim.opt.path:append '**'
+-- vim.opt.selection = 'exclusive'
 vim.opt.mouse = 'a'
 
--- Don't show the mode, since it's already in the status line
-vim.opt.showmode = false
+-- Folding settings
+vim.opt.foldmethod = 'expr' -- Use expression for folding
+vim.wo.foldexpr = 'v:lua.vim.treesitter.foldexpr()'
+vim.opt.foldlevel = 99 -- Start with all folds open
+
+-- Disable treesitter folding for Neogit to prevent errors
+vim.api.nvim_create_autocmd('FileType', {
+  pattern = { 'NeogitStatus', 'NeogitCommit', 'NeogitPopup' },
+  callback = function()
+    vim.opt_local.foldmethod = 'manual'
+  end,
+})
+
+-- Split behavior
+vim.opt.splitbelow = true -- Horizontal splits go below
+vim.opt.splitright = true -- Vertical splits go right
+
+-- Command-line completion
+vim.opt.wildmenu = true
+vim.opt.wildmode = 'longest:full,full'
+vim.opt.wildignore:append { '*.o', '*.obj', '*.pyc', '*.class', '*.jar' }
+
+-- Better diff options
+vim.opt.diffopt:append 'linematch:60'
+
+-- Performance improvements
+-- vim.opt.redrawtime = 10000
+-- vim.opt.maxmempattern = 20000
+
+-- Center screen when jumping
+vim.keymap.set('n', 'n', 'nzzzv', { desc = 'Next search result (centered)' })
+vim.keymap.set('n', 'N', 'Nzzzv', { desc = 'Previous search result (centered)' })
+vim.keymap.set('n', '<C-d>', '<C-d>zz', { desc = 'Half page down (centered)' })
+vim.keymap.set('n', '<C-u>', '<C-u>zz', { desc = 'Half page up (centered)' })
+
+-- Better window navigation
+-- NOTE: currently handled by tmux + nvim plugin
+-- vim.keymap.set("n", "<C-h>", "<C-w>h", { desc = "Move to left window" })
+-- vim.keymap.set("n", "<C-j>", "<C-w>j", { desc = "Move to bottom window" })
+-- vim.keymap.set("n", "<C-k>", "<C-w>k", { desc = "Move to top window" })
+-- vim.keymap.set("n", "<C-l>", "<C-w>l", { desc = "Move to right window" })
+
+-- Splitting & Resizing
+vim.keymap.set('n', '<leader>sv', ':vsplit<CR>', { desc = 'Split window vertically' })
+vim.keymap.set('n', '<leader>sh', ':split<CR>', { desc = 'Split window horizontally' })
+vim.keymap.set('n', '<C-Up>', ':resize +2<CR>', { desc = 'Increase window height' })
+vim.keymap.set('n', '<C-Down>', ':resize -2<CR>', { desc = 'Decrease window height' })
+vim.keymap.set('n', '<C-Left>', ':vertical resize -2<CR>', { desc = 'Decrease window width' })
+vim.keymap.set('n', '<C-Right>', ':vertical resize +2<CR>', { desc = 'Increase window width' })
+
+-- Move lines up/down
+vim.keymap.set('n', '<A-j>', ':m .+1<CR>==', { desc = 'Move line down' })
+vim.keymap.set('n', '<A-k>', ':m .-2<CR>==', { desc = 'Move line up' })
+vim.keymap.set('v', '<A-j>', ":m '>+1<CR>gv=gv", { desc = 'Move selection down' })
+vim.keymap.set('v', '<A-k>', ":m '<-2<CR>gv=gv", { desc = 'Move selection up' })
+
+-- Better indenting in visual mode
+vim.keymap.set('v', '<', '<gv', { desc = 'Indent left and reselect' })
+vim.keymap.set('v', '>', '>gv', { desc = 'Indent right and reselect' })
+
+-- Quick file navigation
+vim.keymap.set('n', '<leader>e', ':Explore<CR>', { desc = 'Open file explorer' })
+vim.keymap.set('n', '<leader>ff', ':find ', { desc = 'Find file' })
+
+-- Better J behavior
+vim.keymap.set('n', 'J', 'mzJ`z', { desc = 'Join lines and keep cursor position' })
+
+local augroup = vim.api.nvim_create_augroup('UserConfig', {})
+
+-- Return to last edit position when opening files
+vim.api.nvim_create_autocmd('BufReadPost', {
+  group = augroup,
+  callback = function()
+    local mark = vim.api.nvim_buf_get_mark(0, '"')
+    local lcount = vim.api.nvim_buf_line_count(0)
+    if mark[1] > 0 and mark[1] <= lcount then
+      pcall(vim.api.nvim_win_set_cursor, 0, mark)
+    end
+  end,
+})
+
+-- Create directories when saving files
+vim.api.nvim_create_autocmd('BufWritePre', {
+  group = augroup,
+  callback = function()
+    local dir = vim.fn.expand '<afile>:p:h'
+    if vim.fn.isdirectory(dir) == 0 then
+      vim.fn.mkdir(dir, 'p')
+    end
+  end,
+})
+
+-- Create undo directory if it doesn't exist
+local undodir = vim.fn.expand '~/.nvim/undodir'
+if vim.fn.isdirectory(undodir) == 0 then
+  vim.fn.mkdir(undodir, 'p')
+end
 
 -- Sync clipboard between OS and Neovim.
 --  Schedule the setting after `UiEnter` because it can increase startup-time.
@@ -43,47 +237,6 @@ vim.opt.showmode = false
 vim.schedule(function()
   vim.opt.clipboard = 'unnamedplus'
 end)
-
--- Enable break indent
-vim.opt.breakindent = true
-
--- Save undo history
-vim.opt.undofile = true
-
--- Case-insensitive searching UNLESS \C or one or more capital letters in the search term
-vim.opt.ignorecase = true
-vim.opt.smartcase = true
-
--- Keep signcolumn on by default
-vim.opt.signcolumn = 'yes'
-
--- Decrease update time
-vim.opt.updatetime = 250
-
--- Decrease mapped sequence wait time
--- Displays which-key popup sooner
-vim.opt.timeoutlen = 300
-
--- Configure how new splits should be opened
-vim.opt.splitright = true
-vim.opt.splitbelow = true
-
--- Sets how neovim will display certain whitespace characters in the editor.
---  See `:help 'list'`
---  and `:help 'listchars'`
-vim.opt.list = true
-vim.opt.listchars = { tab = '» ', trail = '·', nbsp = '␣' }
-
--- Preview substitutions live, as you type!
-vim.opt.inccommand = 'split'
-
--- Show which line your cursor is on
-vim.opt.cursorline = true
-
--- Minimal number of screen lines to keep above and below the cursor.
-vim.opt.scrolloff = 10
-
-vim.opt.showtabline = 0
 
 vim.o.sessionoptions = vim.o.sessionoptions:gsub(',?options,?', '')
 vim.g.session_directory = '~/.config/nvim/sessions/'
@@ -169,10 +322,6 @@ vim.keymap.set('n', '<leader>cf', function()
   copy_path 'filename'
 end, { desc = 'Copy filename' })
 
--- Clear highlights on search when pressing <Esc> in normal mode
---  See `:help hlsearch`
-vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
-
 -- Diagnostic keymaps
 vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic [Q]uickfix list' })
 
@@ -186,9 +335,6 @@ vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagn
 
 -- hide vim terminal mode status line
 vim.o.showmode = false
-
-vim.opt.termguicolors = true
-vim.opt.ttimeoutlen = 50
 vim.o.compatible = false
 
 -- Terminal configuration
@@ -198,12 +344,20 @@ vim.api.nvim_create_autocmd('TermOpen', {
     -- Disable line numbers in terminal
     vim.opt_local.number = false
     vim.opt_local.relativenumber = false
+    vim.opt_local.signcolumn = 'no'
 
     -- Start in insert mode
     vim.cmd 'startinsert'
 
     -- Set terminal buffer options
     vim.opt_local.scrollback = 10000
+
+    -- Make normal mode behave more like terminal mode
+    -- This preserves the terminal's view of the scrollback
+    vim.opt_local.scrolloff = 0
+    vim.opt_local.sidescrolloff = 0
+
+    -- Don't set modifiable = false as it can interfere with DAP debugging
   end,
 })
 
@@ -320,12 +474,6 @@ require('lazy').setup({
   -- Use `opts = {}` to force a plugin to be loaded.
   --
   --
-  -- TODO: PACKAGES I MIGHT WANT LATER
-  -- vim-move
-  -- vim-autoread
-  -- noice
-  -- diffview
-  --
 
   -- Here is a more advanced example where we pass configuration
   -- options to `gitsigns.nvim`. This is equivalent to the following Lua:
@@ -336,12 +484,131 @@ require('lazy').setup({
     'lewis6991/gitsigns.nvim',
     opts = {
       signs = {
-        add = { text = '+' },
-        change = { text = '~' },
+        add = { text = '┃' },
+        change = { text = '┃' },
         delete = { text = '_' },
         topdelete = { text = '‾' },
         changedelete = { text = '~' },
+        untracked = { text = '┆' },
       },
+      signs_staged = {
+        add = { text = '┃' },
+        change = { text = '┃' },
+        delete = { text = '_' },
+        topdelete = { text = '‾' },
+        changedelete = { text = '~' },
+        untracked = { text = '┆' },
+      },
+      signs_staged_enable = true,
+      signcolumn = true, -- Toggle with `:Gitsigns toggle_signs`
+      numhl = false, -- Toggle with `:Gitsigns toggle_numhl`
+      linehl = false, -- Toggle with `:Gitsigns toggle_linehl`
+      word_diff = false, -- Toggle with `:Gitsigns toggle_word_diff`
+      watch_gitdir = {
+        follow_files = true,
+      },
+      auto_attach = true,
+      attach_to_untracked = false,
+      current_line_blame = false, -- Toggle with `:Gitsigns toggle_current_line_blame`
+      current_line_blame_opts = {
+        virt_text = true,
+        virt_text_pos = 'eol', -- 'eol' | 'overlay' | 'right_align'
+        delay = 1000,
+        ignore_whitespace = false,
+        virt_text_priority = 100,
+        use_focus = true,
+      },
+      current_line_blame_formatter = '<author>, <author_time:%R> - <summary>',
+      sign_priority = 6,
+      update_debounce = 100,
+      status_formatter = nil, -- Use default
+      max_file_length = 40000, -- Disable if file is longer than this (in lines)
+      preview_config = {
+        -- Options passed to nvim_open_win
+        style = 'minimal',
+        relative = 'cursor',
+        row = 0,
+        col = 1,
+      },
+      on_attach = function(bufnr)
+        -- Remove background from gitsigns
+        vim.cmd [[
+          highlight GitSignsAdd guibg=NONE ctermbg=NONE
+          highlight GitSignsChange guibg=NONE ctermbg=NONE
+          highlight GitSignsDelete guibg=NONE ctermbg=NONE
+          highlight GitSignsAddNr guibg=NONE ctermbg=NONE
+          highlight GitSignsChangeNr guibg=NONE ctermbg=NONE
+          highlight GitSignsDeleteNr guibg=NONE ctermbg=NONE
+          highlight GitSignsAddLn guibg=NONE ctermbg=NONE
+          highlight GitSignsChangeLn guibg=NONE ctermbg=NONE
+          highlight GitSignsDeleteLn guibg=NONE ctermbg=NONE
+          highlight GitSignsCurrentLineBlame guibg=NONE ctermbg=NONE
+        ]]
+
+        local gitsigns = require 'gitsigns'
+
+        local function map(mode, l, r, opts)
+          opts = opts or {}
+          opts.buffer = bufnr
+          vim.keymap.set(mode, l, r, opts)
+        end
+
+        -- Navigation
+        map('n', ']c', function()
+          if vim.wo.diff then
+            vim.cmd.normal { ']c', bang = true }
+          else
+            gitsigns.nav_hunk 'next'
+          end
+        end, { desc = 'Next [C]hange/hunk' })
+
+        map('n', '[c', function()
+          if vim.wo.diff then
+            vim.cmd.normal { '[c', bang = true }
+          else
+            gitsigns.nav_hunk 'prev'
+          end
+        end, { desc = 'Previous [C]hange/hunk' })
+
+        -- Actions
+        map('n', '<leader>hs', gitsigns.stage_hunk, { desc = '[H]unk [S]tage' })
+        map('n', '<leader>hr', gitsigns.reset_hunk, { desc = '[H]unk [R]eset' })
+
+        map('v', '<leader>hs', function()
+          gitsigns.stage_hunk { vim.fn.line '.', vim.fn.line 'v' }
+        end, { desc = '[H]unk [S]tage (visual)' })
+
+        map('v', '<leader>hr', function()
+          gitsigns.reset_hunk { vim.fn.line '.', vim.fn.line 'v' }
+        end, { desc = '[H]unk [R]eset (visual)' })
+
+        map('n', '<leader>hS', gitsigns.stage_buffer, { desc = '[H]unk [S]tage Buffer' })
+        map('n', '<leader>hR', gitsigns.reset_buffer, { desc = '[H]unk [R]eset Buffer' })
+        map('n', '<leader>hp', gitsigns.preview_hunk, { desc = '[H]unk [P]review' })
+        map('n', '<leader>hi', gitsigns.preview_hunk_inline, { desc = '[H]unk Preview [I]nline' })
+
+        map('n', '<leader>hb', function()
+          gitsigns.blame_line { full = true }
+        end, { desc = '[H]unk [B]lame Line' })
+
+        map('n', '<leader>hd', gitsigns.diffthis, { desc = '[H]unk [D]iff This' })
+
+        map('n', '<leader>hD', function()
+          gitsigns.diffthis '~'
+        end, { desc = '[H]unk [D]iff This (~)' })
+
+        map('n', '<leader>hQ', function()
+          gitsigns.setqflist 'all'
+        end, { desc = '[H]unk [Q]uickfix List (all)' })
+        map('n', '<leader>hq', gitsigns.setqflist, { desc = '[H]unk [Q]uickfix List' })
+
+        -- Toggles
+        map('n', '<leader>tb', gitsigns.toggle_current_line_blame, { desc = '[T]oggle [B]lame Line' })
+        map('n', '<leader>tw', gitsigns.toggle_word_diff, { desc = '[T]oggle [W]ord Diff' })
+
+        -- Text object
+        map({ 'o', 'x' }, 'ih', gitsigns.select_hunk, { desc = '[I]nner [H]unk' })
+      end,
     },
   },
   {
@@ -460,13 +727,29 @@ require('lazy').setup({
       -- Document existing key chains
       spec = {
         { '<leader>c', group = '[C]ode', mode = { 'n', 'x' } },
-        { '<leader>d', group = '[D]ocument' },
+        { '<leader>d', group = '[D]ebug' },
+        { '<leader>e', group = '[E]valuate' },
+        { '<leader>n', group = '[N]avigate' },
         { '<leader>r', group = '[R]ename' },
         { '<leader>s', group = '[S]earch' },
         { '<leader>w', group = '[W]orkspace' },
         { '<leader>t', group = '[T]oggle' },
         { '<leader>h', group = 'Git [H]unk', mode = { 'n', 'v' } },
       },
+
+      -- - <leader>f - Find/Files (telescope, fzf, file operations)
+      -- - <leader>g - Git (git status, blame, diff, commits)
+      -- - <leader>l - LSP/Language (code actions, diagnostics, formatting)
+      -- - <leader>s - Search (grep, find and replace, symbols)
+      -- - <leader>b - Buffers (buffer navigation, close, list)
+      -- - <leader>w - Windows (window splits, resize, navigation)
+      -- - <leader>t - Terminal/Tabs (terminal toggle, tab operations)
+      -- - <leader>d - Debug/Diagnostics (DAP, error navigation)
+      -- - <leader>c - Code (commenting, refactoring, snippets)
+      -- - <leader>n - Navigation (file tree, jumps, marks)
+      -- - <leader>r - Run/REPL (run tests, execute code)
+      -- - <leader>h - Help/Hunk (help docs, git hunks)
+
       config = function(_, opts)
         -- Set up which-key with the provided opts
         local wk = require 'which-key'
@@ -530,6 +813,7 @@ require('lazy').setup({
         end,
       },
       { 'nvim-telescope/telescope-ui-select.nvim' },
+      { 'nvim-telescope/telescope-live-grep-args.nvim' },
 
       -- Useful for getting pretty icons, but requires a Nerd Font.
       { 'nvim-tree/nvim-web-devicons', enabled = vim.g.have_nerd_font },
@@ -842,12 +1126,42 @@ require('lazy').setup({
           ['ui-select'] = {
             require('telescope.themes').get_dropdown(),
           },
+          live_grep_args = {
+            auto_quoting = true, -- enable/disable auto-quoting
+            -- Override the default vimgrep_arguments to ensure compatibility
+            vimgrep_arguments = {
+              'rg',
+              '--color=never',
+              '--no-heading',
+              '--with-filename',
+              '--line-number',
+              '--column',
+              '--smart-case',
+              '--hidden',
+              '--glob=!node_modules',
+            },
+            -- define mappings, e.g.
+            mappings = { -- extend mappings
+              i = {
+                ['<C-k>'] = function(prompt_bufnr)
+                  require('telescope-live-grep-args.actions').quote_prompt()(prompt_bufnr)
+                end,
+                ['<C-i>'] = function(prompt_bufnr)
+                  require('telescope-live-grep-args.actions').quote_prompt { postfix = ' --iglob ' }(prompt_bufnr)
+                end,
+                ['<C-t>'] = function(prompt_bufnr)
+                  require('telescope-live-grep-args.actions').quote_prompt { postfix = ' -t ' }(prompt_bufnr)
+                end,
+              },
+            },
+          },
         },
       }
 
       -- Enable Telescope extensions if they are installed
       pcall(require('telescope').load_extension, 'fzf')
       pcall(require('telescope').load_extension, 'ui-select')
+      pcall(require('telescope').load_extension, 'live_grep_args')
 
       -- See `:help telescope.builtin`
       vim.keymap.set('n', '<leader>sh', builtin.help_tags, { desc = '[S]earch [H]elp' })
@@ -855,7 +1169,7 @@ require('lazy').setup({
       vim.keymap.set('n', '<leader>sf', builtin.find_files, { desc = '[S]earch [F]iles' })
       vim.keymap.set('n', '<leader>ss', builtin.builtin, { desc = '[S]earch [S]elect Telescope' })
       vim.keymap.set('n', '<leader>sw', builtin.grep_string, { desc = '[S]earch current [W]ord' })
-      vim.keymap.set('n', '<leader>sg', builtin.live_grep, { desc = '[S]earch by [G]rep' })
+      vim.keymap.set('n', '<leader>sg', require('telescope').extensions.live_grep_args.live_grep_args, { desc = '[S]earch by [G]rep' })
       vim.keymap.set('n', '<leader>sd', builtin.diagnostics, { desc = '[S]earch [D]iagnostics' })
       vim.keymap.set('n', '<leader>sr', builtin.resume, { desc = '[S]earch [R]esume' })
       vim.keymap.set('n', '<leader>s.', builtin.oldfiles, { desc = '[S]earch Recent Files ("." for repeat)' })
@@ -877,7 +1191,7 @@ require('lazy').setup({
       -- It's also possible to pass additional configuration options.
       --  See `:help telescope.builtin.live_grep()` for information about particular keys
       vim.keymap.set('n', '<leader>s/', function()
-        builtin.live_grep {
+        require('telescope').extensions.live_grep_args.live_grep_args {
           grep_open_files = true,
           prompt_title = 'Live Grep in Open Files',
         }
@@ -982,11 +1296,11 @@ require('lazy').setup({
 
           -- Fuzzy find all the symbols in your current document.
           --  Symbols are things like variables, functions, types, etc.
-          map('<leader>ds', require('telescope.builtin').lsp_document_symbols, '[D]ocument [S]ymbols')
+          map('<leader>nds', require('telescope.builtin').lsp_document_symbols, '[N]avigate [D]ocument [S]ymbols')
 
           -- Fuzzy find all the symbols in your current workspace.
           --  Similar to document symbols, except searches over your entire project.
-          map('<leader>ws', require('telescope.builtin').lsp_dynamic_workspace_symbols, '[W]orkspace [S]ymbols')
+          map('<leader>nws', require('telescope.builtin').lsp_dynamic_workspace_symbols, '[N]avigate [W]orkspace [S]ymbols')
 
           -- Rename the variable under your cursor.
           --  Most Language Servers support renaming across files, etc.
@@ -1007,6 +1321,7 @@ require('lazy').setup({
           -- When you move your cursor, the highlights will be cleared (the second autocommand).
           local client = vim.lsp.get_client_by_id(event.data.client_id)
           if client and client.supports_method(vim.lsp.protocol.Methods.textDocument_documentHighlight) then
+            local highlight_augroup = vim.api.nvim_create_augroup('kickstart-lsp-highlight', { clear = true })
             vim.api.nvim_create_autocmd({ 'CursorHold', 'CursorHoldI' }, {
               buffer = event.buf,
               group = highlight_augroup,
@@ -1068,7 +1383,13 @@ require('lazy').setup({
         --
         -- But for many setups, the LSP (`ts_ls`) will work just fine
         ts_ls = {},
-        --
+
+        -- Additional language servers
+        nil_ls = {}, -- Nix
+        gopls = {}, -- Go
+        pyright = {}, -- Python
+        rust_analyzer = {}, -- Rust
+        clangd = {}, -- C/C++
 
         lua_ls = {
           -- cmd = {...},
@@ -1123,13 +1444,24 @@ require('lazy').setup({
         return server ~= 'fsautocomplete'
       end, ensure_installed)
       vim.list_extend(ensure_installed, {
-        'stylua', -- Used to format Lua code
+        -- Formatters
+        'stylua', -- Lua formatter
+
+        -- Debuggers
+        'js-debug-adapter', -- JavaScript/TypeScript debugging
+
+        -- Tools that are NOT language servers (LSPs are automatically included from servers table)
+        -- 'prettier', -- JavaScript/TypeScript formatter
+        -- 'black', -- Python formatter
+        -- 'eslint', -- JavaScript linter
+        -- 'shellcheck', -- Shell script linter
       })
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
 
       print('mason bin: ', vim.fn.stdpath 'data' .. '/mason/bin/fantomas')
 
       require('mason-lspconfig').setup {
+        automatic_installation = true,
         handlers = {
           function(server_name)
             if server_name == 'fsautocomplete' then
@@ -1167,39 +1499,52 @@ require('lazy').setup({
       local dap = require 'dap'
       local dapui = require 'dapui'
 
-      dapui.setup()
+      dapui.setup {
+        layouts = {
+          {
+            elements = {
+              { id = 'scopes', size = 0.25 },
+              { id = 'breakpoints', size = 0.25 },
+              { id = 'stacks', size = 0.25 },
+              { id = 'watches', size = 0.25 },
+            },
+            position = 'left',
+            size = 40,
+          },
+          {
+            elements = {
+              { id = 'repl', size = 0.5 },
+              { id = 'console', size = 0.5 },
+            },
+            position = 'bottom',
+            size = 10,
+          },
+        },
+      }
 
-      -- Setup keymaps
-      vim.api.nvim_set_keymap('n', '<leader>td', ':lua require("dapui").toggle()<CR>', { noremap = true, silent = true })
+      -- Setup virtual text
+      require('nvim-dap-virtual-text').setup()
 
-      vim.keymap.set({ 'n', 'v' }, '<leader>?', function()
-        -- INFO: tj has this warning, it's ok, skipping values allows it to auto size
-        dapui.eval(nil, { enter = true })
-      end, { desc = 'Evaluate expression (DAP UI)' })
+      -- Debug control
+      vim.keymap.set('n', '<leader>dc', dap.continue, { desc = 'Debug: Continue (or start)' })
+      vim.keymap.set('n', '<leader>dr', dap.restart, { desc = 'Debug: Restart' })
+      vim.keymap.set('n', '<leader>dq', dap.terminate, { desc = 'Debug: Quit' })
 
-      vim.keymap.set('n', '<leader>b', function()
-        require('dap').toggle_breakpoint()
-      end, { desc = 'Toggle breakpoint (DAP)' })
+      -- Stepping (think: directions)
+      vim.keymap.set('n', '<leader>dl', dap.step_over, { desc = 'Debug: Next line' })
+      vim.keymap.set('n', '<leader>dj', dap.step_into, { desc = 'Debug: Into function' })
+      vim.keymap.set('n', '<leader>dk', dap.step_out, { desc = 'Debug: Out of function' })
+      vim.keymap.set('n', '<leader>dh', dap.step_back, { desc = 'Debug: Previous line' })
 
-      vim.keymap.set('n', '<F5>', function()
-        dap.continue()
-      end, { desc = 'DAP: Continue/Start' })
+      -- Breakpoints & UI
+      vim.keymap.set('n', '<leader>db', dap.toggle_breakpoint, { desc = 'Debug: Breakpoint' })
+      vim.keymap.set('n', '<leader>dt', require('dapui').toggle, { desc = 'Debug: Toggle UI' })
 
-      vim.keymap.set('n', '<F1>', function()
-        dap.step_into()
-      end, { desc = 'DAP: Step Into' })
-
-      vim.keymap.set('n', '<F2>', function()
-        dap.step_over()
-      end, { desc = 'DAP: Step Over' })
-
-      vim.keymap.set('n', '<F3>', function()
-        dap.step_out()
-      end, { desc = 'DAP: Step Out' })
-
-      vim.keymap.set('n', '<F4>', function()
-        dap.terminate()
-      end, { desc = 'DAP: Terminate Debugging' })
+      -- Evaluate expressions (both normal and visual mode)
+      vim.keymap.set({ 'n', 'v' }, '<leader>de', function()
+        -- INFO: this warning is ok, tj had it in his video
+        require('dapui').eval(nil, { enter = true })
+      end, { desc = 'Debug: Evaluate expression' })
 
       -- Event hooks
       dap.listeners.before.attach.dapui_config = function()
@@ -1249,6 +1594,136 @@ require('lazy').setup({
 
       dap.configurations.cs = dotnet_config
       dap.configurations.fsharp = dotnet_config
+
+      -- JavaScript/TypeScript debugging with js-debug-adapter
+      dap.adapters['pwa-node'] = {
+        type = 'server',
+        host = 'localhost',
+        port = '${port}',
+        executable = {
+          command = 'js-debug-adapter',
+          args = { '${port}' },
+        },
+      }
+
+      -- Chrome/Browser debugging
+      dap.adapters['pwa-chrome'] = {
+        type = 'server',
+        host = 'localhost',
+        port = '${port}',
+        executable = {
+          command = 'js-debug-adapter',
+          args = { '${port}' },
+        },
+      }
+
+      local js_config = {
+        {
+          name = 'Launch Node.js Program',
+          type = 'pwa-node',
+          request = 'launch',
+          program = function()
+            return vim.fn.input('Path to executable: ', vim.fn.getcwd() .. '/', 'file')
+          end,
+          cwd = '${workspaceFolder}',
+          sourceMaps = true,
+          resolveSourceMapLocations = { '${workspaceFolder}/**', '!**/node_modules/**' },
+          skipFiles = { '<node_internals>/**', 'node_modules/**' },
+          console = 'integratedTerminal',
+        },
+        {
+          name = 'Launch via npm',
+          type = 'pwa-node',
+          request = 'launch',
+          cwd = '${workspaceFolder}',
+          runtimeExecutable = 'npm',
+          runtimeArgs = { 'run-script', 'debug' },
+          skipFiles = { '<node_internals>/**', 'node_modules/**' },
+          console = 'integratedTerminal',
+        },
+        {
+          name = 'Attach to Process',
+          type = 'pwa-node',
+          request = 'attach',
+          processId = function()
+            return require('dap.utils').pick_process()
+          end,
+          cwd = '${workspaceFolder}',
+          skipFiles = { '<node_internals>/**', 'node_modules/**' },
+        },
+        {
+          name = 'Debug Jest Tests',
+          type = 'pwa-node',
+          request = 'launch',
+          cwd = '${workspaceFolder}',
+          runtimeExecutable = 'node',
+          runtimeArgs = { '--inspect-brk', 'node_modules/.bin/jest', '--runInBand' },
+          console = 'integratedTerminal',
+          internalConsoleOptions = 'neverOpen',
+          resolveSourceMapLocations = { '${workspaceFolder}/**', '!**/node_modules/**' },
+          skipFiles = { '<node_internals>/**', 'node_modules/**' },
+        },
+        {
+          name = 'Debug Current File',
+          type = 'pwa-node',
+          request = 'launch',
+          program = '${file}',
+          cwd = '${workspaceFolder}',
+          sourceMaps = true,
+          resolveSourceMapLocations = { '${workspaceFolder}/**', '!**/node_modules/**' },
+          skipFiles = { '<node_internals>/**', 'node_modules/**' },
+          console = 'integratedTerminal',
+        },
+      }
+
+      -- TypeScript-specific configuration
+      local ts_config = {
+        {
+          type = 'pwa-node',
+          request = 'launch',
+          name = 'Debug TypeScript',
+          program = '${workspaceFolder}/src/server.ts',
+          cwd = '${workspaceFolder}',
+          runtimeArgs = { '-r', 'ts-node/register' },
+          sourceMaps = true,
+          outFiles = {
+            '${workspaceFolder}/dist/**/*.js',
+            '${workspaceFolder}/build/**/*.js',
+            '${workspaceFolder}/out/**/*.js',
+            '${workspaceFolder}/**/*.js',
+          },
+          resolveSourceMapLocations = {
+            '${workspaceFolder}/**',
+            '!**/node_modules/**',
+          },
+          skipFiles = { '<node_internals>/**', 'node_modules/**' },
+          console = 'integratedTerminal',
+        },
+        {
+          name = 'Debug Current TypeScript File',
+          type = 'pwa-node',
+          request = 'launch',
+          program = '${file}',
+          cwd = '${workspaceFolder}',
+          runtimeArgs = { '-r', 'ts-node/register' },
+          sourceMaps = true,
+          outFiles = {
+            '${workspaceFolder}/dist/**/*.js',
+            '${workspaceFolder}/build/**/*.js',
+            '${workspaceFolder}/out/**/*.js',
+            '${workspaceFolder}/**/*.js',
+          },
+          resolveSourceMapLocations = {
+            '${workspaceFolder}/**',
+            '!**/node_modules/**',
+          },
+          skipFiles = { '<node_internals>/**', 'node_modules/**' },
+          console = 'integratedTerminal',
+        },
+      }
+
+      dap.configurations.javascript = js_config
+      dap.configurations.typescript = ts_config
     end,
   },
   { 'Olical/conjure' },
@@ -1298,24 +1773,13 @@ require('lazy').setup({
     },
     opts = {
       notify_on_error = false,
-      format_on_save = function(bufnr)
-        -- Disable "format_on_save lsp_fallback" for languages that don't
-        -- have a well standardized coding style. You can add additional
-        -- languages here or re-enable it for the disabled ones.
-        local disable_filetypes = { c = true, cpp = true }
-        local lsp_format_opt
-        if disable_filetypes[vim.bo[bufnr].filetype] then
-          lsp_format_opt = 'never'
-        else
-          lsp_format_opt = 'fallback'
-        end
-        return {
-          timeout_ms = 500,
-          lsp_format = lsp_format_opt,
-        }
-      end,
+      format_on_save = {
+        timeout_ms = 500,
+        lsp_format = 'fallback',
+      },
       formatters_by_ft = {
         lua = { 'stylua' },
+        go = { 'gofmt' }, -- Uses system gofmt
         -- Conform can also run multiple formatters sequentially
         -- python = { "isort", "black" },
         --
@@ -1552,6 +2016,25 @@ require('lazy').setup({
   },
   {
     'windwp/nvim-ts-autotag',
+    config = function()
+      require('nvim-ts-autotag').setup {
+        opts = {
+          -- Defaults
+          enable_close = true, -- Auto close tags
+          enable_rename = true, -- Auto rename pairs of tags
+          enable_close_on_slash = false, -- Auto close on trailing </
+        },
+      }
+    end,
+  },
+  {
+    'olrtg/nvim-emmet',
+    config = function()
+      -- Simple single-key expansion
+      vim.keymap.set({ 'i', 'n' }, '<C-e>', function()
+        require('nvim-emmet').expand_abbr()
+      end, { desc = 'Emmet expand abbreviation' })
+    end,
   },
   { -- You can easily change to a different colorscheme.
     -- Change the name of the colorscheme plugin below, and then
@@ -1620,7 +2103,22 @@ require('lazy').setup({
     main = 'nvim-treesitter.configs', -- Sets main module to use for opts
     -- [[ Configure Treesitter ]] See `:help nvim-treesitter`
     opts = {
-      ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc' },
+      ensure_installed = {
+        'bash',
+        'c',
+        'diff',
+        'html',
+        'lua',
+        'luadoc',
+        'markdown',
+        'markdown_inline',
+        'query',
+        'vim',
+        'vimdoc',
+        'typescript',
+        'javascript',
+        'tsx',
+      },
       -- Autoinstall languages that are not installed
       auto_install = true,
       highlight = {
@@ -1631,6 +2129,10 @@ require('lazy').setup({
         additional_vim_regex_highlighting = { 'ruby' },
       },
       indent = { enable = true, disable = { 'ruby' } },
+      -- Add this for HTML in template strings
+      injections = {
+        enable = true,
+      },
     },
     -- There are additional nvim-treesitter modules that you can use to interact
     -- with nvim-treesitter. You should go explore a few and see what interests you:
@@ -1639,7 +2141,6 @@ require('lazy').setup({
     --    - Show your current context: https://github.com/nvim-treesitter/nvim-treesitter-context
     --    - Treesitter + textobjects: https://github.com/nvim-treesitter/nvim-treesitter-textobjects
   },
-
   {
     'ThePrimeagen/vim-be-good',
   },
@@ -1709,23 +2210,6 @@ require('lazy').setup({
     },
   },
 })
-
-function SwapFileDiff()
-  -- Recover the swap file
-  vim.cmd 'recover'
-
-  -- Open the file on disk in a vertical split
-  vim.cmd 'vs %'
-
-  -- Enable diff mode in both windows
-  vim.cmd 'wincmd h'
-  vim.cmd 'diffthis'
-  vim.cmd 'wincmd l'
-  vim.cmd 'diffthis'
-end
-
--- Create a command to trigger this function
-vim.api.nvim_create_user_command('SwapDiff', SwapFileDiff, {})
 
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et

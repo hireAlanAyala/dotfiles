@@ -20,6 +20,7 @@
     # Custom derivations and scripts
     (callPackage ../derivations/discordo.nix {})
     (callPackage ../derivations/extract-otp-secrets.nix {})
+    (callPackage ../derivations/mcp-chrome-bridge.nix {})
     (writeShellScriptBin "wrapped_nvim" (builtins.readFile ../scripts/wrapped_nvim.sh))
     (writeShellScriptBin "show-2fa" (builtins.readFile ../scripts/show_all_2fa.sh))
     (writeShellScriptBin "hm" (builtins.readFile ../scripts/hm.sh))
@@ -41,6 +42,8 @@
     clojure
     leiningen
     lua
+    rustc
+    cargo
     
     # Node.js ecosystem
     nodePackages.typescript
@@ -63,6 +66,7 @@
     ngrok
     
     # Development tools
+    gnumake
     air
     direnv
     tree

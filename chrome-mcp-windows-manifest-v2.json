@@ -1,0 +1,9 @@
+{
+  "name": "com.chromemcp.nativehost",
+  "description": "Node.js Host for Browser Bridge Extension",
+  "path": "\\\\wsl.localhost\\Ubuntu\\home\\developer\\.config\\chrome-mcp-bridge.bat",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://hbdgbgagpkpjffpklnamcljpakneikee/"
+  ]
+}

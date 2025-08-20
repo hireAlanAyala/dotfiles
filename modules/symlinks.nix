@@ -27,6 +27,17 @@
     # "windows/projects".source = config.lib.file.mkOutOfStoreSymlink "/mnt/c/Users/AlanAyala/projects";
   };
 
+  # ====================== Docker ======================
+  home.file = {
+    ".docker/desktop/docker.sock".source = config.lib.file.mkOutOfStoreSymlink "/mnt/wsl/docker-desktop-bind-mounts/Ubuntu/docker.sock";
+  };
+
+  # ====================== Claude Code ======================
+  home.file = {
+    ".claude/settings.json".source = config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.config/claude/settings.json";
+    ".claude/.mcp.json".source = config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.config/claude/.mcp.json";
+  };
+
   # ====================== Documentation ======================
   # Manual symlinks not managed by Home Manager (for reference):
   # ~/.azure -> /mnt/c/Users/AlanAyala/.azure

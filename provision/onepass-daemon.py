@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 1Password CLI Daemon
-Secure daemon for managing 1Password CLI sessions with socket-based API
+Secure daemon for managing 1Password CLI sessions with service account authentication
 """
 
 import json
@@ -19,6 +19,7 @@ from typing import Optional, Dict, Any
 SOCKET_PATH = "/var/run/onepass/daemon.sock"
 LOG_FILE = "/var/log/onepass/daemon.log"
 PID_FILE = "/var/run/onepass/daemon.pid"
+SERVICE_ACCOUNT_TOKEN_FILE = "/opt/onepass/service-account-token"
 
 # Setup logging
 logging.basicConfig(
@@ -34,10 +35,11 @@ logger = logging.getLogger(__name__)
 
 class OnePasswordDaemon:
     def __init__(self):
-        self.session_token: Optional[str] = None
+        self.service_account_token: Optional[str] = None
         self.socket_path = SOCKET_PATH
         self.running = True
         self.last_activity = time.time()
+        self.authenticated = False
         
     def check_op_cli(self) -> bool:
         """Check if 1Password CLI is available"""
@@ -48,47 +50,80 @@ class OnePasswordDaemon:
         except (subprocess.TimeoutExpired, FileNotFoundError):
             return False
     
-    def signin(self, account: str, email: str, secret_key: str, password: str) -> Dict[str, Any]:
-        """Sign in to 1Password and store session token"""
+    def load_service_account_token(self) -> bool:
+        """Load service account token from file"""
         try:
-            # First sign in 
-            cmd = ['op', 'signin', account, email, secret_key, '--raw']
+            if os.path.exists(SERVICE_ACCOUNT_TOKEN_FILE):
+                with open(SERVICE_ACCOUNT_TOKEN_FILE, 'r') as f:
+                    self.service_account_token = f.read().strip()
+                    if self.service_account_token:
+                        logger.info("Service account token loaded successfully")
+                        return True
+            logger.error(f"Service account token file not found: {SERVICE_ACCOUNT_TOKEN_FILE}")
+            return False
+        except Exception as e:
+            logger.error(f"Failed to load service account token: {e}")
+            return False
+    
+    def validate_service_account(self) -> bool:
+        """Validate service account token with 1Password CLI"""
+        if not self.service_account_token:
+            return False
+        
+        try:
+            env = os.environ.copy()
+            env['OP_SERVICE_ACCOUNT_TOKEN'] = self.service_account_token
             
-            # Use password from stdin for security
+            # Test the service account by listing vaults
             result = subprocess.run(
-                cmd,
-                input=password,
-                text=True,
+                ['op', 'vault', 'list', '--format=json'],
+                env=env,
                 capture_output=True,
-                timeout=30
+                text=True,
+                timeout=10
             )
             
-            if result.returncode != 0:
-                logger.error(f"1Password signin failed: {result.stderr}")
-                return {"status": "error", "message": f"Signin failed: {result.stderr}"}
-            
-            self.session_token = result.stdout.strip()
-            logger.info("Successfully signed in to 1Password")
-            return {"status": "success", "message": "Signed in successfully"}
-            
-        except subprocess.TimeoutExpired:
-            return {"status": "error", "message": "Signin timeout"}
+            if result.returncode == 0:
+                logger.info("Service account validation successful")
+                self.authenticated = True
+                return True
+            else:
+                logger.error(f"Service account validation failed: {result.stderr}")
+                return False
+                
         except Exception as e:
-            logger.error(f"Signin error: {e}")
-            return {"status": "error", "message": str(e)}
+            logger.error(f"Service account validation error: {e}")
+            return False
     
-    def get_item(self, item_name: str, field: Optional[str] = None) -> Dict[str, Any]:
-        """Get item from 1Password"""
-        if not self.session_token:
-            return {"status": "error", "message": "Not signed in"}
+    def signin(self, account: str = None, email: str = None, secret_key: str = None, password: str = None) -> Dict[str, Any]:
+        """Service account authentication (no longer supports interactive signin)"""
+        # This method is kept for backward compatibility but will always use service account
+        if self.authenticated:
+            return {"status": "success", "message": "Already authenticated with service account"}
+        
+        # Attempt to authenticate with service account
+        if self.validate_service_account():
+            return {"status": "success", "message": "Authenticated with service account"}
+        else:
+            return {"status": "error", "message": "Service account authentication failed. Please check token configuration."}
+    
+    def get_item(self, item_name: str, field: Optional[str] = None, vault: Optional[str] = None) -> Dict[str, Any]:
+        """Get item from 1Password using service account"""
+        if not self.authenticated:
+            return {"status": "error", "message": "Not authenticated"}
+        
+        if not self.service_account_token:
+            return {"status": "error", "message": "Service account token not available"}
         
         try:
             cmd = ['op', 'item', 'get', item_name]
             if field:
                 cmd.extend(['--field', field])
+            if vault:
+                cmd.extend(['--vault', vault])
             
             env = os.environ.copy()
-            env['OP_SESSION'] = self.session_token
+            env['OP_SERVICE_ACCOUNT_TOKEN'] = self.service_account_token
             
             result = subprocess.run(
                 cmd,
@@ -111,16 +146,23 @@ class OnePasswordDaemon:
             logger.error(f"Get item error: {e}")
             return {"status": "error", "message": str(e)}
     
-    def list_items(self) -> Dict[str, Any]:
-        """List items from 1Password"""
-        if not self.session_token:
-            return {"status": "error", "message": "Not signed in"}
+    def list_items(self, vault: Optional[str] = None, categories: Optional[str] = None) -> Dict[str, Any]:
+        """List items from 1Password using service account"""
+        if not self.authenticated:
+            return {"status": "error", "message": "Not authenticated"}
+        
+        if not self.service_account_token:
+            return {"status": "error", "message": "Service account token not available"}
         
         try:
             cmd = ['op', 'item', 'list', '--format=json']
+            if vault:
+                cmd.extend(['--vault', vault])
+            if categories:
+                cmd.extend(['--categories', categories])
             
             env = os.environ.copy()
-            env['OP_SESSION'] = self.session_token
+            env['OP_SERVICE_ACCOUNT_TOKEN'] = self.service_account_token
             
             result = subprocess.run(
                 cmd,
@@ -146,20 +188,48 @@ class OnePasswordDaemon:
             return {"status": "error", "message": str(e)}
     
     def signout(self) -> Dict[str, Any]:
-        """Sign out and clear session"""
-        if self.session_token:
-            try:
-                env = os.environ.copy()
-                env['OP_SESSION'] = self.session_token
-                
-                subprocess.run(['op', 'signout'], env=env, timeout=5)
-            except:
-                pass  # Ignore signout errors
-            
-            self.session_token = None
-            logger.info("Signed out of 1Password")
+        """Sign out (service accounts don't need explicit signout)"""
+        # Service accounts don't require signout, but we'll clear the authenticated flag
+        self.authenticated = False
+        logger.info("Cleared authentication state")
+        return {"status": "success", "message": "Authentication state cleared"}
+    
+    def list_vaults(self) -> Dict[str, Any]:
+        """List available vaults using service account"""
+        if not self.authenticated:
+            return {"status": "error", "message": "Not authenticated"}
         
-        return {"status": "success", "message": "Signed out"}
+        if not self.service_account_token:
+            return {"status": "error", "message": "Service account token not available"}
+        
+        try:
+            cmd = ['op', 'vault', 'list', '--format=json']
+            
+            env = os.environ.copy()
+            env['OP_SERVICE_ACCOUNT_TOKEN'] = self.service_account_token
+            
+            result = subprocess.run(
+                cmd,
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if result.returncode != 0:
+                return {"status": "error", "message": f"List vaults failed: {result.stderr}"}
+            
+            self.last_activity = time.time()
+            vaults = json.loads(result.stdout)
+            return {"status": "success", "data": vaults}
+            
+        except json.JSONDecodeError:
+            return {"status": "error", "message": "Invalid JSON response"}
+        except subprocess.TimeoutExpired:
+            return {"status": "error", "message": "List vaults timeout"}
+        except Exception as e:
+            logger.error(f"List vaults error: {e}")
+            return {"status": "error", "message": str(e)}
     
     def handle_request(self, request_data: str) -> Dict[str, Any]:
         """Handle incoming requests"""
@@ -177,18 +247,25 @@ class OnePasswordDaemon:
             elif command == 'get_item':
                 return self.get_item(
                     request.get('item_name', ''),
-                    request.get('field')
+                    request.get('field'),
+                    request.get('vault')
                 )
             elif command == 'list_items':
-                return self.list_items()
+                return self.list_items(
+                    request.get('vault'),
+                    request.get('categories')
+                )
             elif command == 'signout':
                 return self.signout()
             elif command == 'status':
                 return {
                     "status": "success",
-                    "signed_in": self.session_token is not None,
+                    "authenticated": self.authenticated,
+                    "auth_type": "service_account",
                     "last_activity": self.last_activity
                 }
+            elif command == 'list_vaults':
+                return self.list_vaults()
             else:
                 return {"status": "error", "message": f"Unknown command: {command}"}
                 
@@ -220,13 +297,15 @@ class OnePasswordDaemon:
         return sock
     
     def session_timeout_monitor(self):
-        """Monitor for session timeout (30 minutes of inactivity)"""
+        """Monitor for service account validity"""
         while self.running:
-            if (self.session_token and 
-                time.time() - self.last_activity > 1800):  # 30 minutes
-                logger.info("Session timeout, signing out")
-                self.signout()
-            time.sleep(60)  # Check every minute
+            # Service accounts don't timeout, but we can periodically validate
+            if self.authenticated and time.time() - self.last_activity > 3600:  # 1 hour
+                logger.debug("Validating service account token")
+                if not self.validate_service_account():
+                    logger.error("Service account validation failed")
+                    self.authenticated = False
+            time.sleep(300)  # Check every 5 minutes
     
     def run(self):
         """Main daemon loop"""
@@ -234,7 +313,16 @@ class OnePasswordDaemon:
             logger.error("1Password CLI not found or not working")
             sys.exit(1)
         
-        logger.info("Starting 1Password daemon")
+        # Load and validate service account token
+        if not self.load_service_account_token():
+            logger.error("Failed to load service account token")
+            sys.exit(1)
+        
+        if not self.validate_service_account():
+            logger.error("Service account validation failed")
+            sys.exit(1)
+        
+        logger.info("Starting 1Password daemon with service account authentication")
         
         # Write PID file
         Path(PID_FILE).parent.mkdir(parents=True, exist_ok=True)

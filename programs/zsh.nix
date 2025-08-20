@@ -12,14 +12,5 @@
       plugins = [ "git" "vi-mode" "web-search" ];
     };
     initContent = builtins.readFile ../zsh/init_extra.zsh;
-    envExtra = ''
-      if [[ -z "$NVIM" ]]; then
-        # Your normal Zsh setup, including ZLE
-      else
-        # Minimal setup for Neovim, avoiding ZLE
-        # unsetopt zle
-      fi
-
-    '';
   };
 }
