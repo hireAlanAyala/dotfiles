@@ -9,12 +9,14 @@
 -- noice (reokaces the UI for floating messages)
 -- diffview (git diff)
 -- flash
---
+-- change here
 require 'config.options' -- Add this line
 
 --  NOTE: Must happen before plugins are loaded (otherwise wrong leader will be used)
 vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
+
+-- change there
 
 -- Load keymaps early so they're available before plugins
 require('config.keymaps').setup()
@@ -140,11 +142,22 @@ vim.opt.foldmethod = 'expr' -- Use expression for folding
 vim.wo.foldexpr = 'v:lua.vim.treesitter.foldexpr()'
 vim.opt.foldlevel = 99 -- Start with all folds open
 
+-- Override treesitter foldexpr to handle Neogit buffers
+local original_foldexpr = vim.treesitter.foldexpr
+vim.treesitter.foldexpr = function()
+  local bufname = vim.api.nvim_buf_get_name(0)
+  if bufname:match('Neogit') or vim.bo.filetype:match('Neogit') then
+    return '0'
+  end
+  return original_foldexpr()
+end
+
 -- Disable treesitter folding for Neogit to prevent errors
 vim.api.nvim_create_autocmd('FileType', {
   pattern = { 'NeogitStatus', 'NeogitCommit', 'NeogitPopup' },
   callback = function()
     vim.opt_local.foldmethod = 'manual'
+    vim.opt_local.foldenable = false
   end,
 })
 
@@ -378,13 +391,17 @@ vim.keymap.set('n', '<C-k>', '<cmd>TmuxNavigateUp<cr>', { desc = 'Navigate up (n
 -- local root_augroup = vim.api.nvim_create_augroup('MyAutoRoot', {})
 -- vim.api.nvim_create_autocmd('BufEnter', { group = root_augroup, callback = set_root })
 
-
--- Fix treesitter folding issues with Neogit
-vim.api.nvim_create_autocmd('FileType', {
-  pattern = { 'NeogitStatus', 'NeogitCommitMessage', 'NeogitPopup', 'NeogitLogView' },
-  callback = function()
-    vim.wo.foldmethod = 'manual'
-    vim.wo.foldenable = false
+-- Fix treesitter folding issues with Neogit - comprehensive coverage
+vim.api.nvim_create_autocmd({ 'FileType', 'BufWinEnter' }, {
+  pattern = { 'NeogitStatus', 'NeogitCommitMessage', 'NeogitPopup', 'NeogitLogView', 'NeogitCommit', 'Neogit*' },
+  callback = function(event)
+    pcall(function()
+      vim.wo[0].foldmethod = 'manual'
+      vim.wo[0].foldenable = false
+      if event.buf and vim.api.nvim_buf_is_valid(event.buf) then
+        vim.bo[event.buf].foldmethod = 'manual'
+      end
+    end)
   end,
 })
 
@@ -545,7 +562,48 @@ require('lazy').setup({
       'ibhagwan/fzf-lua', -- optional
       'echasnovski/mini.pick', -- optional
     },
-    config = true,
+    config = function()
+      require('neogit').setup({
+        -- Disable problematic options that might conflict with folding
+        disable_hint = false,
+        disable_context_highlighting = false,
+        disable_signs = false,
+        -- Auto-refresh when the git repository state changes
+        auto_refresh = true,
+        -- Disable auto-close to prevent buffer issues
+        auto_close = false,
+        -- Use telescope for branch selection instead of native selectors
+        use_telescope = true,
+        -- Configure signs
+        signs = {
+          -- { CLOSED, OPENED }
+          section = { "", "" },
+          item = { "", "" },
+          hunk = { "", "" },
+        },
+        -- Disable folding entirely for Neogit
+        disable_line_numbers = false,
+        mappings = {
+          -- Disable fold-related mappings
+          status = {
+            ["za"] = false,
+            ["zc"] = false,
+            ["zo"] = false,
+          }
+        }
+      })
+      
+      -- Force disable folding for all Neogit buffers immediately after setup
+      vim.api.nvim_create_autocmd('User', {
+        pattern = 'NeogitStatusRefresh',
+        callback = function()
+          pcall(function()
+            vim.wo.foldmethod = 'manual'
+            vim.wo.foldenable = false
+          end)
+        end,
+      })
+    end,
   },
   {
     'sindrets/diffview.nvim',
