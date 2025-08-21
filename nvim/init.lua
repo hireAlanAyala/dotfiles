@@ -16,6 +16,9 @@ require 'config.options' -- Add this line
 vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
+-- Load keymaps early so they're available before plugins
+require('config.keymaps').setup()
+
 vim.g.have_nerd_font = true
 
 -- background transparent - apply after colorscheme loads
@@ -174,9 +177,7 @@ vim.keymap.set('n', '<C-u>', '<C-u>zz', { desc = 'Half page up (centered)' })
 -- vim.keymap.set("n", "<C-k>", "<C-w>k", { desc = "Move to top window" })
 -- vim.keymap.set("n", "<C-l>", "<C-w>l", { desc = "Move to right window" })
 
--- Splitting & Resizing
-vim.keymap.set('n', '<leader>sv', ':vsplit<CR>', { desc = 'Split window vertically' })
-vim.keymap.set('n', '<leader>sh', ':split<CR>', { desc = 'Split window horizontally' })
+-- Window resizing keymaps
 vim.keymap.set('n', '<C-Up>', ':resize +2<CR>', { desc = 'Increase window height' })
 vim.keymap.set('n', '<C-Down>', ':resize -2<CR>', { desc = 'Decrease window height' })
 vim.keymap.set('n', '<C-Left>', ':vertical resize -2<CR>', { desc = 'Decrease window width' })
@@ -191,10 +192,6 @@ vim.keymap.set('v', '<A-k>', ":m '<-2<CR>gv=gv", { desc = 'Move selection up' })
 -- Better indenting in visual mode
 vim.keymap.set('v', '<', '<gv', { desc = 'Indent left and reselect' })
 vim.keymap.set('v', '>', '>gv', { desc = 'Indent right and reselect' })
-
--- Quick file navigation
-vim.keymap.set('n', '<leader>e', ':Explore<CR>', { desc = 'Open file explorer' })
-vim.keymap.set('n', '<leader>ff', ':find ', { desc = 'Find file' })
 
 -- Better J behavior
 vim.keymap.set('n', 'J', 'mzJ`z', { desc = 'Join lines and keep cursor position' })
@@ -300,31 +297,6 @@ end, {})
 -- [[ Basic Keymaps ]]
 --  See `:help vim.keymap.set()`
 
--- Function to copy buffer paths to clipboard
-local function copy_path(type)
-  local paths = {
-    full = vim.fn.expand '%:p',
-    relative = vim.fn.expand '%',
-    filename = vim.fn.expand '%:t',
-  }
-  vim.fn.setreg('+', paths[type])
-  print('Copied: ' .. paths[type])
-end
-
--- Copy path keymaps
-vim.keymap.set('n', '<leader>cp', function()
-  copy_path 'full'
-end, { desc = 'Copy full path' })
-vim.keymap.set('n', '<leader>cr', function()
-  copy_path 'relative'
-end, { desc = 'Copy relative path' })
-vim.keymap.set('n', '<leader>cf', function()
-  copy_path 'filename'
-end, { desc = 'Copy filename' })
-
--- Diagnostic keymaps
-vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic [Q]uickfix list' })
-
 -- Exit terminal mode in the builtin terminal with a shortcut that is a bit easier
 -- for people to discover. Otherwise, you normally need to press <C-\><C-n>, which
 -- is not what someone will guess without a bit more experience.
@@ -405,6 +377,7 @@ vim.keymap.set('n', '<C-k>', '<cmd>TmuxNavigateUp<cr>', { desc = 'Navigate up (n
 --
 -- local root_augroup = vim.api.nvim_create_augroup('MyAutoRoot', {})
 -- vim.api.nvim_create_autocmd('BufEnter', { group = root_augroup, callback = set_root })
+
 
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
@@ -545,69 +518,10 @@ require('lazy').setup({
           highlight GitSignsCurrentLineBlame guibg=NONE ctermbg=NONE
         ]]
 
-        local gitsigns = require 'gitsigns'
-
-        local function map(mode, l, r, opts)
-          opts = opts or {}
-          opts.buffer = bufnr
-          vim.keymap.set(mode, l, r, opts)
-        end
-
-        -- Navigation
-        map('n', ']c', function()
-          if vim.wo.diff then
-            vim.cmd.normal { ']c', bang = true }
-          else
-            gitsigns.nav_hunk 'next'
-          end
-        end, { desc = 'Next [C]hange/hunk' })
-
-        map('n', '[c', function()
-          if vim.wo.diff then
-            vim.cmd.normal { '[c', bang = true }
-          else
-            gitsigns.nav_hunk 'prev'
-          end
-        end, { desc = 'Previous [C]hange/hunk' })
-
-        -- Actions
-        map('n', '<leader>hs', gitsigns.stage_hunk, { desc = '[H]unk [S]tage' })
-        map('n', '<leader>hr', gitsigns.reset_hunk, { desc = '[H]unk [R]eset' })
-
-        map('v', '<leader>hs', function()
-          gitsigns.stage_hunk { vim.fn.line '.', vim.fn.line 'v' }
-        end, { desc = '[H]unk [S]tage (visual)' })
-
-        map('v', '<leader>hr', function()
-          gitsigns.reset_hunk { vim.fn.line '.', vim.fn.line 'v' }
-        end, { desc = '[H]unk [R]eset (visual)' })
-
-        map('n', '<leader>hS', gitsigns.stage_buffer, { desc = '[H]unk [S]tage Buffer' })
-        map('n', '<leader>hR', gitsigns.reset_buffer, { desc = '[H]unk [R]eset Buffer' })
-        map('n', '<leader>hp', gitsigns.preview_hunk, { desc = '[H]unk [P]review' })
-        map('n', '<leader>hi', gitsigns.preview_hunk_inline, { desc = '[H]unk Preview [I]nline' })
-
-        map('n', '<leader>hb', function()
-          gitsigns.blame_line { full = true }
-        end, { desc = '[H]unk [B]lame Line' })
-
-        map('n', '<leader>hd', gitsigns.diffthis, { desc = '[H]unk [D]iff This' })
-
-        map('n', '<leader>hD', function()
-          gitsigns.diffthis '~'
-        end, { desc = '[H]unk [D]iff This (~)' })
-
-        map('n', '<leader>hQ', function()
-          gitsigns.setqflist 'all'
-        end, { desc = '[H]unk [Q]uickfix List (all)' })
-        map('n', '<leader>hq', gitsigns.setqflist, { desc = '[H]unk [Q]uickfix List' })
-
-        -- Toggles
-        map('n', '<leader>tb', gitsigns.toggle_current_line_blame, { desc = '[T]oggle [B]lame Line' })
-        map('n', '<leader>tw', gitsigns.toggle_word_diff, { desc = '[T]oggle [W]ord Diff' })
-
-        -- Text object
-        map({ 'o', 'x' }, 'ih', gitsigns.select_hunk, { desc = '[I]nner [H]unk' })
+        -- Setup gitsigns keymaps
+        require('config.keymaps').setup_gitsigns_keymaps(bufnr)
+        -- Text object for hunks
+        vim.keymap.set({ 'o', 'x' }, 'ih', require('gitsigns').select_hunk, { buffer = bufnr, desc = '[I]nner [H]unk' })
       end,
     },
   },
@@ -688,8 +602,8 @@ require('lazy').setup({
     event = 'VimEnter', -- Sets the loading event to 'VimEnter'
     opts = {
       icons = {
-        -- set icon mappings to true if you have a Nerd Font
-        mappings = vim.g.have_nerd_font,
+        -- set icon mappings to false to disable icons
+        mappings = false,
         -- If you are using a Nerd Font: set icons.keys to an empty table which will use the
         -- default whick-key.nvim defined Nerd Font icons, otherwise define a string table
         keys = vim.g.have_nerd_font and {} or {
@@ -725,30 +639,7 @@ require('lazy').setup({
       },
 
       -- Document existing key chains
-      spec = {
-        { '<leader>c', group = '[C]ode', mode = { 'n', 'x' } },
-        { '<leader>d', group = '[D]ebug' },
-        { '<leader>e', group = '[E]valuate' },
-        { '<leader>n', group = '[N]avigate' },
-        { '<leader>r', group = '[R]ename' },
-        { '<leader>s', group = '[S]earch' },
-        { '<leader>w', group = '[W]orkspace' },
-        { '<leader>t', group = '[T]oggle' },
-        { '<leader>h', group = 'Git [H]unk', mode = { 'n', 'v' } },
-      },
-
-      -- - <leader>f - Find/Files (telescope, fzf, file operations)
-      -- - <leader>g - Git (git status, blame, diff, commits)
-      -- - <leader>l - LSP/Language (code actions, diagnostics, formatting)
-      -- - <leader>s - Search (grep, find and replace, symbols)
-      -- - <leader>b - Buffers (buffer navigation, close, list)
-      -- - <leader>w - Windows (window splits, resize, navigation)
-      -- - <leader>t - Terminal/Tabs (terminal toggle, tab operations)
-      -- - <leader>d - Debug/Diagnostics (DAP, error navigation)
-      -- - <leader>c - Code (commenting, refactoring, snippets)
-      -- - <leader>n - Navigation (file tree, jumps, marks)
-      -- - <leader>r - Run/REPL (run tests, execute code)
-      -- - <leader>h - Help/Hunk (help docs, git hunks)
+      -- Groups are now defined in config/keymaps.lua
 
       config = function(_, opts)
         -- Set up which-key with the provided opts
@@ -782,6 +673,8 @@ require('lazy').setup({
         wk.add {
           { 'yd', yank_diagnostic, desc = 'Yank diagnostic message', mode = 'n' },
         }
+
+        -- Note: which-key groups are now set up within each plugin-specific keymap function
       end,
     },
   },
@@ -1163,44 +1056,8 @@ require('lazy').setup({
       pcall(require('telescope').load_extension, 'ui-select')
       pcall(require('telescope').load_extension, 'live_grep_args')
 
-      -- See `:help telescope.builtin`
-      vim.keymap.set('n', '<leader>sh', builtin.help_tags, { desc = '[S]earch [H]elp' })
-      vim.keymap.set('n', '<leader>sk', builtin.keymaps, { desc = '[S]earch [K]eymaps' })
-      vim.keymap.set('n', '<leader>sf', builtin.find_files, { desc = '[S]earch [F]iles' })
-      vim.keymap.set('n', '<leader>ss', builtin.builtin, { desc = '[S]earch [S]elect Telescope' })
-      vim.keymap.set('n', '<leader>sw', builtin.grep_string, { desc = '[S]earch current [W]ord' })
-      vim.keymap.set('n', '<leader>sg', require('telescope').extensions.live_grep_args.live_grep_args, { desc = '[S]earch by [G]rep' })
-      vim.keymap.set('n', '<leader>sd', builtin.diagnostics, { desc = '[S]earch [D]iagnostics' })
-      vim.keymap.set('n', '<leader>sr', builtin.resume, { desc = '[S]earch [R]esume' })
-      vim.keymap.set('n', '<leader>s.', builtin.oldfiles, { desc = '[S]earch Recent Files ("." for repeat)' })
-      vim.keymap.set('n', '<leader><leader>', builtin.buffers, { desc = '[ ] Find existing buffers' })
-      -- vim.keymap.set('n', '<leader>gs', git_history_search, { noremap = true, silent = true })
-      vim.keymap.set('n', '<leader>gc', function()
-        colors(require('telescope.themes').get_dropdown {})
-      end)
-
-      -- Slightly advanced example of overriding default behavior and theme
-      vim.keymap.set('n', '<leader>/', function()
-        -- You can pass additional configuration to Telescope to change the theme, layout, etc.
-        builtin.current_buffer_fuzzy_find(require('telescope.themes').get_dropdown {
-          winblend = 10,
-          previewer = false,
-        })
-      end, { desc = '[/] Fuzzily search in current buffer' })
-
-      -- It's also possible to pass additional configuration options.
-      --  See `:help telescope.builtin.live_grep()` for information about particular keys
-      vim.keymap.set('n', '<leader>s/', function()
-        require('telescope').extensions.live_grep_args.live_grep_args {
-          grep_open_files = true,
-          prompt_title = 'Live Grep in Open Files',
-        }
-      end, { desc = '[S]earch [/] in Open Files' })
-
-      -- Shortcut for searching your Neovim configuration files
-      vim.keymap.set('n', '<leader>sn', function()
-        builtin.find_files { cwd = vim.fn.stdpath 'config' }
-      end, { desc = '[S]earch [N]eovim files' })
+      -- Setup telescope keymaps
+      require('config.keymaps').setup_telescope_keymaps()
     end,
   },
 
@@ -1289,26 +1146,8 @@ require('lazy').setup({
           --  Useful when your language has ways of declaring types without an actual implementation.
           map('gI', require('telescope.builtin').lsp_implementations, '[G]oto [I]mplementation')
 
-          -- Jump to the type of the word under your cursor.
-          --  Useful when you're not sure what type a variable is and you want to see
-          --  the definition of its *type*, not where it was *defined*.
-          map('<leader>D', require('telescope.builtin').lsp_type_definitions, 'Type [D]efinition')
-
-          -- Fuzzy find all the symbols in your current document.
-          --  Symbols are things like variables, functions, types, etc.
-          map('<leader>nds', require('telescope.builtin').lsp_document_symbols, '[N]avigate [D]ocument [S]ymbols')
-
-          -- Fuzzy find all the symbols in your current workspace.
-          --  Similar to document symbols, except searches over your entire project.
-          map('<leader>nws', require('telescope.builtin').lsp_dynamic_workspace_symbols, '[N]avigate [W]orkspace [S]ymbols')
-
-          -- Rename the variable under your cursor.
-          --  Most Language Servers support renaming across files, etc.
-          map('<leader>rn', vim.lsp.buf.rename, '[R]e[n]ame')
-
-          -- Execute a code action, usually your cursor needs to be on top of an error
-          -- or a suggestion from your LSP for this to activate.
-          map('<leader>ca', vim.lsp.buf.code_action, '[C]ode [A]ction', { 'n', 'x' })
+          -- Setup LSP keymaps
+          require('config.keymaps').setup_lsp_keymaps(event)
 
           -- WARN: This is not Goto Definition, this is Goto Declaration.
           --  For example, in C this would take you to the header.
@@ -1341,16 +1180,6 @@ require('lazy').setup({
                 vim.api.nvim_clear_autocmds { group = 'kickstart-lsp-highlight', buffer = event2.buf }
               end,
             })
-          end
-
-          -- The following code creates a keymap to toggle inlay hints in your
-          -- code, if the language server you are using supports them
-          --
-          -- This may be unwanted, since they displace some of your code
-          if client and client.supports_method(vim.lsp.protocol.Methods.textDocument_inlayHint) then
-            map('<leader>th', function()
-              vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled { bufnr = event.buf })
-            end, '[T]oggle Inlay [H]ints')
           end
         end,
       })
@@ -1525,26 +1354,8 @@ require('lazy').setup({
       -- Setup virtual text
       require('nvim-dap-virtual-text').setup()
 
-      -- Debug control
-      vim.keymap.set('n', '<leader>dc', dap.continue, { desc = 'Debug: Continue (or start)' })
-      vim.keymap.set('n', '<leader>dr', dap.restart, { desc = 'Debug: Restart' })
-      vim.keymap.set('n', '<leader>dq', dap.terminate, { desc = 'Debug: Quit' })
-
-      -- Stepping (think: directions)
-      vim.keymap.set('n', '<leader>dl', dap.step_over, { desc = 'Debug: Next line' })
-      vim.keymap.set('n', '<leader>dj', dap.step_into, { desc = 'Debug: Into function' })
-      vim.keymap.set('n', '<leader>dk', dap.step_out, { desc = 'Debug: Out of function' })
-      vim.keymap.set('n', '<leader>dh', dap.step_back, { desc = 'Debug: Previous line' })
-
-      -- Breakpoints & UI
-      vim.keymap.set('n', '<leader>db', dap.toggle_breakpoint, { desc = 'Debug: Breakpoint' })
-      vim.keymap.set('n', '<leader>dt', require('dapui').toggle, { desc = 'Debug: Toggle UI' })
-
-      -- Evaluate expressions (both normal and visual mode)
-      vim.keymap.set({ 'n', 'v' }, '<leader>de', function()
-        -- INFO: this warning is ok, tj had it in his video
-        require('dapui').eval(nil, { enter = true })
-      end, { desc = 'Debug: Evaluate expression' })
+      -- Setup debug keymaps
+      require('config.keymaps').setup_dap_keymaps()
 
       -- Event hooks
       dap.listeners.before.attach.dapui_config = function()
@@ -1950,10 +1761,15 @@ require('lazy').setup({
       }
 
       cmp.setup.cmdline(':', {
-        sources = {
-          { name = 'path' },
-          { name = 'cmdline' },
+        mapping = cmp.mapping.preset.cmdline {
+          ['<C-n>'] = cmp.mapping.select_next_item(),
+          ['<C-p>'] = cmp.mapping.select_prev_item(),
         },
+        sources = cmp.config.sources({
+          { name = 'path' },
+        }, {
+          { name = 'cmdline' },
+        }),
       })
 
       cmp.setup.cmdline('/', {
