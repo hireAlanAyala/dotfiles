@@ -379,6 +379,15 @@ vim.keymap.set('n', '<C-k>', '<cmd>TmuxNavigateUp<cr>', { desc = 'Navigate up (n
 -- vim.api.nvim_create_autocmd('BufEnter', { group = root_augroup, callback = set_root })
 
 
+-- Fix treesitter folding issues with Neogit
+vim.api.nvim_create_autocmd('FileType', {
+  pattern = { 'NeogitStatus', 'NeogitCommitMessage', 'NeogitPopup', 'NeogitLogView' },
+  callback = function()
+    vim.wo.foldmethod = 'manual'
+    vim.wo.foldenable = false
+  end,
+})
+
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
 
