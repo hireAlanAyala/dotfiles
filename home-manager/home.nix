@@ -81,6 +81,7 @@
     jq # sed but for json
     fzf
     bat
+    fd
     zoxide
     ripgrep
     yq
