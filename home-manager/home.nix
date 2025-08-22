@@ -72,6 +72,7 @@
     tree
     keychain
     cloc
+    tokei # project code statistics
     
     # Databases
     postgresql_15
@@ -87,6 +88,8 @@
     yq
     htop
     zbar # QR code reader
+    viu # terminal image viewer
+    chafa # terminal image viewer with better compatibility
     _1password-cli
     
     # Media and graphics

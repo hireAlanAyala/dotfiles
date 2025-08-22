@@ -174,6 +174,33 @@ M.setup = function()
 
   -- Terminal - <leader>t
   map('n', '<leader>tt', '<cmd>terminal<CR>', { desc = 'terminal toggle' })
+  map('n', '<leader>tp', function()
+    local dir
+    
+    -- Check if we're in an Oil buffer
+    if vim.bo.filetype == 'oil' then
+      local ok, oil = pcall(require, 'oil')
+      if ok then
+        dir = oil.get_current_dir()
+      end
+    end
+    
+    -- If not Oil or Oil failed, use regular file path logic
+    if not dir then
+      local filepath = vim.fn.expand('%:p')
+      dir = filepath ~= '' and vim.fn.fnamemodify(filepath, ':h') or vim.fn.getcwd()
+    end
+    
+    vim.cmd('terminal')
+    vim.defer_fn(function()
+      local term_buf = vim.api.nvim_get_current_buf()
+      local term_chan = vim.api.nvim_buf_get_option(term_buf, 'channel')
+      if term_chan then
+        vim.api.nvim_chan_send(term_chan, 'cd "' .. dir .. '"\n')
+      end
+    end, 100)
+    vim.cmd('startinsert')
+  end, { desc = 'terminal at buffer path' })
   
 
   -- Debug/Diagnostics - <leader>d
@@ -339,6 +366,7 @@ M.setup_telescope_keymaps = function()
   map('n', '<leader>sr', builtin.resume, { desc = 'search resume' })
   map('n', '<leader>s.', builtin.oldfiles, { desc = 'search recent files' })
   map('n', '<leader>st', '<cmd>TodoTelescope<CR>', { desc = 'search todos' })
+  map('n', '<leader>sm', '<cmd>Telescope media_files<CR>', { desc = 'search media files' })
 
   -- Help/Documentation
   map('n', '<leader>hh', builtin.help_tags, { desc = 'help tags' })

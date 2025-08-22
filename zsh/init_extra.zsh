@@ -32,7 +32,10 @@ bindkey '^e' edit-command-line
 export VISUAL=nvim
 export EDITOR=nvim
 # export TERM="screen-256color"
-export TERM="xterm-256color"
+# Only set TERM if not in tmux (tmux will set it correctly)
+if [[ -z "$TMUX" ]]; then
+  export TERM="xterm-256color"
+fi
 
 # ---------------------- Aliases ------------------------
 alias v="nvim"
