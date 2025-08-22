@@ -47,26 +47,33 @@ vim.api.nvim_create_autocmd('TermOpen', {
   end,
 })
 
--- Disable treesitter folding for Neogit to prevent errors
-vim.api.nvim_create_autocmd('FileType', {
-  pattern = { 'NeogitStatus', 'NeogitCommit', 'NeogitPopup' },
-  callback = function()
-    vim.opt_local.foldmethod = 'manual'
-    vim.opt_local.foldenable = false
+-- Prevent treesitter from attaching to Neogit buffers entirely
+-- This addresses the root cause by stopping treesitter before it can fail
+vim.api.nvim_create_autocmd('BufNew', {
+  callback = function(event)
+    vim.schedule(function()
+      if vim.api.nvim_buf_is_valid(event.buf) then
+        local ft = vim.bo[event.buf].filetype
+        if ft:match('^Neogit') then
+          -- Disable treesitter completely for this buffer
+          vim.bo[event.buf].syntax = 'on'  -- Use traditional syntax instead
+          pcall(vim.treesitter.stop, event.buf)
+        end
+      end
+    end)
   end,
 })
 
--- Fix treesitter folding issues with Neogit - comprehensive coverage
-vim.api.nvim_create_autocmd({ 'FileType', 'BufWinEnter' }, {
-  pattern = { 'NeogitStatus', 'NeogitCommitMessage', 'NeogitPopup', 'NeogitLogView', 'NeogitCommit', 'Neogit*' },
+-- Early intervention for Neogit filetypes
+vim.api.nvim_create_autocmd('FileType', {
+  pattern = 'Neogit*',
   callback = function(event)
-    pcall(function()
-      vim.wo[0].foldmethod = 'manual'
-      vim.wo[0].foldenable = false
-      if event.buf and vim.api.nvim_buf_is_valid(event.buf) then
-        vim.bo[event.buf].foldmethod = 'manual'
-      end
-    end)
+    -- Stop treesitter before it can attach
+    pcall(vim.treesitter.stop, event.buf)
+    -- Use manual folding
+    vim.opt_local.foldmethod = 'manual'
+    vim.opt_local.foldenable = false
+    vim.opt_local.foldexpr = ''
   end,
 })
 
