@@ -176,7 +176,7 @@ M.setup = function()
   map('n', '<leader>tt', '<cmd>terminal<CR>', { desc = 'terminal toggle' })
   map('n', '<leader>tp', function()
     local dir
-    
+
     -- Check if we're in an Oil buffer
     if vim.bo.filetype == 'oil' then
       local ok, oil = pcall(require, 'oil')
@@ -184,14 +184,14 @@ M.setup = function()
         dir = oil.get_current_dir()
       end
     end
-    
+
     -- If not Oil or Oil failed, use regular file path logic
     if not dir then
-      local filepath = vim.fn.expand('%:p')
+      local filepath = vim.fn.expand '%:p'
       dir = filepath ~= '' and vim.fn.fnamemodify(filepath, ':h') or vim.fn.getcwd()
     end
-    
-    vim.cmd('terminal')
+
+    vim.cmd 'terminal'
     vim.defer_fn(function()
       local term_buf = vim.api.nvim_get_current_buf()
       local term_chan = vim.api.nvim_buf_get_option(term_buf, 'channel')
@@ -199,9 +199,78 @@ M.setup = function()
         vim.api.nvim_chan_send(term_chan, 'cd "' .. dir .. '"\n')
       end
     end, 100)
-    vim.cmd('startinsert')
+    vim.cmd 'startinsert'
   end, { desc = 'terminal at buffer path' })
-  
+
+  map('n', '<leader>tt', function()
+    local task_folder = '.vrun'
+
+    local cwd = vim.fn.getcwd()
+    local task_dir = cwd .. '/' .. task_folder
+    
+    -- Check if the task folder exists
+    if vim.fn.isdirectory(task_dir) == 0 then
+      vim.notify('No ' .. task_folder .. ' directory found in ' .. cwd, vim.log.levels.WARN)
+      return
+    end
+    
+    -- Get all files in the task folder
+    local files = vim.fn.glob(task_dir .. '/*', false, true)
+    
+    -- Filter out directories, keep only files
+    local task_files = {}
+    for _, file in ipairs(files) do
+      if vim.fn.isdirectory(file) == 0 then
+        table.insert(task_files, file)
+      end
+    end
+    
+    if #task_files == 0 then
+      vim.notify('No task files found in ' .. task_folder, vim.log.levels.WARN)
+      return
+    end
+    
+    vim.ui.select(task_files, {
+      prompt = 'Select task to run:',
+      format_item = function(item)
+        -- Show just the filename without path
+        return vim.fn.fnamemodify(item, ':t')
+      end,
+    }, function(choice)
+      if not choice then
+        return
+      end
+
+      local lines = vim.fn.readfile(choice)
+      
+      if #lines == 0 then
+        vim.notify(choice .. ' is empty', vim.log.levels.WARN)
+        return
+      end
+
+      local buffer_name = vim.fn.fnamemodify(choice, ':t')
+
+      vim.cmd 'enew'
+      local buf = vim.api.nvim_get_current_buf()
+      local term_id = vim.fn.termopen(vim.o.shell)
+
+      vim.api.nvim_buf_set_name(buf, 'term://' .. buffer_name)
+
+      vim.defer_fn(function()
+        local term_chan = vim.b.terminal_job_id
+
+        if term_chan then
+          for _, line in ipairs(lines) do
+            if line ~= '' and not line:match '^%s*#' then
+              vim.api.nvim_chan_send(term_chan, line .. '\n')
+            end
+          end
+        end
+      end, 100)
+
+      vim.cmd 'startinsert'
+    end)
+  end, { desc = 'terminal task' })
 
   -- Debug/Diagnostics - <leader>d
   -- Debug keymaps are configured in the DAP plugin setup
@@ -215,15 +284,15 @@ M.setup = function()
   -- AI - <leader>a
   map({ 'n', 'v' }, '<leader>a?', function()
     local text_to_send = ''
-    
+
     -- Check if we're in visual mode
     local mode = vim.fn.mode()
     if mode == 'v' or mode == 'V' or mode == '\22' then -- \22 is visual block mode
       -- Get selected text
-      local start_pos = vim.fn.getpos("'<")
-      local end_pos = vim.fn.getpos("'>")
+      local start_pos = vim.fn.getpos "'<"
+      local end_pos = vim.fn.getpos "'>"
       local lines = vim.fn.getline(start_pos[2], end_pos[2])
-      
+
       -- Handle single line selection
       if #lines == 1 then
         if lines[1] then
@@ -238,46 +307,46 @@ M.setup = function()
           lines[#lines] = string.sub(lines[#lines], 1, end_pos[3])
         end
       end
-      
+
       text_to_send = table.concat(lines, '\n')
     else
       -- Normal mode - get current line
-      text_to_send = vim.fn.getline('.')
+      text_to_send = vim.fn.getline '.'
     end
-    
+
     if text_to_send == '' then
       vim.notify('No text to explain', vim.log.levels.WARN)
       return
     end
-    
+
     -- Prompt for additional instructions
-    local additional_prompt = vim.fn.input('Additional instructions (optional): ')
-    
+    local additional_prompt = vim.fn.input 'Additional instructions (optional): '
+
     -- Build the prompt
-    local prompt = "Explain the following code"
+    local prompt = 'Explain the following code'
     if additional_prompt ~= '' then
-      prompt = prompt .. " with these instructions: " .. additional_prompt
+      prompt = prompt .. ' with these instructions: ' .. additional_prompt
     end
-    prompt = prompt .. ":\\n\\n"
-    
+    prompt = prompt .. ':\\n\\n'
+
     -- Escape the text properly for shell
     local escaped_text = text_to_send:gsub('\\', '\\\\'):gsub('"', '\\"'):gsub('\n', '\\n'):gsub('`', '\\`'):gsub('%$', '\\$')
-    
+
     -- Run claude command with text
     local cmd = string.format('claude -p "%s%s"', prompt, escaped_text)
     local output = vim.fn.system(cmd)
-    
+
     if vim.v.shell_error ~= 0 then
       vim.notify('Claude command failed: ' .. output, vim.log.levels.ERROR)
     else
       -- Open output in a new buffer
-      vim.cmd('new')
+      vim.cmd 'new'
       vim.api.nvim_buf_set_lines(0, 0, -1, false, vim.split(output, '\n'))
       vim.bo.buftype = 'nofile'
       vim.bo.bufhidden = 'wipe'
       vim.bo.filetype = 'markdown'
-      vim.cmd('normal! gg')
-      vim.notify('Claude explanation opened in new buffer')
+      vim.cmd 'normal! gg'
+      vim.notify 'Claude explanation opened in new buffer'
     end
   end, { desc = 'explain code' })
 
@@ -543,4 +612,3 @@ M.setup_dap_keymaps = function()
 end
 
 return M
-
