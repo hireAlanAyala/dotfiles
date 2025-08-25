@@ -80,6 +80,7 @@ vim.opt.mouse = 'a'
 vim.opt.foldmethod = 'expr' -- Use expression for folding
 vim.wo.foldexpr = 'v:lua.vim.treesitter.foldexpr()'
 vim.opt.foldlevel = 99 -- Start with all folds open
+vim.opt.foldminlines = 0 -- Prevent treesitter folding errors
 
 -- Command-line completion
 vim.opt.wildmenu = true
@@ -131,5 +132,10 @@ vim.treesitter.foldexpr = function()
   if bufname:match 'Neogit' or filetype:match 'Neogit' then
     return '0'
   end
-  return original_foldexpr()
+  -- Wrap the original call in pcall to handle any errors
+  local ok3, result = pcall(original_foldexpr)
+  if not ok3 then
+    return '0'
+  end
+  return result
 end
