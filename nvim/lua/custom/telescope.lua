@@ -20,6 +20,7 @@
 local builtin = require 'telescope.builtin'
 local actions = require 'telescope.actions'
 local action_state = require 'telescope.actions.state'
+local telescope_utils = require 'custom.telescope-utils'
 
 local function remove_qf_item(prompt_bufnr)
   local selected_entry = action_state.get_selected_entry()
@@ -352,8 +353,106 @@ pcall(require('telescope').load_extension, 'media_files')
 -- Setup telescope keymaps
 require('config.keymaps').setup_telescope_keymaps()
 
+-- Custom tmux session picker
+local tmux_sessions
+tmux_sessions = function(opts)
+  opts = opts or {}
+  
+  local handle = io.popen('tmux list-sessions -F "#{session_name}: #{session_windows} windows#{?session_attached, (attached),}" 2>/dev/null || echo ""')
+  local result = handle:read("*a")
+  handle:close()
+  
+  -- Parse sessions into a table
+  local sessions = {}
+  for line in result:gmatch("[^\n]+") do
+    local name = line:match("^([^:]+)")
+    if name then
+      table.insert(sessions, { name = name, display = line })
+    end
+  end
+  
+  -- If no sessions, show a message
+  if #sessions == 0 then
+    vim.notify("No tmux sessions found", vim.log.levels.INFO)
+    return
+  end
+  
+  pickers.new({
+    layout_strategy = "vertical",
+    layout_config = {
+      height = 0.4,
+      width = 0.6,
+      prompt_position = "bottom",
+    },
+    sorting_strategy = "ascending",
+  }, {
+    prompt_title = 'Tmux Sessions',
+    finder = finders.new_table {
+      results = sessions,
+      entry_maker = function(entry)
+        return {
+          value = entry.name,
+          display = entry.display,
+          ordinal = entry.name,
+        }
+      end,
+    },
+    sorter = conf.generic_sorter(opts),
+    attach_mappings = function(prompt_bufnr, map)
+      actions.select_default:replace(function()
+        actions.close(prompt_bufnr)
+        local selection = action_state.get_selected_entry()
+        if selection then
+          -- Switch to selected tmux session
+          vim.fn.system('tmux switch-client -t ' .. vim.fn.shellescape(selection.value))
+        end
+      end)
+      
+      -- Add 'dd' mapping to delete session using utility
+      local delete_handler = telescope_utils.create_double_key_handler(
+        'd',
+        function()
+          local selection = action_state.get_selected_entry()
+          if selection then
+            local confirm = vim.fn.confirm("Delete tmux session '" .. selection.value .. "'?", "&Yes\n&No", 2)
+            if confirm == 1 then
+              vim.fn.system('tmux kill-session -t ' .. vim.fn.shellescape(selection.value))
+              -- Refresh the picker
+              actions.close(prompt_bufnr)
+              tmux_sessions(opts)
+            end
+          end
+        end,
+        {
+          timeout = 500,
+          message = "Press 'd' again to delete session"
+        }
+      )
+      
+      map('n', 'd', delete_handler)
+      
+      -- Keep Ctrl+d for insert mode
+      map('i', '<C-d>', function()
+        local selection = action_state.get_selected_entry()
+        if selection then
+          local confirm = vim.fn.confirm("Delete tmux session '" .. selection.value .. "'?", "&Yes\n&No", 2)
+          if confirm == 1 then
+            vim.fn.system('tmux kill-session -t ' .. vim.fn.shellescape(selection.value))
+            -- Refresh the picker
+            actions.close(prompt_bufnr)
+            tmux_sessions(opts)
+          end
+        end
+      end)
+      
+      return true
+    end,
+  }):find()
+end
+
 -- Export custom pickers for use in keymaps or commands
 return {
   colors = colors,
   git_log_source_picker = git_log_source_picker,
+  tmux_sessions = tmux_sessions,
 }

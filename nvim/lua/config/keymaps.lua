@@ -159,10 +159,10 @@ M.setup = function()
   map('n', '<leader>bD', '<cmd>%bd|e#<CR>', { desc = 'buffer delete others' })
 
   -- Buffer history navigation (like <C-o>/<C-i> but for whole buffers)
-  map('n', '<C-S-o>', function()
+  map('n', '<leader>bo', function()
     navigate_buffer_history(-1)
   end, { desc = 'buffer history back' })
-  map('n', '<C-S-i>', function()
+  map('n', '<leader>bi', function()
     navigate_buffer_history(1)
   end, { desc = 'buffer history forward' })
 
@@ -436,6 +436,11 @@ M.setup_telescope_keymaps = function()
   map('n', '<leader>s.', builtin.oldfiles, { desc = 'search recent files' })
   map('n', '<leader>st', '<cmd>TodoTelescope<CR>', { desc = 'search todos' })
   map('n', '<leader>sm', '<cmd>Telescope media_files<CR>', { desc = 'search media files' })
+  
+  -- Terminal operations
+  map('n', '<leader>ts', function()
+    require('custom.telescope').tmux_sessions()
+  end, { desc = 'tmux sessions' })
 
   -- Help/Documentation
   map('n', '<leader>hh', builtin.help_tags, { desc = 'help tags' })
