@@ -17,9 +17,14 @@ return {
       wrap = true,
     },
     preview = {
-      width = 40,
-      height = 20,
+      max_width = 0.9,
+      min_width = { 40, 0.4 },
+      max_height = 0.9,
+      min_height = { 5, 0.1 },
       border = 'rounded',
+      win_options = {
+        winblend = 0,
+      },
     },
     view_options = {
       show_hidden = true,
@@ -248,7 +253,7 @@ return {
             'pdf',
           }
 
-          -- Remove current format from options
+          -- Remove current format from options (case insensitive)
           local target_formats = {}
           for _, fmt in ipairs(formats) do
             if fmt:lower() ~= source_ext:lower() then
@@ -304,6 +309,18 @@ return {
   config = function(_, opts)
     require('oil').setup(opts)
 
+    -- Clean up oil buffers on exit to prevent :oil files
+    vim.api.nvim_create_autocmd("VimLeavePre", {
+      callback = function()
+        for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+          local name = vim.api.nvim_buf_get_name(buf)
+          if name:match("oil://") then
+            vim.api.nvim_buf_delete(buf, { force = true })
+          end
+        end
+      end,
+    })
+
     -- Set up which-key group only in oil buffers
     vim.api.nvim_create_autocmd('FileType', {
       pattern = 'oil',
@@ -319,7 +336,8 @@ return {
     })
   end,
   keys = {
-    { '-', '<CMD>oil<CR>', desc = 'Open parent directory' },
+    { '-', function() require('oil').open() end, desc = 'Open parent directory', mode = 'n' },
+    { '<C-\\>-', function() require('oil').open() end, desc = 'Open parent directory', mode = 't' },
   },
   -- Optional dependencies
   dependencies = { { 'echasnovski/mini.icons', opts = {} } },
