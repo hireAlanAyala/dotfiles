@@ -12,6 +12,7 @@ gh/
 # Tool-specific sensitive data
 pulse/
 systemd/
+sops-nix/secrets
 
 # Go telemetry data
 go/telemetry/

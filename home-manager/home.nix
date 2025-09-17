@@ -73,13 +73,13 @@
     keychain
     cloc
     tokei # project code statistics
+    nixfmt # Nix formatter
     
     # Databases
     postgresql_15
     sqlite
     
     # CLI utilities
-    dtach
     jq # sed but for json
     fzf
     bat
