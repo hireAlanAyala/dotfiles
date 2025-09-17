@@ -358,16 +358,26 @@ local tmux_sessions
 tmux_sessions = function(opts)
   opts = opts or {}
   
+  -- Get current session name
+  local current_session_handle = io.popen('tmux display-message -p "#{session_name}" 2>/dev/null || echo ""')
+  local current_session = current_session_handle:read("*a"):gsub("%s+$", "")
+  current_session_handle:close()
+  
   local handle = io.popen('tmux list-sessions -F "#{session_name}: #{session_windows} windows#{?session_attached, (attached),}" 2>/dev/null || echo ""')
   local result = handle:read("*a")
   handle:close()
   
   -- Parse sessions into a table
   local sessions = {}
+  local current_index = 1
   for line in result:gmatch("[^\n]+") do
     local name = line:match("^([^:]+)")
     if name then
       table.insert(sessions, { name = name, display = line })
+      -- Track the index of the current session
+      if name == current_session then
+        current_index = #sessions
+      end
     end
   end
   
@@ -378,6 +388,7 @@ tmux_sessions = function(opts)
   end
   
   pickers.new({
+    default_selection_index = current_index,
     layout_strategy = "vertical",
     layout_config = {
       height = 0.4,

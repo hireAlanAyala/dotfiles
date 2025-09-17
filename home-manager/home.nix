@@ -79,6 +79,7 @@
     sqlite
     
     # CLI utilities
+    dtach
     jq # sed but for json
     fzf
     bat

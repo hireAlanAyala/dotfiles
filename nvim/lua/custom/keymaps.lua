@@ -28,3 +28,16 @@ vim.keymap.set('n', '<C-h>', '<cmd>TmuxNavigateLeft<cr>', { desc = 'Navigate lef
 vim.keymap.set('n', '<C-l>', '<cmd>TmuxNavigateRight<cr>', { desc = 'Navigate right (nvim/tmux)' })
 vim.keymap.set('n', '<C-j>', '<cmd>TmuxNavigateDown<cr>', { desc = 'Navigate down (nvim/tmux)' })
 vim.keymap.set('n', '<C-k>', '<cmd>TmuxNavigateUp<cr>', { desc = 'Navigate up (nvim/tmux)' })
+
+
+-- Tmux persistent terminal keymaps
+local tmux_persist = require('custom.tmux-persist')
+vim.keymap.set('n', '<leader>tn', function()
+  vim.ui.input({ prompt = 'Terminal name: ' }, function(name)
+    if name and name ~= '' then
+      tmux_persist.new_terminal(nil, name)
+    elseif name == '' then
+      vim.notify('Terminal name is required', vim.log.levels.WARN)
+    end
+  end)
+end, { desc = 'New persistent terminal' })
