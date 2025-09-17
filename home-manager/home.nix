@@ -85,7 +85,7 @@
     postgresql_15
     sqlite
 
-    # CLI utilitiej
+    # CLI utilities
     jq # sed but for json
     fzf
     bat
