@@ -95,6 +95,7 @@ function M.new_terminal(cmd, session_name)
   local buf_nr = vim.api.nvim_get_current_buf()
   vim.b[buf_nr].tmux_session = final_session_name
   vim.b[buf_nr].tmux_persistent = true
+  vim.b[buf_nr].terminal_persist_managed = true  -- Unique marker
   
   -- Set buffer name - always use the custom name
   vim.api.nvim_buf_set_name(buf_nr, string.format('term://%s', session_name))
@@ -154,6 +155,7 @@ function M.attach_session(session_name, restore_buffer_name)
         local buf_nr = vim.api.nvim_get_current_buf()
         vim.b[buf_nr].tmux_session = choice.value
         vim.b[buf_nr].tmux_persistent = true
+        vim.b[buf_nr].terminal_persist_managed = true  -- Unique marker
         
         -- Restore buffer name using custom name
         local state = read_project_state()
@@ -173,6 +175,7 @@ function M.attach_session(session_name, restore_buffer_name)
     local buf_nr = vim.api.nvim_get_current_buf()
     vim.b[buf_nr].tmux_session = session_name
     vim.b[buf_nr].tmux_persistent = true
+    vim.b[buf_nr].terminal_persist_managed = true  -- Unique marker
     
     -- Restore buffer name using custom name from state (with delay to ensure terminal is ready)
     vim.defer_fn(function()
@@ -302,11 +305,12 @@ function M.setup(opts)
     return buf_nr, final_session_name
   end
   
-  -- Kill tmux session when terminal buffer is closed
+  -- Kill tmux session when terminal-persist buffer is closed
   vim.api.nvim_create_autocmd({'BufDelete', 'BufWipeout'}, {
     callback = function(args)
       local buf_nr = args.buf
-      if vim.b[buf_nr].tmux_persistent then
+      -- Only handle buffers created by terminal-persist (not other terminal plugins)
+      if vim.b[buf_nr].terminal_persist_managed then
         local session = vim.b[buf_nr].tmux_session
         if session then
           -- Debug: check if session exists first
