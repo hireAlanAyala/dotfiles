@@ -80,16 +80,17 @@ function M.new_terminal(cmd, session_name)
   -- If session doesn't exist, create it detached first
   if not session_exists(final_session_name) then
     local create_cmd = string.format(
-      "tmux new-session -d -s %s -c '%s'",
+      "tmux new-session -d -s %s -c '%s' \\; set-option -t %s history-limit 50000",
       final_session_name,
-      vim.fn.getcwd()
+      vim.fn.getcwd(),
+      final_session_name
     )
     vim.fn.system(create_cmd)
   end
   
   -- Open terminal and attach to the session
   vim.cmd('enew')  -- Create new buffer in current window
-  vim.cmd(string.format('terminal tmux attach-session -t %s', final_session_name))
+  vim.cmd(string.format('terminal ~/.config/scripts/tmux-attach-with-history.sh %s', final_session_name))
   
   -- Store session info in buffer variable
   local buf_nr = vim.api.nvim_get_current_buf()
