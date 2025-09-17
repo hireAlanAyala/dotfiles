@@ -414,21 +414,63 @@ tmux_sessions = function(opts)
   local current_session = current_session_handle:read("*a"):gsub("%s+$", "")
   current_session_handle:close()
   
-  local handle = io.popen('tmux list-sessions -F "#{session_name}: #{session_windows} windows#{?session_attached, (attached),}" 2>/dev/null || echo ""')
+  local handle = io.popen('tmux list-sessions -F "#{session_name}#{?session_attached, (attached),}" 2>/dev/null || echo ""')
   local result = handle:read("*a")
   handle:close()
   
-  -- Parse sessions into a table
+  -- Parse all sessions and separate parent sessions from sub-sessions
+  local all_sessions = {}
+  local sub_sessions = {}
+  
+  for line in result:gmatch("[^\n]+") do
+    local name, is_attached = line:match("^([^%(]+)(.*)$")
+    if name then
+      name = name:gsub("%s+$", "") -- trim whitespace
+      local is_active = is_attached:match("%(attached%)")
+      
+      -- Check if this is a sub-session
+      if name:match("_[%w]+_") then
+        -- Extract parent session name (everything before the first _[hash]_)
+        local parent = name:match("^(.-)_[%w]+_")
+        if parent then
+          if not sub_sessions[parent] then
+            sub_sessions[parent] = 0
+          end
+          sub_sessions[parent] = sub_sessions[parent] + 1
+        end
+      else
+        -- This is a parent session
+        table.insert(all_sessions, { 
+          name = name, 
+          is_active = is_active ~= nil 
+        })
+      end
+    end
+  end
+  
+  -- Build the final sessions list with sub-session counts
   local sessions = {}
   local current_index = 1
-  for line in result:gmatch("[^\n]+") do
-    local name = line:match("^([^:]+)")
-    if name then
-      table.insert(sessions, { name = name, display = line })
-      -- Track the index of the current session
-      if name == current_session then
-        current_index = #sessions
-      end
+  
+  for _, session in ipairs(all_sessions) do
+    local display = session.name
+    
+    -- Add sub-session count if any
+    local sub_count = sub_sessions[session.name] or 0
+    if sub_count > 0 then
+      display = display .. " +" .. sub_count
+    end
+    
+    -- Add active indicator
+    if session.is_active then
+      display = display .. " *"
+    end
+    
+    table.insert(sessions, { name = session.name, display = display })
+    
+    -- Track the index of the current session
+    if session.name == current_session then
+      current_index = #sessions
     end
   end
   
@@ -443,7 +485,7 @@ tmux_sessions = function(opts)
     layout_strategy = "vertical",
     layout_config = {
       height = 0.4,
-      width = 0.6,
+      width = 0.3,
       prompt_position = "bottom",
     },
     sorting_strategy = "ascending",
