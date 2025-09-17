@@ -1,6 +1,12 @@
-{ config, pkgs, lib, home-manager, ... }:
+{
+  config,
+  pkgs,
+  lib,
+  home-manager,
+  ...
+}:
 
-# TODO: 
+# TODO:
 # - add the following tools: nerdfont
 # - add command for creating reports out of data
 
@@ -18,9 +24,9 @@
 
   home.packages = with pkgs; [
     # Custom derivations and scripts
-    (callPackage ../derivations/discordo.nix {})
-    (callPackage ../derivations/extract-otp-secrets.nix {})
-    (callPackage ../derivations/mcp-chrome-bridge.nix {})
+    (callPackage ../derivations/discordo.nix { })
+    (callPackage ../derivations/extract-otp-secrets.nix { })
+    (callPackage ../derivations/mcp-chrome-bridge.nix { })
     (writeShellScriptBin "wrapped_nvim" (builtins.readFile ../scripts/wrapped_nvim.sh))
     (writeShellScriptBin "show-2fa" (builtins.readFile ../scripts/show_all_2fa.sh))
     (writeShellScriptBin "hm" (builtins.readFile ../scripts/hm.sh))
@@ -44,19 +50,19 @@
     lua
     rustc
     cargo
-    
+
     # Node.js ecosystem
     nodePackages.typescript
     nodePackages.typescript-language-server
     nodePackages.nodemon
     pnpm
-    
+
     # .NET ecosystem
     dotnetCorePackages.dotnet_8.sdk
     netcoredbg
     # dotnet-sdk_8
     fsautocomplete
-    
+
     # Cloud and DevOps
     azure-functions-core-tools
     azure-cli
@@ -64,7 +70,7 @@
     docker
     docker-compose
     ngrok
-    
+
     # Development tools
     gnumake
     air
@@ -74,12 +80,12 @@
     cloc
     tokei # project code statistics
     nixfmt # Nix formatter
-    
+
     # Databases
     postgresql_15
     sqlite
-    
-    # CLI utilities
+
+    # CLI utilitiej
     jq # sed but for json
     fzf
     bat
@@ -92,21 +98,21 @@
     viu # terminal image viewer
     chafa # terminal image viewer with better compatibility
     _1password-cli
-    
+
     # Media and graphics
     mpv
     imagemagick
-    
+
     # Communication and entertainment
     irssi
     spotify-player
-    
+
     # Data tools
     visidata
-    
+
     # Hardware
     arduino-cli
-    
+
     # Nerd Fonts
     nerd-fonts.iosevka
     nerd-fonts.fira-code
@@ -114,14 +120,14 @@
     nerd-fonts.hack
   ];
 
-  home.file = {};
+  home.file = { };
 
   sops = {
     defaultSopsFile = ../secrets.yaml;
     gnupg.home = "${config.home.homeDirectory}/.gnupg";
     secrets = {
       # keys to decrypt
-      hpg_plus_supabase_access_token = {};
+      hpg_plus_supabase_access_token = { };
     };
   };
 
@@ -136,8 +142,8 @@
 
   services.gpg-agent = {
     enable = true;
-    defaultCacheTtl = 28800;  # 8 hours
-    maxCacheTtl = 86400;      # 24 hours
+    defaultCacheTtl = 28800; # 8 hours
+    maxCacheTtl = 86400; # 24 hours
     enableSshSupport = true;
     extraConfig = ''
       allow-loopback-pinentry
@@ -150,7 +156,7 @@
     # WARNING: This only applies to programs launched from home-manager,
     # not the whole system
     SHELL = "${pkgs.zsh}/bin/zsh";
-    
+
     # API keys from SOPS secrets
     HPG_PLUS_SUPABASE_ACCESS_TOKEN = "$(cat ${config.sops.secrets.hpg_plus_supabase_access_token.path})";
   };
