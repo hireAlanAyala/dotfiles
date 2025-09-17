@@ -53,6 +53,57 @@ local function remove_qf_item(prompt_bufnr)
   end, 50) -- Small delay to avoid flicker
 end
 
+-- Custom buffer deletion that switches to previous buffer when deleting current buffer
+-- This prevents being left viewing a deleted buffer when using 'dd' in Telescope buffers
+local function delete_buffer_smart(prompt_bufnr)
+  local picker = action_state.get_current_picker(prompt_bufnr)
+  local selected_entry = action_state.get_selected_entry()
+  
+  if not selected_entry then
+    return
+  end
+  
+  local bufnr_to_delete = selected_entry.bufnr
+  
+  -- Check if the buffer to delete is currently visible in any window
+  local should_switch = false
+  local target_win = nil
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    if vim.api.nvim_win_get_buf(win) == bufnr_to_delete then
+      should_switch = true
+      target_win = win
+      break
+    end
+  end
+  
+  -- If we need to switch, do it immediately in the target window
+  if should_switch and target_win then
+    -- Find the most recent valid buffer from the buffer list
+    local alt_buf = nil
+    local buffers = vim.api.nvim_list_bufs()
+    for _, buf in ipairs(buffers) do
+      if buf ~= bufnr_to_delete and vim.api.nvim_buf_is_valid(buf) and vim.api.nvim_buf_is_loaded(buf) then
+        local buftype = vim.api.nvim_buf_get_option(buf, 'buftype')
+        if buftype == '' then -- Only normal buffers, not special ones
+          alt_buf = buf
+          break
+        end
+      end
+    end
+    
+    if alt_buf then
+      vim.api.nvim_win_set_buf(target_win, alt_buf)
+    else
+      -- If no valid buffer exists, create a new empty buffer
+      local new_buf = vim.api.nvim_create_buf(true, false)
+      vim.api.nvim_win_set_buf(target_win, new_buf)
+    end
+  end
+  
+  -- Delete the buffer and let telescope's default action handle the refresh
+  actions.delete_buffer(prompt_bufnr)
+end
+
 local pickers = require 'telescope.pickers'
 local finders = require 'telescope.finders'
 local conf = require('telescope.config').values
@@ -292,7 +343,7 @@ require('telescope').setup {
     buffers = {
       mappings = {
         n = {
-          ['dd'] = 'delete_buffer',
+          ['dd'] = delete_buffer_smart,
         },
       },
     },
