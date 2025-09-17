@@ -4,8 +4,8 @@ local M = {}
 M.config = {
   session_prefix = "nvim",
   auto_name_from_cwd = true,
-  state_file = vim.fn.stdpath('data') .. '/tmux-persist-state.json',
-  project_state_file = '.nvim/tmux-sessions.json',  -- Per-project state
+  state_file = vim.fn.stdpath('data') .. '/terminal-persist-state.json',
+  project_state_file = '.nvim/terminal-sessions.json',  -- Per-project state
   auto_restore = true,
 }
 
