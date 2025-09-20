@@ -85,6 +85,9 @@
     postgresql_15
     sqlite
 
+    # Terminal Core
+    reptyr
+
     # CLI utilities
     jq # sed but for json
     fzf

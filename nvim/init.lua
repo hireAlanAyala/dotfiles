@@ -20,3 +20,14 @@ require('custom.terminal-persist').setup()
 
 -- Setup plugins
 require 'custom.lazy'
+
+vim.api.nvim_create_user_command('Hydrate', function()
+  local ts = vim.fn.expand '~/.config/demo.typescript'
+  local tf = vim.fn.expand '~/.config/demo.time'
+  local cmd = string.format('hydrate-typescript %s %s', vim.fn.shellescape(ts), vim.fn.shellescape(tf))
+  if vim.bo.buftype == 'terminal' and vim.b.terminal_job_id then
+    vim.api.nvim_chan_send(vim.b.terminal_job_id, cmd .. '\r')
+  else
+    vim.cmd('terminal ' .. cmd)
+  end
+end, {})
