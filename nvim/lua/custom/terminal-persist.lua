@@ -427,17 +427,23 @@ function M.restore_project_sessions()
         vim.b[buf_nr].tmux_persistent = true
         vim.b[buf_nr].terminal_persist_managed = true
         
-        -- Set buffer name using custom name if available
-        if session_data.info and session_data.info.custom_name then
-          vim.api.nvim_buf_set_name(buf_nr, string.format('term://%s', session_data.info.custom_name))
-        end
+        -- Restore buffer name from saved state
+        -- We defer this to ensure the terminal buffer is fully initialized
+        -- and re-read state to get the most recent custom name (in case it was renamed)
+        vim.defer_fn(function()
+          local current_state = read_project_state()
+          local session_info = current_state[session_data.name]
+          if session_info and session_info.custom_name then
+            vim.api.nvim_buf_set_name(buf_nr, string.format('term://%s', session_info.custom_name))
+          end
+        end, 100)
       end
       
       -- Return to original buffer/window
       vim.api.nvim_set_current_win(current_win)
       vim.api.nvim_set_current_buf(current_buf)
       
-      vim.notify(string.format('Restored %d project sessions in background', restored))
+      vim.notify(string.format('Restored %d terminals in background', restored))
     end, 500)
   elseif restored > 0 then
     vim.notify(string.format('Project sessions: %d available', restored))
@@ -510,6 +516,32 @@ function M.setup(opts)
           local state = read_project_state()
           state[session] = nil
           write_project_state(state)
+        end
+      end
+    end,
+  })
+
+  -- Handle buffer rename for terminal buffers
+  vim.api.nvim_create_autocmd('BufFilePost', {
+    callback = function(args)
+      local buf_nr = args.buf
+      -- Check if this is a managed terminal buffer
+      if vim.b[buf_nr] and vim.b[buf_nr].terminal_persist_managed then
+        local session = vim.b[buf_nr].tmux_session
+        if session then
+          local new_name = args.file
+          -- Extract the custom name from the new buffer name
+          local custom_name = new_name:match('^term://(.+)$') or new_name:match('([^/]+)$')
+          
+          if custom_name then
+            -- Update the state with new custom name
+            local state = read_project_state()
+            if state[session] then
+              state[session].custom_name = custom_name
+              state[session].buffer_name = new_name
+              write_project_state(state)
+            end
+          end
         end
       end
     end,
