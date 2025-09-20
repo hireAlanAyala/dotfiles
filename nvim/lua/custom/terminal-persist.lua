@@ -420,6 +420,9 @@ function M.restore_project_sessions()
           
           -- Execute the terminal command in this buffer
           vim.cmd(attach_cmd)
+          
+          -- Position cursor at bottom of terminal buffer
+          vim.cmd('normal! G')
         end)
         
         -- Store session info in buffer
