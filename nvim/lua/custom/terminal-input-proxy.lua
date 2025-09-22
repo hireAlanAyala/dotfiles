@@ -554,49 +554,62 @@ function M._create_input_buffer(pane_id, mode, term_job_id, session_name)
   local found_line = nil
   local original_text = ""
   
-  -- Step 1: Save current line by sending End + copy to clipboard  
-  tmux_send_keys(pane_id, { 'C-e' })  -- Move to end
-  tmux_send_keys(pane_id, { 'C-a' })  -- Select to beginning
+  -- Step 1: Two-marker approach for accurate command extraction
   
-  -- Create unique marker
-  local marker = string.format("__NVIM_PROXY_%d__", os.time())
+  -- First, capture the current text by going to end of line
+  tmux_send_keys(pane_id, { 'End' })
   
-  -- Step 2: Replace current line with marker
-  tmux_send_keys(pane_id, { 'C-u' })  -- Clear line
-  tmux_send_keys(pane_id, marker)
+  -- Create unique markers
+  local left_marker = string.format("__START_%d__", os.time())
+  local right_marker = string.format("__END_%d__", os.time())
   
-  -- Step 3: Give tmux a moment to update the display
+  -- Step 2: Insert left marker at start of line
+  tmux_send_keys(pane_id, { 'C-a' })  -- Go to beginning of line
+  tmux_send_keys(pane_id, left_marker)
+  
+  -- Step 3: Insert right marker at current cursor position (where we were)
+  tmux_send_keys(pane_id, { 'End' })  -- Go back to end
+  tmux_send_keys(pane_id, right_marker)
+  
+  -- Step 4: Give tmux a moment to update the display
   vim.wait(50)
   
-  -- Step 4: Find the marker in terminal buffer
+  -- Step 5: Find both markers in terminal buffer
   local win_lines = vim.api.nvim_buf_get_lines(term_buf, -win_height, -1, false)
   
   for i = #win_lines, 1, -1 do
     local line = win_lines[i] or ''
-    if line:find(marker, 1, true) then
+    local left_pos = line:find(left_marker, 1, true)
+    local right_pos = line:find(right_marker, 1, true)
+    
+    if left_pos and right_pos then
       offset_from_bottom = #win_lines - i
       found_line = line
-      -- Extract original text (everything before marker on the line)
-      local marker_pos = line:find(marker, 1, true)
-      if marker_pos > 1 then
-        original_text = line:sub(1, marker_pos - 1)
-        -- Remove prompt characters
-        local prompt_patterns = { '$ ', '> ', '%% ', '# ', ': ' }
-        for _, pattern in ipairs(prompt_patterns) do
-          local pos = original_text:find(pattern, 1, true)
-          if pos then
-            original_text = original_text:sub(pos + #pattern)
-            break
-          end
+      
+      -- Extract text between markers
+      local text_with_prompt = line:sub(left_pos + #left_marker, right_pos - 1)
+      
+      -- Find the prompt boundary (after common prompt patterns)
+      local prompt_patterns = { '$ ', '> ', '%% ', '# ', ': ', '❯ ', '➜ ' }
+      original_text = text_with_prompt
+      
+      for _, pattern in ipairs(prompt_patterns) do
+        local pos = text_with_prompt:find(pattern, 1, true)
+        if pos then
+          -- Extract everything after the prompt pattern
+          original_text = text_with_prompt:sub(pos + #pattern)
+          break
         end
       end
-      vim.notify(string.format('Found marker at offset %d from bottom, original text: "%s"', offset_from_bottom, original_text))
+      
+      vim.notify(string.format('Found markers at offset %d from bottom, command text: "%s"', offset_from_bottom, original_text))
       break
     end
   end
   
-  -- Step 5: Restore original content
-  tmux_send_keys(pane_id, { 'C-u' })  -- Clear marker
+  -- Step 6: Clear both markers and restore original content
+  tmux_send_keys(pane_id, { 'C-a' })  -- Go to start
+  tmux_send_keys(pane_id, { 'C-k' })  -- Clear to end of line
   if #original_text > 0 then
     tmux_send_keys(pane_id, original_text)
   end
