@@ -1,3 +1,6 @@
+# WARNING: this file is not meant as a global ignore, it's a project level ignore only
+# use git/ignore for global ignore config
+
 .git/
 .secrets/
 environment.d/
@@ -17,8 +20,3 @@ sops-nix/secrets
 # Go telemetry data
 go/telemetry/
 
-# GLOBAL IGNORES
-# INFO: this file tracks dotfile project level ignores, but is also the default location for global ignores
-
-# nvim stores persistance data in this location per project folder
-.nvim/
