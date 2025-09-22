@@ -17,6 +17,7 @@ require 'custom.terminal-paste-fix'
 require('custom.sessions').setup()
 -- require('custom.dtach-terminal').setup()  -- Disabled in favor of terminal-persist
 require('custom.terminal-persist').setup()
+require 'custom.terminal-input-proxy'
 
 -- Setup plugins
 require 'custom.lazy'
