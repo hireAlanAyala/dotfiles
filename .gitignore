@@ -17,3 +17,8 @@ sops-nix/secrets
 # Go telemetry data
 go/telemetry/
 
+# GLOBAL IGNORES
+# INFO: this file tracks dotfile project level ignores, but is also the default location for global ignores
+
+# nvim stores persistance data in this location per project folder
+.nvim/

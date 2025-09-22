@@ -1,6 +1,6 @@
 return {
   'stevearc/oil.nvim',
-  event = { 'VimEnter */*,.*', 'BufNew */*,.*' }, -- had to disable in order for keys config to work
+  lazy = false,  -- Load oil immediately to ensure proper initialization
   ---@module 'oil'
   ---@type oil.SetupOpt
   opts = {
@@ -332,6 +332,17 @@ return {
           { '<leader>oi', desc = 'Toggle inline file info', buffer = 0 },
           { '<leader>oc', desc = 'Convert media file', buffer = 0 },
         }
+      end,
+    })
+
+    -- Open oil at startup when no file is specified
+    vim.api.nvim_create_autocmd('VimEnter', {
+      callback = function()
+        local arg = vim.fn.argv(0)
+        -- Only open oil if no file argument was provided
+        if arg == '' then
+          require('oil').open(vim.fn.getcwd())
+        end
       end,
     })
   end,

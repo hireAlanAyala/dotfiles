@@ -26,7 +26,3 @@ Clean screen restore for full-screen TUIs. Apps like vim/nvim, less/man, htop, t
 ## Potential Improvements
 Have nvim sessions persist in a dedicated tmux server
 set -g terminal-overrides 'xterm*:Tc,xterm*:smcup@:rmcup@' for that server (disables the tmux alternate screen)
-
-# NAME
-
-
