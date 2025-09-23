@@ -1,6 +1,0 @@
-{
-  "name": "server_nextjs",
-  "command": "npm run dev",
-  "clean": "rm -rf .next",
-  "autostart": true
-}

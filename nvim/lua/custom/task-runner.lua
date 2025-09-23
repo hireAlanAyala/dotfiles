@@ -208,6 +208,31 @@ function M.create_task()
   end)
 end
 
+-- Check if terminal buffer exists for task name
+local function has_terminal_buffer(task_name)
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_valid(buf) then
+      local buf_name = vim.api.nvim_buf_get_name(buf)
+      if buf_name:match('terminal://.*' .. vim.pesc(task_name) .. '$') then
+        return true
+      end
+    end
+  end
+  return false
+end
+
+-- Auto-launch tasks when pwd changes
+local function auto_launch_on_pwd_change()
+  local tasks = M.load_tasks()
+  for _, task in ipairs(tasks) do
+    if task.autostart and not has_terminal_buffer(task.name) then
+      vim.defer_fn(function()
+        M.run_task(task)
+      end, 500)
+    end
+  end
+end
+
 -- Setup autostart tasks
 function M.setup_autostart()
   local tasks = M.load_tasks()
@@ -218,6 +243,32 @@ function M.setup_autostart()
       end, 1000) -- Delay to ensure nvim is fully loaded
     end
   end
+end
+
+-- Setup both initial autostart and pwd change detection
+function M.setup()
+  -- Initial autostart on nvim launch
+  M.setup_autostart()
+  
+  -- Setup autocmd for pwd change detection
+  vim.api.nvim_create_autocmd("DirChanged", {
+    pattern = "*",
+    callback = function()
+      vim.defer_fn(auto_launch_on_pwd_change, 100)
+    end,
+    group = vim.api.nvim_create_augroup("TaskRunnerPwdChange", { clear = true })
+  })
+end
+
+-- Setup autocmd for pwd change detection (kept for backward compatibility)
+function M.setup_pwd_autolaunch()
+  vim.api.nvim_create_autocmd("DirChanged", {
+    pattern = "*",
+    callback = function()
+      vim.defer_fn(auto_launch_on_pwd_change, 100)
+    end,
+    group = vim.api.nvim_create_augroup("TaskRunnerPwdChange", { clear = true })
+  })
 end
 
 return M
