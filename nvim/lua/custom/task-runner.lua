@@ -156,7 +156,7 @@ function M.delete_task(task_id)
 end
 
 -- Run a task using terminal-persist
-function M.run_task(task)
+function M.run_task(task, switch_to_buffer)
   -- Check if task is already running
   local project_id = vim.fn.fnamemodify(vim.fn.getcwd(), ':t'):gsub('[^%w%-_]', '_') .. '_' .. vim.fn.sha256(vim.fn.getcwd()):sub(1, 6)
   local session_name = project_id .. '_' .. task.name
@@ -168,9 +168,7 @@ function M.run_task(task)
   end
   
   local terminal_persist = require('custom.terminal-persist')
-  
-  -- Use task name as terminal name
-  terminal_persist.new_terminal(task.command, task.name)
+  terminal_persist.new_terminal(task.command, task.name, switch_to_buffer)
 end
 
 
@@ -227,7 +225,7 @@ local function auto_launch_on_pwd_change()
   for _, task in ipairs(tasks) do
     if task.autostart and not has_terminal_buffer(task.name) then
       vim.defer_fn(function()
-        M.run_task(task)
+        M.run_task(task, false)
       end, 500)
     end
   end
@@ -239,7 +237,7 @@ function M.setup_autostart()
   for _, task in ipairs(tasks) do
     if task.autostart then
       vim.defer_fn(function()
-        M.run_task(task)
+        M.run_task(task, false)
       end, 1000) -- Delay to ensure nvim is fully loaded
     end
   end

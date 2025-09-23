@@ -32,8 +32,10 @@ vim.api.nvim_create_autocmd('TermOpen', {
     vim.opt_local.relativenumber = false
     vim.opt_local.signcolumn = 'no'
 
-    -- Start in insert mode
-    vim.cmd 'startinsert'
+    -- WARNING: DO NOT add 'startinsert' here!
+    -- This autocmd runs for ALL terminals including background ones.
+    -- Adding startinsert will steal focus from whatever you're doing.
+    -- Let the specific terminal creation code handle insert mode.
 
     -- Set terminal buffer options
     vim.opt_local.scrollback = 10000

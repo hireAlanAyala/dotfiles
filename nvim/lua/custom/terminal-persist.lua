@@ -85,7 +85,7 @@ local function session_exists(session_name)
 end
 
 -- Create a new persistent terminal
-function M.new_terminal(cmd, session_name)
+function M.new_terminal(cmd, session_name, switch_to_buffer)
   -- Generate session name using custom name as suffix if provided
   local final_session_name = generate_session_name(session_name)
 
@@ -96,18 +96,30 @@ function M.new_terminal(cmd, session_name)
     vim.fn.system(create_cmd)
   end
 
-  -- Open terminal and attach to the session
-  vim.cmd 'enew' -- Create new buffer in current window
-
-  -- Get the attachment command
-  local attach_cmd = M.attach_method(final_session_name)
-  vim.cmd(attach_cmd)
-
+  -- Always create buffer in background first
+  local buf_nr = vim.api.nvim_create_buf(true, false)
+  
+  -- Set up the terminal in the background buffer
+  vim.api.nvim_buf_call(buf_nr, function()
+    local attach_cmd = M.attach_method(final_session_name)
+    vim.cmd(attach_cmd)
+  end)
+  
+  -- Switch to buffer if requested
+  if switch_to_buffer then
+    -- Set buffer in current window
+    vim.cmd('buffer ' .. buf_nr)
+    
+    vim.defer_fn(function()
+      vim.cmd 'startinsert'
+    end, 100)
+  end
+  
   -- Store session info in buffer variable
-  local buf_nr = vim.api.nvim_get_current_buf()
-  vim.b[buf_nr].tmux_session = final_session_name
-  vim.b[buf_nr].tmux_persistent = true
-  vim.b[buf_nr].terminal_persist_managed = true -- Unique marker
+  local buf_vars = vim.b[buf_nr]
+  buf_vars.tmux_session = final_session_name
+  buf_vars.tmux_persistent = true
+  buf_vars.terminal_persist_managed = true -- Unique marker
 
   -- Set buffer name - always use the custom name
   vim.api.nvim_buf_set_name(buf_nr, string.format('term://%s', session_name))
@@ -118,9 +130,6 @@ function M.new_terminal(cmd, session_name)
       M.send_to_session(final_session_name, cmd)
     end, 500)
   end
-
-  -- Auto enter insert mode
-  vim.cmd 'startinsert'
 
   return buf_nr, final_session_name
 end
@@ -334,8 +343,8 @@ function M.setup(opts)
 
   -- Track sessions when created
   local original_new_terminal = M.new_terminal
-  M.new_terminal = function(cmd, session_name)
-    local buf_nr, final_session_name = original_new_terminal(cmd, session_name)
+  M.new_terminal = function(cmd, session_name, switch_to_buffer)
+    local buf_nr, final_session_name = original_new_terminal(cmd, session_name, switch_to_buffer)
     if final_session_name then
       -- Get the buffer name that was set
       local buffer_name = vim.api.nvim_buf_get_name(buf_nr)

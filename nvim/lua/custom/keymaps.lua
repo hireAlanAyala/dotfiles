@@ -34,7 +34,7 @@ local terminal_persist = require 'custom.terminal-persist'
 vim.keymap.set('n', '<leader>tn', function()
   vim.ui.input({ prompt = 'Terminal name: ' }, function(name)
     if name and name ~= '' then
-      terminal_persist.new_terminal(nil, name)
+      terminal_persist.new_terminal(nil, name, true)
     elseif name == '' then
       vim.notify('Terminal name is required', vim.log.levels.WARN)
     end
@@ -49,4 +49,3 @@ end, { desc = 'List tasks' })
 vim.keymap.set('n', '<leader>tc', function()
   require('custom.task-runner').create_task()
 end, { desc = 'Create task' })
-

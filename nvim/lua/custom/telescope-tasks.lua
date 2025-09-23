@@ -58,15 +58,15 @@ function M.task_picker()
         actions.close(prompt_bufnr)
         
         if #multi_selections > 0 then
-          -- Run all multi-selected tasks
+          -- Run all multi-selected tasks in background
           for _, selection in ipairs(multi_selections) do
-            task_runner.run_task(selection.value)
+            task_runner.run_task(selection.value, false)
           end
         else
-          -- Run single selected task
+          -- Run single selected task and switch to it
           local selection = action_state.get_selected_entry()
           if selection then
-            task_runner.run_task(selection.value)
+            task_runner.run_task(selection.value, true)
           end
         end
       end)
