@@ -335,6 +335,28 @@ return {
       end,
     })
 
+    -- Track directory changes in oil buffers
+    vim.api.nvim_create_autocmd('FileType', {
+      pattern = 'oil',
+      callback = function()
+        local oil = require('oil')
+        local current_dir = oil.get_current_dir()
+        
+        -- If we have a valid directory, store it as last visited
+        if current_dir and not current_dir:match('v:null') then
+          vim.g.oil_last_dir = current_dir
+        end
+        
+        -- If we're in an invalid buffer, navigate to a valid location
+        if not current_dir or current_dir:match('v:null') then
+          vim.defer_fn(function()
+            local last_dir = vim.g.oil_last_dir or vim.fn.getcwd()
+            oil.open(last_dir)
+          end, 10)
+        end
+      end,
+    })
+
     -- Open oil at startup when no file is specified
     vim.api.nvim_create_autocmd('VimEnter', {
       callback = function()
@@ -347,8 +369,36 @@ return {
     })
   end,
   keys = {
-    { '-', function() require('oil').open() end, desc = 'Open parent directory', mode = 'n' },
-    { '<C-\\>-', function() require('oil').open() end, desc = 'Open parent directory', mode = 't' },
+    { '-', function() 
+      local oil = require('oil')
+      local current_dir = oil.get_current_dir()
+      
+      -- If we're in an invalid oil buffer (like v:null), go to cwd or last visited directory
+      if not current_dir or current_dir:match('v:null') then
+        -- Try to get the last visited directory from global variable or use cwd
+        local last_dir = vim.g.oil_last_dir or vim.fn.getcwd()
+        oil.open(last_dir)
+      else
+        -- Store current directory as last visited
+        vim.g.oil_last_dir = current_dir
+        oil.open()
+      end
+    end, desc = 'Open parent directory', mode = 'n' },
+    { '<C-\\>-', function() 
+      local oil = require('oil')
+      local current_dir = oil.get_current_dir()
+      
+      -- If we're in an invalid oil buffer (like v:null), go to cwd or last visited directory
+      if not current_dir or current_dir:match('v:null') then
+        -- Try to get the last visited directory from global variable or use cwd
+        local last_dir = vim.g.oil_last_dir or vim.fn.getcwd()
+        oil.open(last_dir)
+      else
+        -- Store current directory as last visited
+        vim.g.oil_last_dir = current_dir
+        oil.open()
+      end
+    end, desc = 'Open parent directory', mode = 't' },
   },
   -- Optional dependencies
   dependencies = { { 'echasnovski/mini.icons', opts = {} } },

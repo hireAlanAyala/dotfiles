@@ -41,3 +41,12 @@ vim.keymap.set('n', '<leader>tn', function()
   end)
 end, { desc = 'new persistent terminal' })
 
+-- Task runner keymaps (lazy loaded to avoid telescope dependency issues)
+vim.keymap.set('n', '<leader>tt', function()
+  require('custom.telescope-tasks').task_picker()
+end, { desc = 'List tasks' })
+
+vim.keymap.set('n', '<leader>tc', function()
+  require('custom.task-runner').create_task()
+end, { desc = 'Create task' })
+

@@ -96,10 +96,9 @@
       "Bash(chmod * ~)"
     ]
   },
+  "includeCoAuthoredBy": false,
   "env": {
       "DISABLE_TELEMETRY": 1,
       "CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL": 1
-  },
-  "hooks": [
-  ]
+  }
 }

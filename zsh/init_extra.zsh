@@ -38,6 +38,7 @@ if [[ -z "$TMUX" ]]; then
 fi
 
 # ---------------------- Aliases ------------------------
+alias fd='fd --hidden --no-ignore'
 alias v="nvim"
 alias path="echo -e ${PATH//:/\\n}"
 alias fucking='sudo env "PATH=$PATH"'

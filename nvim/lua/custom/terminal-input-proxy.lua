@@ -553,22 +553,24 @@ function M._create_input_buffer(pane_id, mode, term_job_id, session_name)
   local offset_from_bottom = 0
   local found_line = nil
   local original_text = ""
+  local prompt_width = 0  -- Track where command input starts
   
   -- Step 1: Two-marker approach for accurate command extraction
   
-  -- First, capture the current text by going to end of line
-  tmux_send_keys(pane_id, { 'End' })
+  -- First, go to the start of the command input (after prompt)
+  tmux_send_keys(pane_id, { 'C-a' })  -- Go to beginning of line  
+  tmux_send_keys(pane_id, { 'C-e' })  -- Go to end to capture existing text
   
   -- Create unique markers
   local left_marker = string.format("__START_%d__", os.time())
   local right_marker = string.format("__END_%d__", os.time())
   
-  -- Step 2: Insert left marker at start of line
-  tmux_send_keys(pane_id, { 'C-a' })  -- Go to beginning of line
+  -- Step 2: Insert left marker at start of command input (not line start)
+  tmux_send_keys(pane_id, { 'C-a' })  -- Go to beginning of command input
   tmux_send_keys(pane_id, left_marker)
   
-  -- Step 3: Insert right marker at current cursor position (where we were)
-  tmux_send_keys(pane_id, { 'End' })  -- Go back to end
+  -- Step 3: Insert right marker at end of command input
+  tmux_send_keys(pane_id, { 'C-e' })  -- Go to end of command input
   tmux_send_keys(pane_id, right_marker)
   
   -- Step 4: Give tmux a moment to update the display
@@ -593,10 +595,17 @@ function M._create_input_buffer(pane_id, mode, term_job_id, session_name)
       local prompt_patterns = { '$ ', '> ', '%% ', '# ', ': ', '❯ ', '➜ ' }
       original_text = text_with_prompt
       
+      -- The left marker was inserted at the command input start position
+      -- The prompt width is the position just before the left marker
+      prompt_width = left_pos - 1  -- Position where command input should start
+      
+      -- Extract the command text (everything between the markers)
+      original_text = text_with_prompt
+      
+      -- Try to clean up any remaining prompt patterns that might have been captured
       for _, pattern in ipairs(prompt_patterns) do
         local pos = text_with_prompt:find(pattern, 1, true)
         if pos then
-          -- Extract everything after the prompt pattern
           original_text = text_with_prompt:sub(pos + #pattern)
           break
         end
@@ -612,6 +621,8 @@ function M._create_input_buffer(pane_id, mode, term_job_id, session_name)
   tmux_send_keys(pane_id, { 'C-k' })  -- Clear to end of line
   if #original_text > 0 then
     tmux_send_keys(pane_id, original_text)
+    -- Move cursor back to start of command input for proper overlay positioning
+    tmux_send_keys(pane_id, { 'C-a' })
   end
   
   -- If marker wasn't found, fall back to finding last non-empty line
@@ -644,20 +655,25 @@ function M._create_input_buffer(pane_id, mode, term_job_id, session_name)
   
   -- Calculate floating window position
   local float_row = win_pos[1] + win_height - 1 - offset_from_bottom
-  local float_col = win_pos[2]
+  local float_col = win_pos[2]  -- Start at terminal window left edge
+  local float_width = win_width  -- Full width
   
-  vim.notify(string.format('Overlay position: row=%d', float_row))
+  vim.notify(string.format('Overlay position: row=%d, col=%d', float_row, float_col))
   
   -- Create floating window positioned at cursor line
+  -- Use a more conservative size for terminal buffers
+  local overlay_width = math.min(80, float_width)
+  local overlay_height = 1
+  
   local win = vim.api.nvim_open_win(buf, true, {
-    relative = 'editor',
-    width = win_width,
-    height = 1,
-    row = float_row,
-    col = float_col,
+    relative = 'win',  -- Relative to current window, not editor
+    width = overlay_width,
+    height = overlay_height,
+    row = win_height - 1 - offset_from_bottom,  -- Position within window
+    col = 0,
     style = 'minimal',
-    border = 'none',
-    zindex = 50,  -- Float above other windows
+    border = 'single',  -- Add border to make it more visible
+    zindex = 50,
   })
   
   -- Style to match terminal
