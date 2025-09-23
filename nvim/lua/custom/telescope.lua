@@ -58,13 +58,13 @@ end
 local function delete_buffer_smart(prompt_bufnr)
   local picker = action_state.get_current_picker(prompt_bufnr)
   local selected_entry = action_state.get_selected_entry()
-  
+
   if not selected_entry then
     return
   end
-  
+
   local bufnr_to_delete = selected_entry.bufnr
-  
+
   -- Check if the buffer to delete is currently visible in any window
   local should_switch = false
   local target_win = nil
@@ -75,7 +75,7 @@ local function delete_buffer_smart(prompt_bufnr)
       break
     end
   end
-  
+
   -- If we need to switch, do it immediately in the target window
   if should_switch and target_win then
     -- Find the most recent valid buffer from the buffer list
@@ -90,7 +90,7 @@ local function delete_buffer_smart(prompt_bufnr)
         end
       end
     end
-    
+
     if alt_buf then
       vim.api.nvim_win_set_buf(target_win, alt_buf)
     else
@@ -99,7 +99,7 @@ local function delete_buffer_smart(prompt_bufnr)
       vim.api.nvim_win_set_buf(target_win, new_buf)
     end
   end
-  
+
   -- Delete the buffer and let telescope's default action handle the refresh
   actions.delete_buffer(prompt_bufnr)
 end
@@ -408,30 +408,30 @@ require('config.keymaps').setup_telescope_keymaps()
 local tmux_sessions
 tmux_sessions = function(opts)
   opts = opts or {}
-  
+
   -- Get current session name
-  local current_session_handle = io.popen('tmux display-message -p "#{session_name}" 2>/dev/null || echo ""')
-  local current_session = current_session_handle:read("*a"):gsub("%s+$", "")
+  local current_session_handle = io.popen 'tmux display-message -p "#{session_name}" 2>/dev/null || echo ""'
+  local current_session = current_session_handle:read('*a'):gsub('%s+$', '')
   current_session_handle:close()
-  
-  local handle = io.popen('tmux list-sessions -F "#{session_name}#{?session_attached, (attached),}" 2>/dev/null || echo ""')
-  local result = handle:read("*a")
+
+  local handle = io.popen 'tmux list-sessions -F "#{session_name}#{?session_attached, (attached),}" 2>/dev/null || echo ""'
+  local result = handle:read '*a'
   handle:close()
-  
+
   -- Parse all sessions and separate parent sessions from sub-sessions
   local all_sessions = {}
   local sub_sessions = {}
-  
-  for line in result:gmatch("[^\n]+") do
-    local name, is_attached = line:match("^([^%(]+)(.*)$")
+
+  for line in result:gmatch '[^\n]+' do
+    local name, is_attached = line:match '^([^%(]+)(.*)$'
     if name then
-      name = name:gsub("%s+$", "") -- trim whitespace
-      local is_active = is_attached:match("%(attached%)")
-      
+      name = name:gsub('%s+$', '') -- trim whitespace
+      local is_active = is_attached:match '%(attached%)'
+
       -- Check if this is a sub-session
-      if name:match("_[%w]+_") then
+      if name:match '_[%w]+_' then
         -- Extract parent session name (everything before the first _[hash]_)
-        local parent = name:match("^(.-)_[%w]+_")
+        local parent = name:match '^(.-)_[%w]+_'
         if parent then
           if not sub_sessions[parent] then
             sub_sessions[parent] = 0
@@ -440,85 +440,84 @@ tmux_sessions = function(opts)
         end
       else
         -- This is a parent session
-        table.insert(all_sessions, { 
-          name = name, 
-          is_active = is_active ~= nil 
+        table.insert(all_sessions, {
+          name = name,
+          is_active = is_active ~= nil,
         })
       end
     end
   end
-  
+
   -- Build the final sessions list with sub-session counts
   local sessions = {}
   local current_index = 1
-  
+
   for _, session in ipairs(all_sessions) do
     local display = session.name
-    
+
     -- Add sub-session count if any
     local sub_count = sub_sessions[session.name] or 0
     if sub_count > 0 then
-      display = display .. " +" .. sub_count
+      display = display .. ' +' .. sub_count
     end
-    
+
     -- Add active indicator
     if session.is_active then
-      display = display .. " *"
+      display = display .. ' *'
     end
-    
+
     table.insert(sessions, { name = session.name, display = display })
-    
+
     -- Track the index of the current session
     if session.name == current_session then
       current_index = #sessions
     end
   end
-  
+
   -- If no sessions, show a message
   if #sessions == 0 then
-    vim.notify("No tmux sessions found", vim.log.levels.INFO)
+    vim.notify('No tmux sessions found', vim.log.levels.INFO)
     return
   end
-  
-  pickers.new({
-    default_selection_index = current_index,
-    layout_strategy = "vertical",
-    layout_config = {
-      height = 0.4,
-      width = 0.3,
-      prompt_position = "bottom",
-    },
-    sorting_strategy = "ascending",
-  }, {
-    prompt_title = 'Tmux Sessions',
-    finder = finders.new_table {
-      results = sessions,
-      entry_maker = function(entry)
-        return {
-          value = entry.name,
-          display = entry.display,
-          ordinal = entry.name,
-        }
-      end,
-    },
-    sorter = conf.generic_sorter(opts),
-    attach_mappings = function(prompt_bufnr, map)
-      actions.select_default:replace(function()
-        actions.close(prompt_bufnr)
-        local selection = action_state.get_selected_entry()
-        if selection then
-          -- Switch to selected tmux session
-          vim.fn.system('tmux switch-client -t ' .. vim.fn.shellescape(selection.value))
-        end
-      end)
-      
-      -- Add 'dd' mapping to delete session using utility
-      local delete_handler = telescope_utils.create_double_key_handler(
-        'd',
-        function()
+
+  pickers
+    .new({
+      default_selection_index = current_index,
+      layout_strategy = 'vertical',
+      layout_config = {
+        height = 0.4,
+        width = 0.3,
+        prompt_position = 'bottom',
+      },
+      sorting_strategy = 'ascending',
+    }, {
+      prompt_title = 'Tmux Sessions',
+      finder = finders.new_table {
+        results = sessions,
+        entry_maker = function(entry)
+          return {
+            value = entry.name,
+            display = entry.display,
+            ordinal = entry.name,
+          }
+        end,
+      },
+      sorter = conf.generic_sorter(opts),
+      attach_mappings = function(prompt_bufnr, map)
+        actions.select_default:replace(function()
+          actions.close(prompt_bufnr)
           local selection = action_state.get_selected_entry()
           if selection then
-            local confirm = vim.fn.confirm("Delete tmux session '" .. selection.value .. "'?", "&Yes\n&No", 2)
+            -- Switch to selected tmux session
+            vim.fn.system('tmux switch-client -t ' .. vim.fn.shellescape(selection.value))
+          end
+        end)
+
+        -- Add 'dd' mapping to delete session using utility
+        local delete_handler = telescope_utils.create_double_key_handler('d', function()
+          local selection = action_state.get_selected_entry()
+          if selection then
+            local confirm = vim.fn.confirm("Delete tmux session '" .. selection.value .. "'?", '&Yes\n&No', 2)
             if confirm == 1 then
               vim.fn.system('tmux kill-session -t ' .. vim.fn.shellescape(selection.value))
               -- Refresh the picker
@@ -526,32 +525,31 @@ tmux_sessions = function(opts)
               tmux_sessions(opts)
             end
           end
-        end,
-        {
+        end, {
           timeout = 500,
-          message = "Press 'd' again to delete session"
-        }
-      )
-      
-      map('n', 'd', delete_handler)
-      
-      -- Keep Ctrl+d for insert mode
-      map('i', '<C-d>', function()
-        local selection = action_state.get_selected_entry()
-        if selection then
-          local confirm = vim.fn.confirm("Delete tmux session '" .. selection.value .. "'?", "&Yes\n&No", 2)
-          if confirm == 1 then
-            vim.fn.system('tmux kill-session -t ' .. vim.fn.shellescape(selection.value))
-            -- Refresh the picker
-            actions.close(prompt_bufnr)
-            tmux_sessions(opts)
+          message = "Press 'd' again to delete session",
+        })
+
+        map('n', 'd', delete_handler)
+
+        -- Keep Ctrl+d for insert mode
+        map('i', '<C-d>', function()
+          local selection = action_state.get_selected_entry()
+          if selection then
+            local confirm = vim.fn.confirm("Delete tmux session '" .. selection.value .. "'?", '&Yes\n&No', 2)
+            if confirm == 1 then
+              vim.fn.system('tmux kill-session -t ' .. vim.fn.shellescape(selection.value))
+              -- Refresh the picker
+              actions.close(prompt_bufnr)
+              tmux_sessions(opts)
+            end
           end
-        end
-      end)
-      
-      return true
-    end,
-  }):find()
+        end)
+
+        return true
+      end,
+    })
+    :find()
 end
 
 -- Export custom pickers for use in keymaps or commands
@@ -560,3 +558,4 @@ return {
   git_log_source_picker = git_log_source_picker,
   tmux_sessions = tmux_sessions,
 }
+

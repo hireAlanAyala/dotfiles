@@ -421,6 +421,9 @@ M.setup_telescope_keymaps = function()
   -- Git operations
   map('n', '<leader>gc', builtin.git_commits, { desc = 'git commits' })
   map('n', '<leader>gb', builtin.git_branches, { desc = 'git branches' })
+  map('n', '<leader>gw', function()
+    require('custom.git-worktree').git_worktrees()
+  end, { desc = 'git worktrees' })
 
   -- Search operations
   map('n', '<leader>sh', builtin.help_tags, { desc = 'search help' })
