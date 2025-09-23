@@ -157,6 +157,16 @@ end
 
 -- Run a task using terminal-persist
 function M.run_task(task)
+  -- Check if task is already running
+  local project_id = vim.fn.fnamemodify(vim.fn.getcwd(), ':t'):gsub('[^%w%-_]', '_') .. '_' .. vim.fn.sha256(vim.fn.getcwd()):sub(1, 6)
+  local session_name = project_id .. '_' .. task.name
+  local is_running = vim.fn.system('tmux has-session -t ' .. session_name .. ' 2>/dev/null; echo $?'):gsub('%s+', '') == '0'
+  
+  if is_running then
+    vim.notify('Task "' .. task.name .. '" is already running', vim.log.levels.WARN)
+    return
+  end
+  
   local terminal_persist = require('custom.terminal-persist')
   
   -- Use task name as terminal name

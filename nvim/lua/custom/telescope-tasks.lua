@@ -33,8 +33,14 @@ function M.task_picker()
       results = tasks,
       entry_maker = function(task)
         local display = task.name
-        if task.autostart then
-          display = display .. ' [autostart]'
+        
+        -- Check if task is running by looking for tmux session
+        local project_id = vim.fn.fnamemodify(vim.fn.getcwd(), ':t'):gsub('[^%w%-_]', '_') .. '_' .. vim.fn.sha256(vim.fn.getcwd()):sub(1, 6)
+        local session_name = project_id .. '_' .. task.name
+        local is_running = vim.fn.system('tmux has-session -t ' .. session_name .. ' 2>/dev/null; echo $?'):gsub('%s+', '') == '0'
+        
+        if is_running then
+          display = display .. ' ✅'
         end
         return {
           value = task,
