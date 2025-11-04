@@ -49,3 +49,31 @@ end, { desc = 'List tasks' })
 vim.keymap.set('n', '<leader>tc', function()
   require('custom.task-runner').create_task()
 end, { desc = 'Create task' })
+
+-- Alt+I/O test notifications
+vim.keymap.set('n', '<A-o>', function()
+  vim.notify('Alt+O pressed - Jump back', vim.log.levels.INFO, { timeout = 1000 })
+end, { desc = 'Test Alt+O notification' })
+
+vim.keymap.set('n', '<A-i>', function()
+  vim.notify('Alt+I pressed - Jump forward', vim.log.levels.INFO, { timeout = 1000 })
+end, { desc = 'Test Alt+I notification' })
+
+-- Telescope quickfix
+vim.keymap.set('n', 'sq', '<cmd>Telescope quickfix<cr>', { desc = 'Search [Q]uickfix' })
+
+-- CSV Viewer
+vim.api.nvim_create_user_command('CsvView', function(opts)
+  local max_width = tonumber(opts.args) or 20
+  require('custom.csv-viewer').view_csv(nil, max_width)
+end, {
+  nargs = '?',
+  desc = 'View CSV as formatted table (optional: max column width)',
+})
+
+vim.keymap.set('n', '<leader>cv', function()
+  vim.ui.input({ prompt = 'Max column width (default 20): ' }, function(input)
+    local max_width = tonumber(input) or 20
+    require('custom.csv-viewer').view_csv(nil, max_width)
+  end)
+end, { desc = 'CSV view table' })
