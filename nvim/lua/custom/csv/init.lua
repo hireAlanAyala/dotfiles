@@ -1,19 +1,23 @@
+-- INFO: usage recipes
+-- move between columns: f| then ; for next and , for prev
+-- edit cell: shift + k, change data in the window
+
 -- CSV Viewer with truncation and full-text expansion
 local M = {}
 
-M.ns = vim.api.nvim_create_namespace('csv_viewer')
-M.cells = {}  -- Metadata: {["row:col"] = {full="...", truncated="...", is_truncated=...}}
-M.max_width = 20  -- Default max column width
-M.original_csv_rows = {}  -- Original CSV rows: {[row_num] = "csv,row,data"}
-M.csv_file_path = nil  -- Path to the original CSV file
-M.layouts = {}  -- Store layouts by buffer number: {[bufnr] = {data_win, prev_bufnr, col_widths, full_header}}
-M.columns = {}  -- Column names in order: {[bufnr] = {"col1", "col2", ...}}
-M.num_rows = {}  -- Number of rows: {[bufnr] = count}
-M.suppress_autoopen = {}  -- Temporarily suppress auto-opening: {[bufnr] = true}
+M.ns = vim.api.nvim_create_namespace 'csv_viewer'
+M.cells = {} -- Metadata: {["row:col"] = {full="...", truncated="...", is_truncated=...}}
+M.max_width = 20 -- Default max column width
+M.original_csv_rows = {} -- Original CSV rows: {[row_num] = "csv,row,data"}
+M.csv_file_path = nil -- Path to the original CSV file
+M.layouts = {} -- Store layouts by buffer number: {[bufnr] = {data_win, prev_bufnr, col_widths, full_header}}
+M.columns = {} -- Column names in order: {[bufnr] = {"col1", "col2", ...}}
+M.num_rows = {} -- Number of rows: {[bufnr] = count}
+M.suppress_autoopen = {} -- Temporarily suppress auto-opening: {[bufnr] = true}
 
 -- Convert cell_id string "row:col" to extmark ID (integer)
 local function cell_id_to_extmark_id(cell_id)
-  local row, col = cell_id:match('(%d+):(%d+)')
+  local row, col = cell_id:match '(%d+):(%d+)'
   return tonumber(row) * 1000 + tonumber(col)
 end
 
@@ -31,13 +35,7 @@ local function find_cell_at_cursor(bufnr)
   local row, col = cursor[1] - 1, cursor[2]
 
   -- Get all extmarks on current line
-  local marks = vim.api.nvim_buf_get_extmarks(
-    bufnr,
-    M.ns,
-    { row, 0 },
-    { row, -1 },
-    { details = true }
-  )
+  local marks = vim.api.nvim_buf_get_extmarks(bufnr, M.ns, { row, 0 }, { row, -1 }, { details = true })
 
   -- Find which cell contains the cursor
   for _, mark in ipairs(marks) do
@@ -139,7 +137,9 @@ function M.edit_cell(bufnr, cell_id, initial_key)
 
   -- Save on <CR> or <Esc>
   local function save_and_close()
-    if not vim.api.nvim_win_is_valid(win) then return end
+    if not vim.api.nvim_win_is_valid(win) then
+      return
+    end
 
     local new_lines = vim.api.nvim_buf_get_lines(edit_buf, 0, -1, false)
     local new_text = new_lines[1] or ''
@@ -159,11 +159,11 @@ function M.edit_cell(bufnr, cell_id, initial_key)
   vim.keymap.set('n', '<CR>', save_and_close, { buffer = edit_buf, nowait = true })
   vim.keymap.set('n', '<Esc>', save_and_close, { buffer = edit_buf, nowait = true })
   vim.keymap.set('i', '<CR>', function()
-    vim.cmd('stopinsert')
+    vim.cmd 'stopinsert'
     save_and_close()
   end, { buffer = edit_buf, nowait = true })
   vim.keymap.set('i', '<Esc>', function()
-    vim.cmd('stopinsert')
+    vim.cmd 'stopinsert'
     save_and_close()
   end, { buffer = edit_buf, nowait = true })
 
@@ -176,7 +176,7 @@ function M.edit_cell(bufnr, cell_id, initial_key)
     end, 10)
   else
     -- Default to insert mode if no key provided
-    vim.cmd('startinsert')
+    vim.cmd 'startinsert'
   end
 end
 
@@ -358,14 +358,18 @@ local function rebuild_table_from_cells(bufnr)
 
       while true do
         local pipe_start = line:find('|', search_pos)
-        if not pipe_start then break end
+        if not pipe_start then
+          break
+        end
         local pipe_end = line:find('|', pipe_start + 1)
-        if not pipe_end then break end
+        if not pipe_end then
+          break
+        end
 
         col_num = col_num + 1
 
         local cell_content = line:sub(pipe_start + 1, pipe_end - 1)
-        local trimmed = cell_content:match('^%s*(.-)%s*$')
+        local trimmed = cell_content:match '^%s*(.-)%s*$'
 
         local cell_id = string.format('%d:%d', data_row, col_num)
         local cell = M.cells[cell_id]
@@ -440,16 +444,20 @@ local function place_extmarks(bufnr)
     while true do
       -- Find the next pipe-delimited cell
       local pipe_start = line:find('|', search_pos)
-      if not pipe_start then break end
+      if not pipe_start then
+        break
+      end
 
       local pipe_end = line:find('|', pipe_start + 1)
-      if not pipe_end then break end
+      if not pipe_end then
+        break
+      end
 
       col_num = col_num + 1
 
       -- Extract cell content between pipes
       local cell_content = line:sub(pipe_start + 1, pipe_end - 1)
-      local trimmed = cell_content:match('^%s*(.-)%s*$')
+      local trimmed = cell_content:match '^%s*(.-)%s*$'
 
       local cell_id = string.format('%d:%d', data_row, col_num)
       local cell = M.cells[cell_id]
@@ -529,7 +537,7 @@ function M.view_csv(bufnr, max_width)
   for col_name, _ in pairs(rows[1]) do
     table.insert(columns, col_name)
   end
-  table.sort(columns)  -- Keep consistent order
+  table.sort(columns) -- Keep consistent order
 
   -- Store column info for rebuilds
   local orig_bufnr = bufnr
@@ -685,13 +693,6 @@ function M.view_csv(bufnr, max_width)
     end,
   })
 
-  -- Add CSV info to statusline
-  local row_count = #rows
-  local col_count = #columns
-  local current_statusline = vim.o.statusline
-  local csv_info = string.format(' | %d rows × %d cols', row_count, col_count)
-  vim.wo[orig_win].statusline = current_statusline .. csv_info
-
   -- Place extmarks on buffer
   place_extmarks(bufnr)
 
@@ -713,67 +714,6 @@ function M.view_csv(bufnr, max_width)
       nowait = true,
     })
   end
-
-  -- Remap word motions to skip over | characters
-  vim.keymap.set('n', 'w', function()
-    vim.cmd('normal! w')
-    local line = vim.api.nvim_get_current_line()
-    local row, col = unpack(vim.api.nvim_win_get_cursor(0))
-    while col < #line and line:sub(col + 1, col + 1):match('[|%s]') do
-      col = col + 1
-    end
-    vim.api.nvim_win_set_cursor(0, {row, col})
-  end, { buffer = bufnr, nowait = true })
-
-  vim.keymap.set('n', 'W', function()
-    vim.cmd('normal! W')
-    local line = vim.api.nvim_get_current_line()
-    local row, col = unpack(vim.api.nvim_win_get_cursor(0))
-    while col < #line and line:sub(col + 1, col + 1):match('[|%s]') do
-      col = col + 1
-    end
-    vim.api.nvim_win_set_cursor(0, {row, col})
-  end, { buffer = bufnr, nowait = true })
-
-  vim.keymap.set('n', 'e', function()
-    vim.cmd('normal! e')
-    local line = vim.api.nvim_get_current_line()
-    local row, col = unpack(vim.api.nvim_win_get_cursor(0))
-    while col < #line and line:sub(col + 1, col + 1):match('[|%s]') do
-      col = col + 1
-    end
-    vim.api.nvim_win_set_cursor(0, {row, col})
-  end, { buffer = bufnr, nowait = true })
-
-  vim.keymap.set('n', 'E', function()
-    vim.cmd('normal! E')
-    local line = vim.api.nvim_get_current_line()
-    local row, col = unpack(vim.api.nvim_win_get_cursor(0))
-    while col < #line and line:sub(col + 1, col + 1):match('[|%s]') do
-      col = col + 1
-    end
-    vim.api.nvim_win_set_cursor(0, {row, col})
-  end, { buffer = bufnr, nowait = true })
-
-  vim.keymap.set('n', 'b', function()
-    vim.cmd('normal! b')
-    local line = vim.api.nvim_get_current_line()
-    local row, col = unpack(vim.api.nvim_win_get_cursor(0))
-    while col > 0 and line:sub(col + 1, col + 1):match('[|%s]') do
-      col = col - 1
-    end
-    vim.api.nvim_win_set_cursor(0, {row, col})
-  end, { buffer = bufnr, nowait = true })
-
-  vim.keymap.set('n', 'B', function()
-    vim.cmd('normal! B')
-    local line = vim.api.nvim_get_current_line()
-    local row, col = unpack(vim.api.nvim_win_get_cursor(0))
-    while col > 0 and line:sub(col + 1, col + 1):match('[|%s]') do
-      col = col - 1
-    end
-    vim.api.nvim_win_set_cursor(0, {row, col})
-  end, { buffer = bufnr, nowait = true })
 
   -- Set up save handler
   vim.api.nvim_create_autocmd('BufWriteCmd', {
@@ -800,7 +740,7 @@ function M.save_csv(bufnr)
     -- Use the full text from metadata (updated by edit_cell)
     local current_full_text = cell_meta.full
 
-    local row, col = cell_id:match('(%d+):(%d+)')
+    local row, col = cell_id:match '(%d+):(%d+)'
     if not row or not col then
       goto continue
     end
@@ -814,7 +754,7 @@ function M.save_csv(bufnr)
       local in_quotes = false
       local current_field = ''
 
-      for char in original_row:gmatch('.') do
+      for char in original_row:gmatch '.' do
         if char == '"' then
           in_quotes = not in_quotes
           current_field = current_field .. char
@@ -853,7 +793,7 @@ function M.save_csv(bufnr)
       local field_num = 1
 
       -- Simple CSV parser
-      for char in original_row:gmatch('.') do
+      for char in original_row:gmatch '.' do
         if char == '"' then
           in_quotes = not in_quotes
           current_field = current_field .. char
@@ -927,7 +867,7 @@ vim.api.nvim_create_autocmd('BufEnter', {
     -- Check if buffer is already formatted (contains pipe-delimited table)
     -- vs raw CSV (contains commas but no pipes in structured way)
     local first_line = vim.api.nvim_buf_get_lines(bufnr, 0, 1, false)[1] or ''
-    local is_formatted = first_line:match('^|.*|$') ~= nil
+    local is_formatted = first_line:match '^|.*|$' ~= nil
 
     if is_formatted then
       -- Buffer is already formatted, don't reformat
