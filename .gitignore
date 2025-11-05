@@ -9,6 +9,7 @@ gh/
 # Runtime/cache data
 **/cache/
 **/logs/
+/*.log
 **/.DS_Store
 **/tmp/
 
