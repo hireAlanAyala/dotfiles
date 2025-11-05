@@ -1,0 +1,2 @@
+powershell.exe -command "Get-Clipboard"
+

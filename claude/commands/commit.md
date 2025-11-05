@@ -1,0 +1,1 @@
+read the uncommited files and commit them by task worked on. ask for approval per commit, if not approved, go to the next. only use git commit [filename] [message] to commit the files. Do not commit all files at once, do not run risky git operations. 
