@@ -121,9 +121,6 @@ function M.show_full_cell()
     vim.cmd('stopinsert')
     save_and_close()
   end, { buffer = edit_buf, nowait = true })
-
-  -- Start in insert mode
-  vim.cmd('startinsert')
 end
 
 -- Slice string by display width (UTF-8 aware)
