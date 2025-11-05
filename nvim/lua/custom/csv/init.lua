@@ -10,7 +10,7 @@ M.cells = {} -- Metadata: {["row:col"] = {full="...", truncated="...", is_trunca
 M.max_width = 20 -- Default max column width
 M.json_data = {} -- JSON array from miller: {[bufnr] = [{col1="val",...}, ...]}
 M.csv_file_path = {} -- Path to CSV file: {[bufnr] = "path"}
-M.layouts = {} -- Store layouts by buffer number: {[bufnr] = {data_win, prev_bufnr, col_widths, full_header}}
+M.layouts = {} -- Store layouts by buffer number: {[bufnr] = {data_win, col_widths, full_header}}
 M.columns = {} -- Column names in order: {[bufnr] = {"col1", "col2", ...}}
 M.num_rows = {} -- Number of rows: {[bufnr] = count}
 M.suppress_autoopen = {} -- Temporarily suppress auto-opening: {[bufnr] = true}
@@ -86,11 +86,18 @@ function M.show_full_cell()
     height = 1,
     style = 'minimal',
     border = 'rounded',
-    title = ' Edit Cell (Enter/Esc to save) ',
+    title = ' Edit Cell (Enter to save, Esc to cancel) ',
     title_pos = 'center',
   }
 
   local win = vim.api.nvim_open_win(edit_buf, true, opts)
+
+  -- Close without saving
+  local function close_without_saving()
+    if vim.api.nvim_win_is_valid(win) then
+      vim.api.nvim_win_close(win, true)
+    end
+  end
 
   -- Save and close function
   local function save_and_close()
@@ -110,17 +117,70 @@ function M.show_full_cell()
     vim.api.nvim_win_close(win, true)
   end
 
-  -- Keymaps for saving
+  -- Close without saving when leaving the window
+  vim.api.nvim_create_autocmd({ 'BufLeave', 'WinLeave' }, {
+    buffer = edit_buf,
+    once = true,
+    callback = close_without_saving,
+  })
+
+  -- Keymaps
   vim.keymap.set('n', '<CR>', save_and_close, { buffer = edit_buf, nowait = true })
-  vim.keymap.set('n', '<Esc>', save_and_close, { buffer = edit_buf, nowait = true })
+  vim.keymap.set('n', '<Esc>', close_without_saving, { buffer = edit_buf, nowait = true })
   vim.keymap.set('i', '<CR>', function()
     vim.cmd('stopinsert')
     save_and_close()
   end, { buffer = edit_buf, nowait = true })
   vim.keymap.set('i', '<Esc>', function()
     vim.cmd('stopinsert')
-    save_and_close()
+    close_without_saving()
   end, { buffer = edit_buf, nowait = true })
+end
+
+-- Truncate cell value to max_width with '...' suffix
+local function truncate_cell(value, max_width)
+  local display_width = vim.fn.strdisplaywidth(value)
+  local is_truncated = display_width > max_width
+  local truncated = value
+
+  if is_truncated then
+    local char_count = 0
+    local byte_pos = 0
+    for i = 1, vim.fn.strchars(value) do
+      local char = vim.fn.strcharpart(value, i - 1, 1)
+      local char_width = vim.fn.strdisplaywidth(char)
+      if char_count + char_width > max_width - 3 then
+        break
+      end
+      char_count = char_count + char_width
+      byte_pos = byte_pos + #char
+    end
+    truncated = value:sub(1, byte_pos) .. '...'
+  end
+
+  return truncated, is_truncated
+end
+
+-- Build pipe-delimited row string
+local function build_row_string(row_values, columns, col_widths)
+  local parts = { '|' }
+  for col_idx, col_name in ipairs(columns) do
+    local value = row_values[col_idx] or ''
+    local value_display_width = vim.fn.strdisplaywidth(value)
+    local padding = col_widths[col_name] - value_display_width
+    table.insert(parts, ' ' .. value .. string.rep(' ', padding) .. ' |')
+  end
+  return table.concat(parts)
+end
+
+-- Build pipe-delimited header string
+local function build_header_string(columns, col_widths)
+  local parts = { '|' }
+  for _, col_name in ipairs(columns) do
+    local col_display_width = vim.fn.strdisplaywidth(col_name)
+    table.insert(parts, ' ' .. col_name .. string.rep(' ', col_widths[col_name] - col_display_width) .. ' |')
+  end
+  return table.concat(parts)
 end
 
 -- Slice string by display width (UTF-8 aware)
@@ -193,198 +253,6 @@ local function update_winbar_for_scroll(win, orig_bufnr)
   vim.wo[win].winbar = winbar_text
 end
 
--- Rebuild table from M.cells (called after cell edits)
-local function rebuild_table_from_cells(bufnr)
-  local data_win = M.layouts[bufnr] and M.layouts[bufnr].data_win
-  local cursor, view
-  if data_win and vim.api.nvim_win_is_valid(data_win) then
-    cursor = vim.api.nvim_win_get_cursor(data_win)
-    view = vim.api.nvim_win_call(data_win, vim.fn.winsaveview)
-  end
-
-  local columns = M.columns[bufnr]
-  local num_rows = M.num_rows[bufnr]
-
-  if not columns or not num_rows then
-    return
-  end
-
-  -- Recalculate column widths
-  local col_widths = {}
-  for _, col_name in ipairs(columns) do
-    col_widths[col_name] = vim.fn.strdisplaywidth(col_name)
-  end
-
-  for row_idx = 2, num_rows + 1 do
-    for col_idx, col_name in ipairs(columns) do
-      local cell_id = string.format('%d:%d', row_idx, col_idx)
-      local cell = M.cells[cell_id]
-      if cell then
-        local value = cell.full
-        local display_width = vim.fn.strdisplaywidth(value)
-        local is_truncated = display_width > M.max_width
-        local truncated = value
-
-        if is_truncated then
-          local char_count = 0
-          local byte_pos = 0
-          for i = 1, vim.fn.strchars(value) do
-            local char = vim.fn.strcharpart(value, i - 1, 1)
-            local char_width = vim.fn.strdisplaywidth(char)
-            if char_count + char_width > M.max_width - 3 then
-              break
-            end
-            char_count = char_count + char_width
-            byte_pos = byte_pos + #char
-          end
-          truncated = value:sub(1, byte_pos) .. '...'
-        end
-
-        cell.truncated = truncated
-        cell.is_truncated = is_truncated
-
-        local trunc_width = vim.fn.strdisplaywidth(truncated)
-        if trunc_width > col_widths[col_name] then
-          col_widths[col_name] = trunc_width
-        end
-      end
-    end
-  end
-
-  -- Build data lines (no separators)
-  local data_lines = {}
-  for row_idx = 2, num_rows + 1 do
-    local data_row = {}
-    table.insert(data_row, '|')
-    for col_idx, col_name in ipairs(columns) do
-      local cell_id = string.format('%d:%d', row_idx, col_idx)
-      local cell = M.cells[cell_id]
-      local value = cell and cell.truncated or ''
-      local value_display_width = vim.fn.strdisplaywidth(value)
-      local padding = col_widths[col_name] - value_display_width
-      table.insert(data_row, ' ' .. value .. string.rep(' ', padding) .. ' |')
-    end
-    table.insert(data_lines, table.concat(data_row))
-  end
-
-  -- Update buffer (in-place)
-  vim.bo[bufnr].modifiable = true
-  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, data_lines)
-  vim.bo[bufnr].modifiable = false
-  vim.bo[bufnr].modified = false  -- Prevent auto-save from triggering
-
-  -- Rebuild cached full header string
-  if M.layouts[bufnr] then
-    local header_parts = {}
-    table.insert(header_parts, '|')
-    for _, col_name in ipairs(columns) do
-      local col_display_width = vim.fn.strdisplaywidth(col_name)
-      table.insert(header_parts, ' ' .. col_name .. string.rep(' ', col_widths[col_name] - col_display_width) .. ' |')
-    end
-    M.layouts[bufnr].full_header = table.concat(header_parts)
-    M.layouts[bufnr].col_widths = col_widths
-
-    if data_win and vim.api.nvim_win_is_valid(data_win) then
-      update_winbar_for_scroll(data_win, bufnr)
-    end
-  end
-
-  -- Re-place extmarks
-  local function place_extmarks_internal(buf)
-    vim.api.nvim_buf_clear_namespace(buf, M.ns, 0, -1)
-    local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
-
-    for line_idx, line in ipairs(lines) do
-      local data_row = line_idx + 1
-
-      local col_num = 0
-      local search_pos = 1
-
-      while true do
-        local pipe_start = line:find('|', search_pos)
-        if not pipe_start then
-          break
-        end
-        local pipe_end = line:find('|', pipe_start + 1)
-        if not pipe_end then
-          break
-        end
-
-        col_num = col_num + 1
-
-        local cell_content = line:sub(pipe_start + 1, pipe_end - 1)
-        local trimmed = cell_content:match '^%s*(.-)%s*$'
-
-        local cell_id = string.format('%d:%d', data_row, col_num)
-        local cell = M.cells[cell_id]
-
-        if cell and trimmed and trimmed ~= '' then
-          local cell_col = pipe_start + 2
-          local extmark_id = cell_id_to_extmark_id(cell_id)
-
-          vim.api.nvim_buf_set_extmark(buf, M.ns, line_idx - 1, cell_col - 1, {
-            id = extmark_id,
-            end_col = cell_col - 1 + vim.fn.strdisplaywidth(trimmed),
-          })
-        end
-
-        search_pos = pipe_end
-      end
-    end
-  end
-
-  place_extmarks_internal(bufnr)
-
-  -- Restore cursor
-  if data_win and vim.api.nvim_win_is_valid(data_win) and cursor and view then
-    pcall(vim.api.nvim_win_set_cursor, data_win, cursor)
-    pcall(vim.api.nvim_win_call, data_win, function()
-      vim.fn.winrestview(view)
-    end)
-  end
-end
-
--- Update cell display in the table buffer after editing
-function M.update_cell_display(bufnr, cell_id, new_text)
-  bufnr = bufnr or vim.api.nvim_get_current_buf()
-
-  local cell = M.cells[cell_id]
-  if not cell then
-    vim.notify('Cell not found: ' .. cell_id, vim.log.levels.WARN)
-    return
-  end
-
-  -- Update the full value in M.cells
-  cell.full = new_text
-
-  -- Update JSON data
-  local row, col = cell_id:match('(%d+):(%d+)')
-  if row and col then
-    row = tonumber(row)
-    col = tonumber(col)
-
-    local json_row_idx = row - 1  -- cell row 2 = JSON row 1
-    local columns = M.columns[bufnr]
-
-    if M.json_data[bufnr] and M.json_data[bufnr][json_row_idx] and columns and columns[col] then
-      local col_name = columns[col]
-      M.json_data[bufnr][json_row_idx][col_name] = new_text
-    end
-  end
-
-  -- In the in-place approach, bufnr is the layout key
-  if not M.layouts[bufnr] then
-    vim.notify('Could not find layout for buffer', vim.log.levels.WARN)
-    return
-  end
-
-  -- Rebuild entire table from M.cells
-  rebuild_table_from_cells(bufnr)
-
-  -- Note: rebuild_table_from_cells() sets modified=false to prevent auto-save.
-  -- Changes are stored in JSON data and will be written to file on :w via BufWriteCmd.
-end
-
 -- Place extmarks on cells for tracking
 local function place_extmarks(bufnr)
   -- Clear existing extmarks
@@ -436,6 +304,128 @@ local function place_extmarks(bufnr)
       search_pos = pipe_end
     end
   end
+end
+
+-- Rebuild table from M.cells (called after cell edits)
+local function rebuild_table_from_cells(bufnr)
+  local data_win = M.layouts[bufnr] and M.layouts[bufnr].data_win
+  local cursor, view
+  if data_win and vim.api.nvim_win_is_valid(data_win) then
+    cursor = vim.api.nvim_win_get_cursor(data_win)
+    view = vim.api.nvim_win_call(data_win, vim.fn.winsaveview)
+  end
+
+  local columns = M.columns[bufnr]
+  local num_rows = M.num_rows[bufnr]
+
+  if not columns or not num_rows then
+    return
+  end
+
+  -- Recalculate column widths
+  local col_widths = {}
+  for _, col_name in ipairs(columns) do
+    col_widths[col_name] = vim.fn.strdisplaywidth(col_name)
+  end
+
+  for row_idx = 2, num_rows + 1 do
+    for col_idx, col_name in ipairs(columns) do
+      local cell_id = string.format('%d:%d', row_idx, col_idx)
+      local cell = M.cells[cell_id]
+      if cell then
+        local value = cell.full
+        local truncated, is_truncated = truncate_cell(value, M.max_width)
+
+        cell.truncated = truncated
+        cell.is_truncated = is_truncated
+
+        local trunc_width = vim.fn.strdisplaywidth(truncated)
+        if trunc_width > col_widths[col_name] then
+          col_widths[col_name] = trunc_width
+        end
+      end
+    end
+  end
+
+  -- Build data lines (no separators)
+  local data_lines = {}
+  for row_idx = 2, num_rows + 1 do
+    local row_values = {}
+    for col_idx, col_name in ipairs(columns) do
+      local cell_id = string.format('%d:%d', row_idx, col_idx)
+      local cell = M.cells[cell_id]
+      row_values[col_idx] = cell and cell.truncated or ''
+    end
+    table.insert(data_lines, build_row_string(row_values, columns, col_widths))
+  end
+
+  -- Update buffer (in-place)
+  vim.bo[bufnr].modifiable = true
+  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, data_lines)
+  vim.bo[bufnr].modifiable = false
+  vim.bo[bufnr].modified = false  -- Prevent auto-save from triggering
+
+  -- Rebuild cached full header string
+  if M.layouts[bufnr] then
+    M.layouts[bufnr].full_header = build_header_string(columns, col_widths)
+    M.layouts[bufnr].col_widths = col_widths
+
+    if data_win and vim.api.nvim_win_is_valid(data_win) then
+      update_winbar_for_scroll(data_win, bufnr)
+    end
+  end
+
+  -- Re-place extmarks
+  place_extmarks(bufnr)
+
+  -- Restore cursor
+  if data_win and vim.api.nvim_win_is_valid(data_win) and cursor and view then
+    pcall(vim.api.nvim_win_set_cursor, data_win, cursor)
+    pcall(vim.api.nvim_win_call, data_win, function()
+      vim.fn.winrestview(view)
+    end)
+  end
+end
+
+-- Update cell display in the table buffer after editing
+function M.update_cell_display(bufnr, cell_id, new_text)
+  bufnr = bufnr or vim.api.nvim_get_current_buf()
+
+  local cell = M.cells[cell_id]
+  if not cell then
+    vim.notify('Cell not found: ' .. cell_id, vim.log.levels.WARN)
+    return
+  end
+
+  -- Update the full value in M.cells
+  cell.full = new_text
+
+  -- Update JSON data
+  local row, col = cell_id:match('(%d+):(%d+)')
+  if row and col then
+    row = tonumber(row)
+    col = tonumber(col)
+
+    local json_row_idx = row - 1  -- cell row 2 = JSON row 1
+    local columns = M.columns[bufnr]
+
+    if M.json_data[bufnr] and M.json_data[bufnr][json_row_idx] and columns and columns[col] then
+      local col_name = columns[col]
+      M.json_data[bufnr][json_row_idx][col_name] = new_text
+    end
+  end
+
+  -- In the in-place approach, bufnr is the layout key
+  if not M.layouts[bufnr] then
+    vim.notify('Could not find layout for buffer', vim.log.levels.WARN)
+    return
+  end
+
+  -- Rebuild entire table from M.cells
+  rebuild_table_from_cells(bufnr)
+
+  -- Note: rebuild_table_from_cells() sets modified=false to prevent auto-save.
+  -- Changes are stored in JSON data and will be written to file on :w via BufWriteCmd.
 end
 
 -- Convert CSV buffer to formatted table view
@@ -516,24 +506,7 @@ function M.view_csv(bufnr, max_width)
       local value = tostring(row[col_name] or '')
       local cell_id = string.format('%d:%d', row_idx + 1, col_idx)
 
-      local display_width = vim.fn.strdisplaywidth(value)
-      local is_truncated = display_width > M.max_width
-      local truncated = value
-
-      if is_truncated then
-        local char_count = 0
-        local byte_pos = 0
-        for i = 1, vim.fn.strchars(value) do
-          local char = vim.fn.strcharpart(value, i - 1, 1)
-          local char_width = vim.fn.strdisplaywidth(char)
-          if char_count + char_width > M.max_width - 3 then
-            break
-          end
-          char_count = char_count + char_width
-          byte_pos = byte_pos + #char
-        end
-        truncated = value:sub(1, byte_pos) .. '...'
-      end
+      local truncated, is_truncated = truncate_cell(value, M.max_width)
 
       M.cells[cell_id] = {
         full = value,
@@ -563,26 +536,7 @@ function M.view_csv(bufnr, max_width)
   -- Build data rows (no separators between rows)
   local output_lines = {}
   for row_idx = 1, #rows do
-    local data_row = {}
-    table.insert(data_row, '|')
-    for col_idx, col_name in ipairs(columns) do
-      local value = row_data[row_idx][col_idx]
-      local value_display_width = vim.fn.strdisplaywidth(value)
-      local padding = col_widths[col_name] - value_display_width
-      table.insert(data_row, ' ' .. value .. string.rep(' ', padding) .. ' |')
-    end
-    table.insert(output_lines, table.concat(data_row))
-  end
-
-  -- Get the previous buffer from jumplist
-  local jumplist = vim.fn.getjumplist()[1]
-  local prev_bufnr = nil
-  for i = #jumplist, 1, -1 do
-    local jump_bufnr = jumplist[i].bufnr
-    if jump_bufnr ~= orig_bufnr and vim.api.nvim_buf_is_valid(jump_bufnr) then
-      prev_bufnr = jump_bufnr
-      break
-    end
+    table.insert(output_lines, build_row_string(row_data[row_idx], columns, col_widths))
   end
 
   -- Store original window
@@ -601,21 +555,11 @@ function M.view_csv(bufnr, max_width)
   vim.wo[orig_win].signcolumn = 'no'
   vim.wo[orig_win].foldcolumn = '0'
 
-  -- Build and cache full header string for winbar updates
-  local header_parts = {}
-  table.insert(header_parts, '|')
-  for _, col_name in ipairs(columns) do
-    local col_display_width = vim.fn.strdisplaywidth(col_name)
-    table.insert(header_parts, ' ' .. col_name .. string.rep(' ', col_widths[col_name] - col_display_width) .. ' |')
-  end
-  local full_header_string = table.concat(header_parts)
-
   -- Store layout info (no data_buf since we modify in-place)
   M.layouts[orig_bufnr] = {
     data_win = orig_win,
-    prev_bufnr = prev_bufnr,
     col_widths = col_widths,
-    full_header = full_header_string,
+    full_header = build_header_string(columns, col_widths),
   }
 
   -- Set initial winbar
@@ -642,8 +586,9 @@ function M.view_csv(bufnr, max_width)
     end,
   })
 
-  -- Handle window resize
+  -- Handle window resize (buffer-scoped to auto-cleanup)
   vim.api.nvim_create_autocmd('VimResized', {
+    buffer = bufnr,
     callback = function()
       if M.layouts[orig_bufnr] and vim.api.nvim_win_is_valid(orig_win) then
         update_winbar_for_scroll(orig_win, orig_bufnr)
