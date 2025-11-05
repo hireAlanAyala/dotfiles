@@ -8,8 +8,8 @@ local M = {}
 M.ns = vim.api.nvim_create_namespace 'csv_viewer'
 M.cells = {} -- Metadata: {["row:col"] = {full="...", truncated="...", is_truncated=...}}
 M.max_width = 20 -- Default max column width
-M.original_csv_rows = {} -- Original CSV rows: {[row_num] = "csv,row,data"}
-M.csv_file_path = nil -- Path to the original CSV file
+M.json_data = {} -- JSON array from miller: {[bufnr] = [{col1="val",...}, ...]}
+M.csv_file_path = {} -- Path to CSV file: {[bufnr] = "path"}
 M.layouts = {} -- Store layouts by buffer number: {[bufnr] = {data_win, prev_bufnr, col_widths, full_header}}
 M.columns = {} -- Column names in order: {[bufnr] = {"col1", "col2", ...}}
 M.num_rows = {} -- Number of rows: {[bufnr] = count}
@@ -57,58 +57,18 @@ local function find_cell_at_cursor(bufnr)
   return nil
 end
 
--- Show floating window with full cell content
+-- Show and edit cell content in floating window
 function M.show_full_cell()
+  local bufnr = vim.api.nvim_get_current_buf()
   local cell_id, cell = find_cell_at_cursor()
 
-  if cell then
-    M.show_float(cell.full)
-  else
+  if not cell then
     local cursor = vim.api.nvim_win_get_cursor(0)
     vim.notify('No cell found at cursor (row=' .. (cursor[1] - 1) .. ', col=' .. cursor[2] .. ')', vim.log.levels.WARN)
-  end
-end
-
--- Display floating window with text (using LSP's floating preview for auto-close behavior)
-function M.show_float(text)
-  local lines = vim.split(text, '\n')
-
-  -- Use LSP's built-in floating preview which handles auto-close on cursor move
-  vim.lsp.util.open_floating_preview(lines, 'markdown', {
-    border = 'none',
-    focusable = true,
-    focus = false,
-    close_events = { 'CursorMoved', 'CursorMovedI', 'InsertEnter', 'BufLeave' },
-  })
-end
-
--- Edit a cell in a floating window
-function M.edit_cell(bufnr, cell_id, initial_key)
-  bufnr = bufnr or vim.api.nvim_get_current_buf()
-
-  local cell_id_actual, cell, _, mark_col = find_cell_at_cursor(bufnr)
-  if not cell_id_actual then
-    cell_id_actual = cell_id
-    cell = M.cells[cell_id]
-  end
-
-  if not cell then
-    vim.notify('No cell to edit', vim.log.levels.WARN)
     return
   end
 
-  -- Calculate cursor position within the cell
-  local cursor = vim.api.nvim_win_get_cursor(0)
-  local cursor_col = cursor[2]
-  local cell_offset = 0
-
-  if mark_col then
-    -- Calculate how far into the cell the cursor is
-    cell_offset = math.max(0, cursor_col - mark_col)
-    cell_offset = math.min(cell_offset, #cell.full)
-  end
-
-  -- Create a scratch buffer for editing
+  -- Create editable buffer for cell content
   local edit_buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_buf_set_lines(edit_buf, 0, -1, false, { cell.full })
   vim.bo[edit_buf].bufhidden = 'wipe'
@@ -126,58 +86,44 @@ function M.edit_cell(bufnr, cell_id, initial_key)
     height = 1,
     style = 'minimal',
     border = 'rounded',
-    title = ' Edit Cell ',
+    title = ' Edit Cell (Enter/Esc to save) ',
     title_pos = 'center',
   }
 
   local win = vim.api.nvim_open_win(edit_buf, true, opts)
 
-  -- Position cursor within the edit window
-  vim.api.nvim_win_set_cursor(win, { 1, cell_offset })
-
-  -- Save on <CR> or <Esc>
+  -- Save and close function
   local function save_and_close()
-    if not vim.api.nvim_win_is_valid(win) then
-      return
-    end
+    if not vim.api.nvim_win_is_valid(win) then return end
 
     local new_lines = vim.api.nvim_buf_get_lines(edit_buf, 0, -1, false)
     local new_text = new_lines[1] or ''
 
-    -- Update the cell metadata
+    -- Update cell metadata
     cell.full = new_text
-    M.cells[cell_id_actual] = cell
+    M.cells[cell_id] = cell
 
-    -- Update the displayed cell in the table
-    M.update_cell_display(bufnr, cell_id_actual, new_text)
+    -- Update display
+    M.update_cell_display(bufnr, cell_id, new_text)
 
     -- Close window
     vim.api.nvim_win_close(win, true)
   end
 
-  -- Keymap to save and close
+  -- Keymaps for saving
   vim.keymap.set('n', '<CR>', save_and_close, { buffer = edit_buf, nowait = true })
   vim.keymap.set('n', '<Esc>', save_and_close, { buffer = edit_buf, nowait = true })
   vim.keymap.set('i', '<CR>', function()
-    vim.cmd 'stopinsert'
+    vim.cmd('stopinsert')
     save_and_close()
   end, { buffer = edit_buf, nowait = true })
   vim.keymap.set('i', '<Esc>', function()
-    vim.cmd 'stopinsert'
+    vim.cmd('stopinsert')
     save_and_close()
   end, { buffer = edit_buf, nowait = true })
 
-  -- Apply the initial key press if provided
-  if initial_key then
-    vim.defer_fn(function()
-      if vim.api.nvim_win_is_valid(win) then
-        vim.api.nvim_feedkeys(initial_key, 'n', false)
-      end
-    end, 10)
-  else
-    -- Default to insert mode if no key provided
-    vim.cmd 'startinsert'
-  end
+  -- Start in insert mode
+  vim.cmd('startinsert')
 end
 
 -- Slice string by display width (UTF-8 aware)
@@ -328,6 +274,7 @@ local function rebuild_table_from_cells(bufnr)
   vim.bo[bufnr].modifiable = true
   vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, data_lines)
   vim.bo[bufnr].modifiable = false
+  vim.bo[bufnr].modified = false  -- Prevent auto-save from triggering
 
   -- Rebuild cached full header string
   if M.layouts[bufnr] then
@@ -410,8 +357,23 @@ function M.update_cell_display(bufnr, cell_id, new_text)
     return
   end
 
-  -- Update the full value
+  -- Update the full value in M.cells
   cell.full = new_text
+
+  -- Update JSON data
+  local row, col = cell_id:match('(%d+):(%d+)')
+  if row and col then
+    row = tonumber(row)
+    col = tonumber(col)
+
+    local json_row_idx = row - 1  -- cell row 2 = JSON row 1
+    local columns = M.columns[bufnr]
+
+    if M.json_data[bufnr] and M.json_data[bufnr][json_row_idx] and columns and columns[col] then
+      local col_name = columns[col]
+      M.json_data[bufnr][json_row_idx][col_name] = new_text
+    end
+  end
 
   -- In the in-place approach, bufnr is the layout key
   if not M.layouts[bufnr] then
@@ -422,8 +384,8 @@ function M.update_cell_display(bufnr, cell_id, new_text)
   -- Rebuild entire table from M.cells
   rebuild_table_from_cells(bufnr)
 
-  -- Mark buffer as modified
-  vim.bo[bufnr].modified = true
+  -- Note: rebuild_table_from_cells() sets modified=false to prevent auto-save.
+  -- Changes are stored in JSON data and will be written to file on :w via BufWriteCmd.
 end
 
 -- Place extmarks on cells for tracking
@@ -484,15 +446,11 @@ function M.view_csv(bufnr, max_width)
   bufnr = bufnr or vim.api.nvim_get_current_buf()
   M.max_width = max_width or M.max_width
 
-  -- Store original CSV rows and file path
-  local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-  M.original_csv_rows = {}
-  for i, line in ipairs(lines) do
-    M.original_csv_rows[i] = line
-  end
-  M.csv_file_path = vim.api.nvim_buf_get_name(bufnr)
+  -- Store CSV file path
+  M.csv_file_path[bufnr] = vim.api.nvim_buf_get_name(bufnr)
 
   -- Get CSV content
+  local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
   local csv_content = table.concat(lines, '\n')
 
   -- Write CSV to temp file
@@ -505,8 +463,8 @@ function M.view_csv(bufnr, max_width)
   f:write(csv_content)
   f:close()
 
-  -- Use miller to parse CSV to JSON
-  local cmd = string.format('mlr --csv --ojson cat %s', vim.fn.shellescape(temp_file))
+  -- Use miller to parse CSV to JSON (with ragged CSV support for inconsistent column counts)
+  local cmd = string.format('mlr --csv --allow-ragged-csv-input --ojson cat %s', vim.fn.shellescape(temp_file))
   local json_output = vim.fn.system(cmd)
 
   -- Clean up temp file
@@ -528,6 +486,9 @@ function M.view_csv(bufnr, max_width)
     vim.notify('No data in CSV', vim.log.levels.WARN)
     return
   end
+
+  -- Store JSON data for this buffer
+  M.json_data[bufnr] = rows
 
   -- Build table from parsed data
   M.cells = {}
@@ -699,21 +660,9 @@ function M.view_csv(bufnr, max_width)
   -- Set up buffer-local keymap for K
   vim.keymap.set('n', 'K', M.show_full_cell, {
     buffer = bufnr,
-    desc = 'Show full CSV cell content',
+    desc = 'Show and edit CSV cell content',
     nowait = true,
   })
-
-  -- Set up keymaps to edit cells
-  local edit_keys = { 'i', 'a', 'I', 'A', 'c', 'C', 's', 'S', 'o', 'O' }
-  for _, key in ipairs(edit_keys) do
-    vim.keymap.set('n', key, function()
-      M.edit_cell(bufnr, nil, key)
-    end, {
-      buffer = bufnr,
-      desc = 'Edit CSV cell',
-      nowait = true,
-    })
-  end
 
   -- Set up save handler
   vim.api.nvim_create_autocmd('BufWriteCmd', {
@@ -724,116 +673,65 @@ function M.view_csv(bufnr, max_width)
   })
 end
 
--- Save changes back to CSV file
+-- Save changes back to CSV file using miller
 function M.save_csv(bufnr)
   bufnr = bufnr or vim.api.nvim_get_current_buf()
 
-  if not M.csv_file_path or #M.original_csv_rows == 0 then
+  if not M.csv_file_path[bufnr] or not M.json_data[bufnr] then
     vim.notify('No CSV file loaded', vim.log.levels.ERROR)
     return
   end
 
-  -- Collect all changes by comparing current M.cells with original CSV
-  local modified_rows = {}
-
-  for cell_id, cell_meta in pairs(M.cells) do
-    -- Use the full text from metadata (updated by edit_cell)
-    local current_full_text = cell_meta.full
-
-    local row, col = cell_id:match '(%d+):(%d+)'
-    if not row or not col then
-      goto continue
-    end
-    row = tonumber(row)
-    col = tonumber(col)
-
-    -- Parse original CSV to get original value for this cell
-    local original_row = M.original_csv_rows[row]
-    if original_row then
-      local fields = {}
-      local in_quotes = false
-      local current_field = ''
-
-      for char in original_row:gmatch '.' do
-        if char == '"' then
-          in_quotes = not in_quotes
-          current_field = current_field .. char
-        elseif char == ',' and not in_quotes then
-          table.insert(fields, current_field)
-          current_field = ''
-        else
-          current_field = current_field .. char
-        end
-      end
-      table.insert(fields, current_field)
-
-      local original_value = fields[col] or ''
-      -- Remove quotes if present
-      original_value = original_value:gsub('^"', ''):gsub('"$', '')
-
-      -- Check if value changed
-      if current_full_text ~= original_value then
-        if not modified_rows[row] then
-          modified_rows[row] = {}
-        end
-        modified_rows[row][col] = current_full_text
-      end
-    end
-    ::continue::
+  -- Write JSON to temp file
+  local json_temp = vim.fn.tempname()
+  local json_str = vim.json.encode(M.json_data[bufnr])
+  local f = io.open(json_temp, 'w')
+  if not f then
+    vim.notify('Failed to create temp JSON file', vim.log.levels.ERROR)
+    return
   end
+  f:write(json_str)
+  f:close()
 
-  -- Apply changes to original CSV rows
-  local new_csv_rows = {}
-  for i, original_row in ipairs(M.original_csv_rows) do
-    if modified_rows[i] then
-      -- Parse CSV row and update modified fields
-      local fields = {}
-      local in_quotes = false
-      local current_field = ''
-      local field_num = 1
+  -- Convert JSON to CSV using miller
+  local csv_temp = vim.fn.tempname()
+  local cmd = string.format('mlr --json --ocsv cat %s > %s',
+    vim.fn.shellescape(json_temp),
+    vim.fn.shellescape(csv_temp))
+  local result = vim.fn.system(cmd)
 
-      -- Simple CSV parser
-      for char in original_row:gmatch '.' do
-        if char == '"' then
-          in_quotes = not in_quotes
-          current_field = current_field .. char
-        elseif char == ',' and not in_quotes then
-          table.insert(fields, current_field)
-          current_field = ''
-          field_num = field_num + 1
-        else
-          current_field = current_field .. char
-        end
-      end
-      table.insert(fields, current_field) -- Last field
+  -- Clean up JSON temp file
+  vim.fn.delete(json_temp)
 
-      -- Apply modifications
-      for col, new_value in pairs(modified_rows[i]) do
-        fields[col] = new_value
-      end
-
-      -- Rebuild CSV row
-      new_csv_rows[i] = table.concat(fields, ',')
-    else
-      new_csv_rows[i] = original_row
-    end
-  end
-
-  -- Write to file
-  local file = io.open(M.csv_file_path, 'w')
-  if not file then
-    vim.notify('Failed to open file for writing: ' .. M.csv_file_path, vim.log.levels.ERROR)
+  if vim.v.shell_error ~= 0 then
+    vim.notify('Error converting JSON to CSV: ' .. result, vim.log.levels.ERROR)
+    vim.fn.delete(csv_temp)
     return
   end
 
-  for _, row in ipairs(new_csv_rows) do
-    file:write(row .. '\n')
+  -- Read CSV output from miller
+  local csv_file = io.open(csv_temp, 'r')
+  if not csv_file then
+    vim.notify('Failed to read CSV temp file', vim.log.levels.ERROR)
+    vim.fn.delete(csv_temp)
+    return
   end
-  file:close()
+  local csv_content = csv_file:read('*all')
+  csv_file:close()
+  vim.fn.delete(csv_temp)
+
+  -- Write to actual CSV file
+  local out_file = io.open(M.csv_file_path[bufnr], 'w')
+  if not out_file then
+    vim.notify('Failed to open file for writing: ' .. M.csv_file_path[bufnr], vim.log.levels.ERROR)
+    return
+  end
+  out_file:write(csv_content)
+  out_file:close()
 
   -- Mark buffer as not modified
   vim.bo[bufnr].modified = false
-  vim.notify('CSV file saved: ' .. M.csv_file_path, vim.log.levels.INFO)
+  vim.notify('CSV file saved: ' .. M.csv_file_path[bufnr], vim.log.levels.INFO)
 end
 
 -- Automatically open CSV files in the viewer whenever buffer is entered
