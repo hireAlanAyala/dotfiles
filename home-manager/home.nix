@@ -27,7 +27,7 @@
     (callPackage ../derivations/discordo.nix { })
     (callPackage ../derivations/extract-otp-secrets.nix { })
     (callPackage ../derivations/mcp-chrome-bridge.nix { })
-    (writeShellScriptBin "wrapped_nvim" (builtins.readFile ../scripts/wrapped_nvim.sh))
+    (callPackage ../derivations/claude.nix { })
     (writeShellScriptBin "show-2fa" (builtins.readFile ../scripts/show_all_2fa.sh))
     (writeShellScriptBin "hm" (builtins.readFile ../scripts/hm.sh))
     #(writeShellScriptBin "mouse-jiggle" (builtins.readFile ../scripts/mouse-jiggle.sh))
@@ -37,11 +37,12 @@
     unzip
 
     # ai
-    claude-code
+    # claude-code
+    ollama
 
     # Development languages and runtimes
     go
-    nodejs_20
+    nodejs_22
     python3Packages.git-filter-repo
     temurin-bin # java openJDK
     jbang
@@ -56,6 +57,7 @@
     nodePackages.typescript-language-server
     nodePackages.nodemon
     pnpm
+    yarn-berry
 
     # .NET ecosystem
     dotnetCorePackages.dotnet_8.sdk
@@ -67,6 +69,7 @@
     azure-functions-core-tools
     azure-cli
     linode-cli
+    podman
     docker
     docker-compose
     ngrok
@@ -80,13 +83,18 @@
     cloc
     tokei # project code statistics
     nixfmt # Nix formatter
+    sops # secrets management CLI
 
     # Databases
     postgresql_15
     sqlite
 
+    # data processing
+    miller
+
     # Terminal Core
     reptyr
+    ttyd
 
     # CLI utilities
     jq # sed but for json
