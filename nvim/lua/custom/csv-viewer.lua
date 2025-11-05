@@ -6,7 +6,7 @@ M.cells = {}  -- Metadata: {["row:col"] = {full="...", truncated="...", is_trunc
 M.max_width = 20  -- Default max column width
 M.original_csv_rows = {}  -- Original CSV rows: {[row_num] = "csv,row,data"}
 M.csv_file_path = nil  -- Path to the original CSV file
-M.layouts = {}  -- Store layouts by buffer number: {[bufnr] = {data_buf, data_win, prev_bufnr, col_widths, full_header}}
+M.layouts = {}  -- Store layouts by buffer number: {[bufnr] = {data_win, prev_bufnr, col_widths, full_header}}
 M.columns = {}  -- Column names in order: {[bufnr] = {"col1", "col2", ...}}
 M.num_rows = {}  -- Number of rows: {[bufnr] = count}
 M.suppress_autoopen = {}  -- Temporarily suppress auto-opening: {[bufnr] = true}
@@ -64,7 +64,7 @@ function M.show_full_cell()
   local cell_id, cell = find_cell_at_cursor()
 
   if cell then
-    M.show_float(cell.full, cell.is_truncated, cell_id)
+    M.show_float(cell.full)
   else
     local cursor = vim.api.nvim_win_get_cursor(0)
     vim.notify('No cell found at cursor (row=' .. (cursor[1] - 1) .. ', col=' .. cursor[2] .. ')', vim.log.levels.WARN)
@@ -72,7 +72,7 @@ function M.show_full_cell()
 end
 
 -- Display floating window with text (using LSP's floating preview for auto-close behavior)
-function M.show_float(text, is_truncated, cell_id)
+function M.show_float(text)
   local lines = vim.split(text, '\n')
 
   -- Use LSP's built-in floating preview which handles auto-close on cursor move
@@ -88,7 +88,7 @@ end
 function M.edit_cell(bufnr, cell_id, initial_key)
   bufnr = bufnr or vim.api.nvim_get_current_buf()
 
-  local cell_id_actual, cell, mark_row, mark_col, mark_end_col = find_cell_at_cursor(bufnr)
+  local cell_id_actual, cell, _, mark_col = find_cell_at_cursor(bufnr)
   if not cell_id_actual then
     cell_id_actual = cell_id
     cell = M.cells[cell_id]
@@ -113,8 +113,8 @@ function M.edit_cell(bufnr, cell_id, initial_key)
   -- Create a scratch buffer for editing
   local edit_buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_buf_set_lines(edit_buf, 0, -1, false, { cell.full })
-  vim.api.nvim_buf_set_option(edit_buf, 'bufhidden', 'wipe')
-  vim.api.nvim_buf_set_option(edit_buf, 'filetype', 'text')
+  vim.bo[edit_buf].bufhidden = 'wipe'
+  vim.bo[edit_buf].filetype = 'text'
 
   -- Calculate window size
   local width = math.max(#cell.full + 4, 40)
@@ -247,7 +247,7 @@ local function update_winbar_for_scroll(win, orig_bufnr)
 
   local win_width = vim.api.nvim_win_get_width(win)
   local winbar_text = build_winbar_header(layout.full_header, leftcol, win_width)
-  vim.api.nvim_win_set_option(win, 'winbar', winbar_text)
+  vim.wo[win].winbar = winbar_text
 end
 
 -- Rebuild table from M.cells (called after cell edits)
@@ -268,7 +268,7 @@ local function rebuild_table_from_cells(bufnr)
 
   -- Recalculate column widths
   local col_widths = {}
-  for col_idx, col_name in ipairs(columns) do
+  for _, col_name in ipairs(columns) do
     col_widths[col_name] = vim.fn.strdisplaywidth(col_name)
   end
 
@@ -325,15 +325,15 @@ local function rebuild_table_from_cells(bufnr)
   end
 
   -- Update buffer (in-place)
-  vim.api.nvim_buf_set_option(bufnr, 'modifiable', true)
+  vim.bo[bufnr].modifiable = true
   vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, data_lines)
-  vim.api.nvim_buf_set_option(bufnr, 'modifiable', false)
+  vim.bo[bufnr].modifiable = false
 
   -- Rebuild cached full header string
   if M.layouts[bufnr] then
     local header_parts = {}
     table.insert(header_parts, '|')
-    for col_idx, col_name in ipairs(columns) do
+    for _, col_name in ipairs(columns) do
       local col_display_width = vim.fn.strdisplaywidth(col_name)
       table.insert(header_parts, ' ' .. col_name .. string.rep(' ', col_widths[col_name] - col_display_width) .. ' |')
     end
@@ -419,17 +419,7 @@ function M.update_cell_display(bufnr, cell_id, new_text)
   rebuild_table_from_cells(bufnr)
 
   -- Mark buffer as modified
-  vim.api.nvim_buf_set_option(bufnr, 'modified', true)
-end
-
--- Parse JSON metadata from AWK script
-local function parse_metadata(json_str)
-  local ok, result = pcall(vim.json.decode, json_str)
-  if not ok then
-    vim.notify('Failed to parse cell metadata: ' .. tostring(result), vim.log.levels.ERROR)
-    return {}
-  end
-  return result
+  vim.bo[bufnr].modified = true
 end
 
 -- Place extmarks on cells for tracking
@@ -633,17 +623,17 @@ function M.view_csv(bufnr, max_width)
   local orig_win = vim.api.nvim_get_current_win()
 
   -- Replace buffer content in-place with formatted table
-  vim.api.nvim_buf_set_option(bufnr, 'modifiable', true)
+  vim.bo[bufnr].modifiable = true
   vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, output_lines)
-  vim.api.nvim_buf_set_option(bufnr, 'modifiable', false)
-  vim.api.nvim_buf_set_option(bufnr, 'modified', false)
+  vim.bo[bufnr].modifiable = false
+  vim.bo[bufnr].modified = false
 
   -- Configure window options
-  vim.api.nvim_win_set_option(orig_win, 'wrap', false)
-  vim.api.nvim_win_set_option(orig_win, 'number', false)
-  vim.api.nvim_win_set_option(orig_win, 'relativenumber', false)
-  vim.api.nvim_win_set_option(orig_win, 'signcolumn', 'no')
-  vim.api.nvim_win_set_option(orig_win, 'foldcolumn', '0')
+  vim.wo[orig_win].wrap = false
+  vim.wo[orig_win].number = false
+  vim.wo[orig_win].relativenumber = false
+  vim.wo[orig_win].signcolumn = 'no'
+  vim.wo[orig_win].foldcolumn = '0'
 
   -- Build and cache full header string for winbar updates
   local header_parts = {}
@@ -700,7 +690,7 @@ function M.view_csv(bufnr, max_width)
   local col_count = #columns
   local current_statusline = vim.o.statusline
   local csv_info = string.format(' | %d rows × %d cols', row_count, col_count)
-  vim.api.nvim_win_set_option(orig_win, 'statusline', current_statusline .. csv_info)
+  vim.wo[orig_win].statusline = current_statusline .. csv_info
 
   -- Place extmarks on buffer
   place_extmarks(bufnr)
@@ -794,25 +784,6 @@ function M.view_csv(bufnr, max_width)
   })
 end
 
--- Get current text content of a cell from the buffer
-local function get_current_cell_text(bufnr, cell_id)
-  local extmark_id = cell_id_to_extmark_id(cell_id)
-  local marks = vim.api.nvim_buf_get_extmarks(bufnr, M.ns, extmark_id, extmark_id, { details = true })
-
-  if #marks == 0 then
-    return nil
-  end
-
-  local mark = marks[1]
-  local row = mark[2]
-  local start_col = mark[3]
-  local end_col = mark[4].end_col
-
-  -- Get text between extmark positions
-  local lines = vim.api.nvim_buf_get_text(bufnr, row, start_col, row, end_col, {})
-  return lines[1] or ''
-end
-
 -- Save changes back to CSV file
 function M.save_csv(bufnr)
   bufnr = bufnr or vim.api.nvim_get_current_buf()
@@ -830,6 +801,9 @@ function M.save_csv(bufnr)
     local current_full_text = cell_meta.full
 
     local row, col = cell_id:match('(%d+):(%d+)')
+    if not row or not col then
+      goto continue
+    end
     row = tonumber(row)
     col = tonumber(col)
 
@@ -865,6 +839,7 @@ function M.save_csv(bufnr)
         modified_rows[row][col] = current_full_text
       end
     end
+    ::continue::
   end
 
   -- Apply changes to original CSV rows
@@ -917,7 +892,7 @@ function M.save_csv(bufnr)
   file:close()
 
   -- Mark buffer as not modified
-  vim.api.nvim_buf_set_option(bufnr, 'modified', false)
+  vim.bo[bufnr].modified = false
   vim.notify('CSV file saved: ' .. M.csv_file_path, vim.log.levels.INFO)
 end
 
