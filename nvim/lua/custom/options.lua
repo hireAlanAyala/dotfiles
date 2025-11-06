@@ -44,7 +44,7 @@ vim.opt.pumblend = 10 -- Popup menu transparency
 vim.opt.winblend = 0 -- Floating window transparency
 vim.opt.conceallevel = 0 -- Don't hide markup
 vim.opt.concealcursor = '' -- Don't hide cursor line markup
-vim.opt.lazyredraw = true -- Don't redraw during macros
+vim.opt.lazyredraw = false -- Redraw screen properly (fixes terminal glitches)
 vim.opt.synmaxcol = 300 -- Syntax highlighting limit
 
 -- Search settings
@@ -98,13 +98,8 @@ vim.opt.diffopt:append 'linematch:60'
 vim.o.sessionoptions = vim.o.sessionoptions:gsub(',?options,?', '')
 vim.g.session_directory = '~/.config/nvim/sessions/'
 
--- Sync clipboard between OS and Neovim.
---  Schedule the setting after `UiEnter` because it can increase startup-time.
---  Remove this option if you want your OS clipboard to remain independent.
---  See `:help 'clipboard'`
-vim.schedule(function()
-  vim.opt.clipboard = 'unnamedplus'
-end)
+-- load quickfix fiter
+vim.cmd 'packadd cfilter'
 
 -- Create undo directory if it doesn't exist
 local undodir = vim.fn.expand '~/.nvim/undodir'
