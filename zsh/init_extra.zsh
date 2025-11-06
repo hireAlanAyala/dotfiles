@@ -30,7 +30,11 @@ zle -N edit-command-line
 bindkey '^e' edit-command-line
 
 export VISUAL=nvim
-export EDITOR=nvim
+
+# Use nvim wrapper that automatically handles nested nvim detection
+# The wrapper checks tmux environment and uses --remote if inside nvim
+export EDITOR="$HOME/.config/scripts/nvim-prevent-nesting-wrapper.sh"
+
 # export TERM="screen-256color"
 # Only set TERM if not in tmux (tmux will set it correctly)
 if [[ -z "$TMUX" ]]; then
@@ -42,9 +46,11 @@ alias fd='fd --hidden --no-ignore'
 alias v="nvim"
 alias path="echo -e ${PATH//:/\\n}"
 alias fucking='sudo env "PATH=$PATH"'
-alias gen-ssh-key="bash ~/.config/.ssh/generate_ssh_key.sh"
+alias sshgen="bash ~/.config/.ssh/generate_ssh_key.sh"
 alias gpg-restart="pkill -f gpg-agent; pkill -f gpg; gpg-connect-agent /bye"
 alias 2fa="show-2fa"
+alias tinit="~/.config/tmux/tmux-init.sh"
+alias nvim-control="$HOME/.config/scripts/nvim-control.sh"
 
 # Docker helpers
 export DOCKER_HOST=unix:///var/run/docker.sock
@@ -108,7 +114,6 @@ if command -v keychain &> /dev/null; then
         eval $(keychain --eval --quiet "${ssh_keys[@]}")
     fi
 fi
-alias tinit="~/.config/tmux/tmux-init.sh"
 
 # PATH is handled by NIX
 
