@@ -43,10 +43,8 @@ local function close_regular_buffers()
 end
 
 local function reload_nvim_for_worktree(worktree_path)
-  -- Close terminal buffers first
   close_terminal_buffers()
 
-  -- Then close regular buffers
   local unclosed_bufs = close_regular_buffers()
 
   if #unclosed_bufs > 0 then
