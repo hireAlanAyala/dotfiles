@@ -47,8 +47,11 @@
     ];
     terminal = "tmux-256color";
     extraConfig = ''
+      # WARNING: This file (tmux.conf) is managed by Nix/home-manager - DO NOT EDIT
+      # To add custom configuration, edit ~/.config/tmux/editable-tmux.conf
+      
       set -ga terminal-overrides ",*256col*:Tc"
-      source-file ~/.config/tmux/.tmux.conf
+      source-file ~/.config/tmux/editable-tmux.conf
       
       # Additional resurrect configuration for NixOS
       set -g @resurrect-restore-processes 'nvim'
