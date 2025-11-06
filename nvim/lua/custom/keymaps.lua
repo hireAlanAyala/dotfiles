@@ -41,6 +41,10 @@ vim.keymap.set('n', '<leader>tn', function()
   end)
 end, { desc = 'new persistent terminal' })
 
+vim.keymap.set('n', '<leader>ac', function()
+  terminal_persist.new_terminal('claude /commit', 'commits', true)
+end, { desc = 'commit' })
+
 -- Task runner keymaps (lazy loaded to avoid telescope dependency issues)
 vim.keymap.set('n', '<leader>tt', function()
   require('custom.telescope-tasks').task_picker()
@@ -62,18 +66,36 @@ end, { desc = 'Test Alt+I notification' })
 -- Telescope quickfix
 vim.keymap.set('n', 'sq', '<cmd>Telescope quickfix<cr>', { desc = 'Search [Q]uickfix' })
 
--- CSV Viewer
-vim.api.nvim_create_user_command('CsvView', function(opts)
-  local max_width = tonumber(opts.args) or 20
-  require('custom.csv-viewer').view_csv(nil, max_width)
-end, {
-  nargs = '?',
-  desc = 'View CSV as formatted table (optional: max column width)',
-})
+-- Open file or URL under cursor
+vim.keymap.set('n', 'gx', function()
+  local path = vim.fn.expand '<cfile>'
+  if vim.fn.filereadable(path) == 1 then
+    vim.cmd('edit ' .. vim.fn.fnameescape(path))
+  else
+    -- Handle URLs or external paths
+    if vim.fn.has 'wsl' == 1 then
+      vim.fn.system('wslview ' .. vim.fn.shellescape(path))
+    else
+      vim.fn.system('xdg-open ' .. vim.fn.shellescape(path))
+    end
+  end
+end, { desc = 'Open file or URL under cursor' })
 
-vim.keymap.set('n', '<leader>cv', function()
-  vim.ui.input({ prompt = 'Max column width (default 20): ' }, function(input)
-    local max_width = tonumber(input) or 20
-    require('custom.csv-viewer').view_csv(nil, max_width)
-  end)
-end, { desc = 'CSV view table' })
+-- CSV Viewer - automatically opens CSV files in special viewer format
+
+-- TEST COMMANDS for scrollback options
+vim.api.nvim_create_user_command('TestOriginal', function()
+  terminal_persist.test_original_attach('_config_c858e7_claude_scrollback')
+end, { desc = 'Test Original: Current approach with scrollback=10000' })
+
+vim.api.nvim_create_user_command('TestOption2', function()
+  terminal_persist.test_option2_attach('_config_c858e7_claude_scrollback')
+end, { desc = 'Test Option 2: Unbuffered PTY output' })
+
+vim.api.nvim_create_user_command('TestOption4', function()
+  terminal_persist.test_option4_attach('_config_c858e7_claude_scrollback')
+end, { desc = 'Test Option 4: Tmux c0-change throttling' })
+
+vim.api.nvim_create_user_command('TestOption7', function()
+  terminal_persist.test_option7_attach('_config_c858e7_claude_scrollback')
+end, { desc = 'Test Option 7: Explicit output handlers' })
