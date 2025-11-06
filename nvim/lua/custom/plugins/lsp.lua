@@ -148,7 +148,22 @@ return {
         --    https://github.com/pmizio/typescript-tools.nvim
         --
         -- But for many setups, the LSP (`ts_ls`) will work just fine
-        ts_ls = {},
+        ts_ls = {
+          settings = {
+            typescript = {
+              suggest = {
+                -- Disable automatic tag suggestions
+                includeCompletionsWithSnippetText = false,
+              },
+            },
+            javascript = {
+              suggest = {
+                -- Disable automatic tag suggestions
+                includeCompletionsWithSnippetText = false,
+              },
+            },
+          },
+        },
 
         -- Additional language servers
         nil_ls = {}, -- Nix
@@ -156,6 +171,9 @@ return {
         pyright = {}, -- Python
         rust_analyzer = {}, -- Rust
         clangd = {}, -- C/C++
+
+        -- Copilot LSP
+        copilot = {},
 
         lua_ls = {
           -- cmd = {...},
@@ -210,6 +228,9 @@ return {
         return server ~= 'fsautocomplete'
       end, ensure_installed)
       vim.list_extend(ensure_installed, {
+        -- Language servers
+        'copilot-language-server', -- GitHub Copilot
+
         -- Formatters
         'stylua', -- Lua formatter
 
@@ -233,6 +254,11 @@ return {
             if server_name == 'fsautocomplete' then
               return -- skip fsautocomplete, you set it up manually
             end
+            
+            -- Skip emmet-ls to prevent HTML tag snippets
+            if server_name == 'emmet_ls' then
+              return
+            end
 
             local server = servers[server_name] or {}
             -- This handles overriding only values explicitly passed
@@ -246,3 +272,4 @@ return {
     end,
   },
 }
+
