@@ -32,3 +32,7 @@ go/telemetry/
 git/config
 tmux/tmux.conf
 
+# Build artifacts and caches
+derivations/
+github-copilot/
+
