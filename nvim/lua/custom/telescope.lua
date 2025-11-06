@@ -16,6 +16,9 @@
 -- This opens a window that shows you all of the keymaps for the current
 -- Telescope picker. This is really useful to discover what Telescope can
 -- do as well as how to actually do it!
+--
+-- IDEA: use a <space space> delimeter to pass in multiple args into the same input.
+-- like ripgrep: first arg is regex, second arg is file | MyObj.test( <space space> .tsx
 
 local builtin = require 'telescope.builtin'
 local actions = require 'telescope.actions'
@@ -404,17 +407,22 @@ pcall(require('telescope').load_extension, 'media_files')
 -- Setup telescope keymaps
 require('config.keymaps').setup_telescope_keymaps()
 
+-- Helper to run tmux commands on parent server (non-nested)
+local function parent_tmux(cmd)
+  return 'TMUX="" tmux ' .. cmd
+end
+
 -- Custom tmux session picker
 local tmux_sessions
 tmux_sessions = function(opts)
   opts = opts or {}
 
-  -- Get current session name
-  local current_session_handle = io.popen 'tmux display-message -p "#{session_name}" 2>/dev/null || echo ""'
+  -- Get current session name from parent tmux
+  local current_session_handle = io.popen(parent_tmux 'display-message -p "#{session_name}"' .. ' 2>/dev/null || echo ""')
   local current_session = current_session_handle:read('*a'):gsub('%s+$', '')
   current_session_handle:close()
 
-  local handle = io.popen 'tmux list-sessions -F "#{session_name}#{?session_attached, (attached),}" 2>/dev/null || echo ""'
+  local handle = io.popen(parent_tmux 'list-sessions -F "#{session_name}#{?session_attached, (attached),}"' .. ' 2>/dev/null || echo ""')
   local result = handle:read '*a'
   handle:close()
 
@@ -508,8 +516,9 @@ tmux_sessions = function(opts)
           actions.close(prompt_bufnr)
           local selection = action_state.get_selected_entry()
           if selection then
-            -- Switch to selected tmux session
-            vim.fn.system('tmux switch-client -t ' .. vim.fn.shellescape(selection.value))
+            -- Switch to selected tmux session in parent tmux
+            local session_to_switch = selection.value
+            vim.fn.system(parent_tmux('switch-client -t ' .. vim.fn.shellescape(session_to_switch)))
           end
         end)
 
@@ -519,7 +528,7 @@ tmux_sessions = function(opts)
           if selection then
             local confirm = vim.fn.confirm("Delete tmux session '" .. selection.value .. "'?", '&Yes\n&No', 2)
             if confirm == 1 then
-              vim.fn.system('tmux kill-session -t ' .. vim.fn.shellescape(selection.value))
+              vim.fn.system(parent_tmux('kill-session -t ' .. vim.fn.shellescape(selection.value)))
               -- Refresh the picker
               actions.close(prompt_bufnr)
               tmux_sessions(opts)
@@ -538,7 +547,7 @@ tmux_sessions = function(opts)
           if selection then
             local confirm = vim.fn.confirm("Delete tmux session '" .. selection.value .. "'?", '&Yes\n&No', 2)
             if confirm == 1 then
-              vim.fn.system('tmux kill-session -t ' .. vim.fn.shellescape(selection.value))
+              vim.fn.system(parent_tmux('kill-session -t ' .. vim.fn.shellescape(selection.value)))
               -- Refresh the picker
               actions.close(prompt_bufnr)
               tmux_sessions(opts)
@@ -558,4 +567,3 @@ return {
   git_log_source_picker = git_log_source_picker,
   tmux_sessions = tmux_sessions,
 }
-
