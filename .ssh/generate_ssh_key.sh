@@ -68,6 +68,10 @@ case "$encryption_choice" in
         ;;
 esac
 
+# Save original key name for SSH Host alias, then append encryption type to key_name
+host_alias="$key_name"
+key_name="${key_name}_${key_type_flag}"
+
 # Determine key type
 echo -e "\n${BLUE}Key type:${RESET}"
 echo "1. Server/VPS (Linode, DigitalOcean, etc.)"
@@ -128,107 +132,41 @@ if [[ -f "$final_private_key_path" ]]; then
 fi
 
 # Generate the SSH key pair
-echo -e "${BLUE}Generating SSH key pair...${RESET}"
 if [[ -n "$key_size_flag" ]]; then
-    ssh-keygen -t "$key_type_flag" -b "$key_size_flag" -C "$key_email" -f "$private_key_path" -N "" || { echo -e "${RED}Error generating SSH key${RESET}"; exit 1; }
+    ssh-keygen -t "$key_type_flag" -b "$key_size_flag" -C "$key_email" -f "$private_key_path" -N "" >/dev/null 2>&1 || { echo -e "${RED}Error generating SSH key${RESET}"; exit 1; }
 else
-    ssh-keygen -t "$key_type_flag" -C "$key_email" -f "$private_key_path" -N "" || { echo -e "${RED}Error generating SSH key${RESET}"; exit 1; }
+    ssh-keygen -t "$key_type_flag" -C "$key_email" -f "$private_key_path" -N "" >/dev/null 2>&1 || { echo -e "${RED}Error generating SSH key${RESET}"; exit 1; }
 fi
 
-# Ensure ~/.config/.ssh directory exists
+# Install keys to ~/.config/.ssh
 mkdir -p "$HOME/.config/.ssh"
-
-# Copy private key to ~/.config/.ssh with correct permissions
-cp "$private_key_path" "$final_private_key_path" || { echo -e "${RED}Error copying private key to ~/.config/.ssh/${RESET}"; exit 1; }
-chmod 600 "$final_private_key_path" || { echo -e "${RED}Error setting private key permissions${RESET}"; exit 1; }
-echo -e "${GREEN}Private key installed at $final_private_key_path with correct permissions${RESET}"
-
-# Copy public key to ~/.config/.ssh
-cp "$public_key_path" "$final_public_key_path" || { echo -e "${RED}Error copying public key to ~/.config/.ssh/${RESET}"; exit 1; }
-echo -e "${GREEN}Public key installed at $final_public_key_path${RESET}"
+cp "$private_key_path" "$final_private_key_path" || { echo -e "${RED}Error copying private key${RESET}"; exit 1; }
+chmod 600 "$final_private_key_path" || { echo -e "${RED}Error setting permissions${RESET}"; exit 1; }
+cp "$public_key_path" "$final_public_key_path" || { echo -e "${RED}Error copying public key${RESET}"; exit 1; }
 
 # Add key to ssh-agent
-if ssh-add "$final_private_key_path" 2>/dev/null; then
-    echo -e "${GREEN}SSH key added to ssh-agent${RESET}"
-else
-    echo -e "${YELLOW}Warning: Could not add key to ssh-agent (agent may not be running)${RESET}"
-fi
+ssh-add "$final_private_key_path" 2>/dev/null
 
-# Copy the private key to the clipboard for SOPS
-echo -e "\n${BLUE}Copying private key to clipboard for SOPS...${RESET}"
-if command -v pbcopy &> /dev/null; then
-    # macOS
-    cat "$private_key_path" | pbcopy
-    echo -e "${GREEN}Private key copied to clipboard (macOS)${RESET}"
-elif command -v xclip &> /dev/null; then
-    # Linux (xclip)
-    cat "$private_key_path" | xclip -selection clipboard
-    echo -e "${GREEN}Private key copied to clipboard (Linux with xclip)${RESET}"
-elif command -v wl-copy &> /dev/null; then
-    # Linux (Wayland wl-copy)
-    cat "$private_key_path" | wl-copy
-    echo -e "${GREEN}Private key copied to clipboard (Linux with wl-copy)${RESET}"
-elif [[ -f "/mnt/c/Windows/System32/clip.exe" ]]; then
-    # WSL
-    cat "$private_key_path" | /mnt/c/Windows/System32/clip.exe
-    echo -e "${GREEN}Private key copied to clipboard (WSL)${RESET}"
-else
-    echo -e "${YELLOW}Warning: No clipboard utility found. You'll need to manually copy the private key${RESET}"
-    echo -e "${YELLOW}Private key location: $private_key_path${RESET}"
-fi
+# Send SOPS entry directly to nvim register (no temp file)
+if [[ -n "$NVIM" ]]; then
+    # Build SOPS entry: header line + indented private key
+    sops_entry="ssh_private_key_$key_name: |"$'\n'"$(sed 's/^/    /' "$private_key_path")"
 
-# Auto-add to SOPS
-echo -e "\n${BLUE}Adding private key to SOPS...${RESET}"
-if command -v sops &> /dev/null && [[ -f ~/.config/secrets.yaml ]]; then
-    # Create properly formatted YAML entry with indentation
-    temp_yaml="/tmp/sops_entry_$key_name.yaml"
-    echo "ssh_private_key_$key_name: |" > "$temp_yaml"
-    sed 's/^/    /' "$private_key_path" >> "$temp_yaml"
-
-    # Decrypt, append new key, re-encrypt
-    temp_decrypted="/tmp/secrets_decrypted_$key_name.yaml"
-    if sops -d ~/.config/secrets.yaml > "$temp_decrypted" 2>/dev/null; then
-        # Check if key already exists
-        if grep -q "^ssh_private_key_$key_name:" "$temp_decrypted"; then
-            echo -e "${YELLOW}Warning: ssh_private_key_$key_name already exists in SOPS${RESET}"
-        else
-            # Append new key entry
-            cat "$temp_yaml" >> "$temp_decrypted"
-            # Re-encrypt
-            if sops -e "$temp_decrypted" > ~/.config/secrets.yaml 2>/dev/null; then
-                echo -e "${GREEN}✓ Private key added to SOPS secrets${RESET}"
-            else
-                echo -e "${YELLOW}Could not encrypt secrets. Manual addition required.${RESET}"
-            fi
-        fi
-        rm -f "$temp_decrypted"
-    else
-        echo -e "${YELLOW}Could not decrypt secrets. Manual addition required:${RESET}"
-        echo -e "${YELLOW}1. Run: sops ~/.config/secrets.yaml${RESET}"
-        echo -e "${YELLOW}2. Add this entry (each line indented with 4 spaces):${RESET}"
-        cat "$temp_yaml"
-    fi
-    rm -f "$temp_yaml"
-elif command -v sops &> /dev/null; then
-    echo -e "${YELLOW}secrets.yaml not found at ~/.config/secrets.yaml${RESET}"
-else
-    echo -e "${YELLOW}sops command not found, skipping SOPS integration${RESET}"
+    # Send to nvim register
+    nvim --server "$NVIM" --remote-expr "setreg('+', '$sops_entry')" 2>/dev/null || \
+        echo -e "${YELLOW}Warning: Failed to copy SOPS entry to nvim register${RESET}"
 fi
 
 # Auto-add SSH config entry (only for servers and other services with hostnames)
-if [[ "$key_type" == "2" ]]; then
-    echo -e "\n${BLUE}Skipping SSH config entry for Git service${RESET}"
-    echo -e "${YELLOW}For Git services, add the public key to your account's SSH settings${RESET}"
-elif [[ -n "$hostname" ]]; then
-    echo -e "\n${BLUE}Adding SSH config entry...${RESET}"
+if [[ "$key_type" != "2" && -n "$hostname" ]]; then
     ssh_config_entry="
-Host $key_name
+Host $host_alias
   HostName $hostname
   User $username
   IdentityFile ~/.ssh/$key_name
   IdentitiesOnly yes
 "
-    
+
     # Try to add to ~/.config/.ssh/config first, then ~/.ssh/config
     if [[ -f ~/.config/.ssh/config ]]; then
         config_file=~/.config/.ssh/config
@@ -239,76 +177,61 @@ Host $key_name
         mkdir -p ~/.config/.ssh
         touch "$config_file"
     fi
-    
-    # Check if entry already exists
-    if grep -q "^Host $key_name$" "$config_file"; then
-        echo -e "${YELLOW}SSH config entry for $key_name already exists in $config_file${RESET}"
-    else
+
+    # Add entry if it doesn't already exist
+    if ! grep -q "^Host $host_alias$" "$config_file" 2>/dev/null; then
         echo "$ssh_config_entry" >> "$config_file"
-        echo -e "${GREEN}✓ SSH config entry added to $config_file${RESET}"
-        if [[ "$config_file" == *".config/.ssh/config"* ]]; then
-            echo -e "${BLUE}Note: Run 'hm' to activate the SSH config changes${RESET}"
-        fi
     fi
-else
-    echo -e "${YELLOW}No hostname provided. Manual SSH config entry:${RESET}"
-    echo -e "${YELLOW}Host $key_name${RESET}"
-    echo -e "${YELLOW}  HostName example.com${RESET}"
-    echo -e "${YELLOW}  User $username${RESET}"
-    echo -e "${YELLOW}  IdentityFile ~/.ssh/$key_name${RESET}"
-    echo -e "${YELLOW}  IdentitiesOnly yes${RESET}"
 fi
 
 # Auto-install public key on server (only for servers, not Git services)
-if [[ "$key_type" == "2" ]]; then
-    echo -e "\n${YELLOW}=== PUBLIC KEY FOR GIT SERVICE ===${RESET}"
-    echo -e "${YELLOW}Copy this public key to your Git service account:${RESET}"
-    cat "$final_public_key_path"
-    echo -e "\n${YELLOW}Common locations:${RESET}"
-    echo -e "${YELLOW}- GitHub: Settings → SSH and GPG keys → New SSH key${RESET}"
-    echo -e "${YELLOW}- GitLab: User Settings → SSH Keys${RESET}"
-    echo -e "${YELLOW}- Azure DevOps: User settings → SSH public keys${RESET}"
-elif [[ "$key_type" == "1" && -n "$hostname" ]]; then
-    echo -e "\n${BLUE}Public key installation...${RESET}"
-    echo -e "${YELLOW}Public key content:${RESET}"
-    cat "$final_public_key_path"
-    echo ""
-    
+install_key=""
+if [[ "$key_type" == "1" && -n "$hostname" ]]; then
     read -p "Install public key on server $hostname now? (y/N): " install_key
     if [[ "$install_key" =~ ^[Yy]$ ]]; then
-        echo -e "${BLUE}Installing public key on $hostname...${RESET}"
-        if ssh-copy-id -i "$final_private_key_path" "$username@$hostname" 2>/dev/null; then
-            echo -e "${GREEN}✓ Public key successfully installed on $hostname${RESET}"
-        else
-            echo -e "${YELLOW}Could not auto-install. Try manually:${RESET}"
-            echo -e "${YELLOW}ssh-copy-id -i ~/.ssh/$key_name $key_name${RESET}"
+        if ! ssh-copy-id -i "$final_private_key_path" "$username@$hostname" 2>/dev/null; then
+            install_key="n"  # Mark as failed so TODO is added
         fi
-    else
-        echo -e "${YELLOW}To install later, run:${RESET}"
-        echo -e "${YELLOW}ssh-copy-id -i ~/.ssh/$key_name $key_name${RESET}"
     fi
-else
-    echo -e "${YELLOW}=== PUBLIC KEY FOR SERVER ===${RESET}"
-    echo -e "${YELLOW}To install on server, run:${RESET}"
-    echo -e "${YELLOW}ssh-copy-id -i ~/.ssh/$key_name $key_name${RESET}"
-    echo -e "${YELLOW}Or manually add this public key to server's ~/.ssh/authorized_keys:${RESET}"
-    cat "$final_public_key_path"
 fi
 
 # Clean up temporary files
 rm -f "$private_key_path" "$public_key_path"
 
-echo -e "\n${GREEN}✓ SSH key generation complete!${RESET}"
-echo -e "${GREEN}✓ Private key: $final_private_key_path${RESET}"
-echo -e "${GREEN}✓ Public key: $final_public_key_path${RESET}"
-echo -e "${GREEN}✓ Key added to ssh-agent${RESET}"
-echo -e "${GREEN}✓ Private key copied to clipboard${RESET}"
+# Print final output with top border
+echo ""
+echo -e "${BLUE}════════════════════════════════════════════════════════════════════════════${RESET}"
+echo -e "${GREEN}✓ SSH key generation complete!${RESET}"
+echo -e "  Private: $final_private_key_path"
+echo -e "  Public:  $final_public_key_path"
+
+# Collect TODOs for manual actions
+todos=()
+
 if command -v sops &> /dev/null && [[ -f ~/.config/secrets.yaml ]]; then
-    echo -e "${GREEN}✓ Private key added to SOPS secrets${RESET}"
+    todos+=("Add to SOPS: ${GREEN}sops ~/.config/secrets.yaml${RESET} (entry in ${YELLOW}\"+${RESET} register)")
 fi
-if [[ "$key_type" != "2" && -n "$hostname" ]]; then
-    echo -e "${GREEN}✓ SSH config entry created${RESET}"
-fi
+
 if [[ "$key_type" == "2" ]]; then
-    echo -e "${GREEN}✓ Ready for Git service configuration${RESET}"
+    # Git service - show where to add public key
+    echo ""
+    echo -e "${YELLOW}Public key (add to your Git service):${RESET}"
+    cat "$final_public_key_path"
+    todos+=("Add public key to Git service (GitHub/GitLab/Azure DevOps)")
+fi
+
+if [[ "$key_type" != "2" && -n "$hostname" ]]; then
+    todos+=("Run: ${GREEN}hm${RESET} (activate SSH config)")
+    if [[ "$install_key" != "y" && "$install_key" != "Y" ]]; then
+        todos+=("Install key: ${GREEN}ssh-copy-id -i ~/.ssh/$key_name $host_alias${RESET}")
+    fi
+fi
+
+# Display all TODOs at the end
+if [ ${#todos[@]} -gt 0 ]; then
+    echo ""
+    echo -e "${BLUE}TODOs:${RESET}"
+    for i in "${!todos[@]}"; do
+        echo -e "  $((i+1)). ${todos[$i]}"
+    done
 fi

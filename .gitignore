@@ -21,3 +21,10 @@ sops-nix/secrets
 # Go telemetry data
 go/telemetry/
 
+# SSH keys (ignore both private and public keys)
+.ssh/*_ed25519
+.ssh/*_rsa
+.ssh/*_ecdsa
+.ssh/*_dsa
+.ssh/*.pub
+
