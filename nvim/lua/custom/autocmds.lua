@@ -23,32 +23,6 @@ vim.api.nvim_create_autocmd('BufWritePre', {
   end,
 })
 
--- Terminal configuration
-vim.api.nvim_create_autocmd('TermOpen', {
-  pattern = '*',
-  callback = function()
-    -- Disable line numbers in terminal
-    vim.opt_local.number = false
-    vim.opt_local.relativenumber = false
-    vim.opt_local.signcolumn = 'no'
-
-    -- WARNING: DO NOT add 'startinsert' here!
-    -- This autocmd runs for ALL terminals including background ones.
-    -- Adding startinsert will steal focus from whatever you're doing.
-    -- Let the specific terminal creation code handle insert mode.
-
-    -- Set terminal buffer options
-    vim.opt_local.scrollback = 10000
-
-    -- Make normal mode behave more like terminal mode
-    -- This preserves the terminal's view of the scrollback
-    vim.opt_local.scrolloff = 0
-    vim.opt_local.sidescrolloff = 0
-
-    -- Don't set modifiable = false as it can interfere with DAP debugging
-  end,
-})
-
 -- Prevent treesitter from attaching to Neogit buffers entirely
 -- This addresses the root cause by stopping treesitter before it can fail
 vim.api.nvim_create_autocmd('BufNew', {
