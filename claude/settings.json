@@ -75,6 +75,7 @@
       "Bash(pnpm add:*)",
       "Write(**/*.env*)",
       "Write(**/secrets*)",
+      "Read(**/.ssh/**)",
       "Read(**/node_modules/**)"
     ],
     "deny": [
@@ -83,7 +84,6 @@
       "Read(**/secrets.*)",
       "Read(**/*secret*)",
       "Read(**/private*)",
-      "Read(**/.ssh/**)",
       "Read(**/.aws/**)",
       "Read(**/.azure/**)",
       "Bash(rm -rf /)",
