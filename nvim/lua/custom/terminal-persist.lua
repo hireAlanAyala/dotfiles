@@ -12,9 +12,31 @@ M.config = {
   attach_method = 'with-history',
 }
 
--- Define attachment method - only with-history
-M.attach_method = function(session_name)
-  return string.format('terminal ~/.config/scripts/tmux-attach-with-history.sh %s', session_name)
+-- Define attachment method using termopen for better control
+M.attach_method = function(session_name, buf_nr)
+  local socket = require('custom.socket')
+  local nvim_addr = socket.get()
+  local cmd = string.format('NVIM=%s ~/.config/scripts/tmux-attach-with-history.sh %s', nvim_addr, session_name)
+
+  -- Use termopen for terminal attachment
+  -- WARNING: Do NOT use stdout_buffered/stderr_buffered options - they are deprecated in Neovim 0.10+
+  local job_id = vim.fn.termopen(cmd)
+
+  -- Set scrollback to maximum AFTER terminal is created
+  -- WARNING: do not move into autocmd, it must be set once & early to prevent resetting the location
+  if buf_nr then
+    vim.bo[buf_nr].scrollback = 100000
+  else
+    vim.bo.scrollback = 100000
+  end
+
+  -- Update $NVIM in tmux session environment for this specific session
+  if nvim_addr and nvim_addr ~= '' then
+    -- Update environment for this specific tmux session
+    -- vim.fn.system(string.format('tmux set-environment -t %s NVIM "%s"', session_name, nvim_addr))
+  end
+
+  return job_id
 end
 
 -- Get project identifier (used for grouping sessions)
@@ -40,43 +62,6 @@ local function generate_session_name(custom_suffix)
   end
 end
 
--- Get project state file path
-local function get_project_state_file()
-  local cwd = vim.fn.getcwd()
-  return cwd .. '/' .. M.config.project_state_file
-end
-
--- Read project state
-local function read_project_state()
-  local state_file = get_project_state_file()
-  local file = io.open(state_file, 'r')
-  if not file then
-    return {}
-  end
-
-  local content = file:read '*all'
-  file:close()
-
-  local ok, state = pcall(vim.json.decode, content)
-  return ok and state or {}
-end
-
--- Write project state
-local function write_project_state(state)
-  local state_file = get_project_state_file()
-
-  -- Create directory if it doesn't exist
-  local dir = vim.fn.fnamemodify(state_file, ':h')
-  vim.fn.mkdir(dir, 'p')
-
-  local file = io.open(state_file, 'w')
-  if not file then
-    return
-  end
-
-  file:write(vim.json.encode(state))
-  file:close()
-end
 
 -- Check if tmux session exists
 local function session_exists(session_name)
@@ -98,23 +83,22 @@ function M.new_terminal(cmd, session_name, switch_to_buffer)
 
   -- Always create buffer in background first
   local buf_nr = vim.api.nvim_create_buf(true, false)
-  
-  -- Set up the terminal in the background buffer
+
+  -- Set up the terminal in the background buffer using termopen
   vim.api.nvim_buf_call(buf_nr, function()
-    local attach_cmd = M.attach_method(final_session_name)
-    vim.cmd(attach_cmd)
+    M.attach_method(final_session_name, buf_nr)
   end)
-  
+
   -- Switch to buffer if requested
   if switch_to_buffer then
     -- Set buffer in current window
     vim.cmd('buffer ' .. buf_nr)
-    
+
     vim.defer_fn(function()
       vim.cmd 'startinsert'
     end, 100)
   end
-  
+
   -- Store session info in buffer variable
   local buf_vars = vim.b[buf_nr]
   buf_vars.tmux_session = final_session_name
@@ -145,7 +129,7 @@ function M.attach_session(session_name, restore_buffer_name)
     end
 
     -- Get project state to show custom names
-    local project_state = read_project_state()
+    local project_state = require('custom.session').read_state()
     local session_choices = {}
     for _, sess in ipairs(sessions) do
       local info = project_state[sess]
@@ -171,18 +155,18 @@ function M.attach_session(session_name, restore_buffer_name)
     }, function(choice)
       if choice then
         vim.cmd 'enew'
+        local buf_nr = vim.api.nvim_get_current_buf()
 
-        -- Use attachment method
-        vim.cmd(M.attach_method(choice.value))
+        -- Use termopen attachment method
+        M.attach_method(choice.value, buf_nr)
 
         -- Store session info
-        local buf_nr = vim.api.nvim_get_current_buf()
         vim.b[buf_nr].tmux_session = choice.value
         vim.b[buf_nr].tmux_persistent = true
         vim.b[buf_nr].terminal_persist_managed = true -- Unique marker
 
         -- Restore buffer name using custom name
-        local state = read_project_state()
+        local state = require('custom.session').read_state()
         local session_info = state[choice.value]
         if session_info and session_info.custom_name then
           vim.api.nvim_buf_set_name(buf_nr, string.format('term://%s', session_info.custom_name))
@@ -193,19 +177,19 @@ function M.attach_session(session_name, restore_buffer_name)
     end)
   else
     vim.cmd 'enew'
+    local buf_nr = vim.api.nvim_get_current_buf()
 
-    -- Use attachment method
-    vim.cmd(M.attach_method(session_name))
+    -- Use termopen attachment method
+    M.attach_method(session_name, buf_nr)
 
     -- Store session info
-    local buf_nr = vim.api.nvim_get_current_buf()
     vim.b[buf_nr].tmux_session = session_name
     vim.b[buf_nr].tmux_persistent = true
     vim.b[buf_nr].terminal_persist_managed = true -- Unique marker
 
     -- Restore buffer name using custom name from state (with delay to ensure terminal is ready)
     vim.defer_fn(function()
-      local project_state = read_project_state()
+      local project_state = require('custom.session').read_state()
       local session_info = project_state[session_name]
       if session_info and session_info.custom_name then
         vim.api.nvim_buf_set_name(buf_nr, string.format('term://%s', session_info.custom_name))
@@ -222,94 +206,52 @@ function M.send_to_session(session_name, cmd)
   vim.fn.system(tmux_cmd)
 end
 
--- Track session for current project
-local function track_session(session_name, info)
-  local state = read_project_state()
-
-  -- Add or update session info
-  state[session_name] = vim.tbl_extend('force', info or {}, {
-    last_accessed = os.time(),
-    project_dir = vim.fn.getcwd(),
-  })
-
-  write_project_state(state)
-end
-
--- Untrack session
-local function untrack_session(session_name)
-  local state = read_project_state()
-  state[session_name] = nil
-  write_project_state(state)
-end
 
 -- Restore project sessions
 function M.restore_project_sessions()
-  local state = read_project_state()
+  local session = require('custom.session')
+  local state = session.read_state()
   local project_id = get_project_id()
   local restored = 0
-  local failed = 0
   local sessions_to_restore = {}
 
   -- Collect sessions belonging to this project
   for session_name, info in pairs(state) do
-    -- Check if session belongs to current project (has same prefix)
-    if session_name:sub(1, #project_id) == project_id then
-      if session_exists(session_name) then
-        restored = restored + 1
-        table.insert(sessions_to_restore, { name = session_name, info = info })
-      else
-        -- Session doesn't exist anymore, clean up
-        failed = failed + 1
+    -- Skip non-session keys (like nvim_socket)
+    if session_name ~= 'nvim_socket' and type(info) == 'table' then
+      -- Check if session belongs to current project (has same prefix)
+      if session_name:sub(1, #project_id) == project_id then
+        if session_exists(session_name) then
+          restored = restored + 1
+          table.insert(sessions_to_restore, { name = session_name, info = info })
+        end
       end
     end
   end
 
-  if failed > 0 then
-    -- Clean up dead sessions
-    local new_state = {}
-    for session_name, info in pairs(state) do
-      if session_exists(session_name) then
-        new_state[session_name] = info
-      end
-    end
-    write_project_state(new_state)
+  -- Clean up stale sessions
+  local cleaned = session.cleanup_stale()
+  if cleaned > 0 then
+    vim.notify(string.format('Cleaned up %d stale session(s)', cleaned), vim.log.levels.INFO)
   end
 
   -- Restore all matching sessions as terminal buffers
   if restored > 0 and M.config.auto_restore then
     vim.defer_fn(function()
-      -- Save current window
+      -- Save current window/buffer to return to after restoration
       local current_win = vim.api.nvim_get_current_win()
       local current_buf = vim.api.nvim_get_current_buf()
 
+      -- IMPORTANT: We reuse new_terminal() for restoration instead of duplicating logic.
+      -- This relies on generate_session_name() producing consistent names based on project ID.
+      -- If the naming scheme changes, restored sessions won't match existing tmux sessions.
+      -- The project ID is stable (based on CWD hash), so this should be safe.
       for _, session_data in ipairs(sessions_to_restore) do
-        -- Create buffer for session without switching to it
-        local buf_nr = vim.api.nvim_create_buf(true, false)
-
-        -- Set up the terminal in the background buffer
-        vim.api.nvim_buf_call(buf_nr, function()
-          -- Get the attachment command
-          local attach_cmd = M.attach_method(session_data.name)
-
-          -- Execute the terminal command in this buffer
-          vim.cmd(attach_cmd)
-        end)
-
-        -- Store session info in buffer
-        vim.b[buf_nr].tmux_session = session_data.name
-        vim.b[buf_nr].tmux_persistent = true
-        vim.b[buf_nr].terminal_persist_managed = true
-
-        -- Restore buffer name from saved state
-        -- We defer this to ensure the terminal buffer is fully initialized
-        -- and re-read state to get the most recent custom name (in case it was renamed)
-        vim.defer_fn(function()
-          local current_state = read_project_state()
-          local session_info = current_state[session_data.name]
-          if session_info and session_info.custom_name then
-            vim.api.nvim_buf_set_name(buf_nr, string.format('term://%s', session_info.custom_name))
-          end
-        end, 100)
+        local session_info = session_data.info
+        if session_info and session_info.custom_name then
+          -- Create terminal without switching to it (3rd param = false)
+          M.new_terminal(nil, session_info.custom_name, false)
+        end
       end
 
       -- Return to original buffer/window
@@ -325,12 +267,30 @@ function M.restore_project_sessions()
   return restored
 end
 
+-- Save the current socket to project state
+local function save_socket_to_state()
+  local socket = require('custom.socket').get()
+  if not socket or socket == '' then
+    return
+  end
+
+  local session = require('custom.session')
+  local state = session.read_state()
+  state.nvim_socket = socket
+  session.write_state(state)
+end
+
 -- Setup autocmds and keymaps
 function M.setup(opts)
   -- Merge config
   if opts and opts.config then
     M.config = vim.tbl_deep_extend('force', M.config, opts.config)
   end
+
+  -- Save the Neovim socket to project state on startup
+  vim.defer_fn(function()
+    save_socket_to_state()
+  end, 100)
 
   -- Auto-restore on startup
   if M.config.auto_restore then
@@ -341,6 +301,26 @@ function M.setup(opts)
 
   -- No automatic history refresh - use 'with-history' method or tmux copy mode for full history
 
+  -- Terminal configuration autocmd - consolidated settings for terminal-persist managed buffers only
+  -- prevents overriding settings for neogit & other plugin buffers/terminals
+  vim.api.nvim_create_autocmd('BufEnter', {
+    callback = function(args)
+      local buf_nr = args.buf
+      -- Only apply to terminal-persist managed buffers
+      if vim.b[buf_nr].terminal_persist_managed then
+        -- Disable line numbers and sign column for clean terminal appearance
+        vim.wo.number = false
+        vim.wo.relativenumber = false
+        vim.wo.signcolumn = 'no'
+
+        -- Make normal mode behave more like terminal mode
+        -- This preserves the terminal's view of the scrollback
+        vim.wo.scrolloff = 0
+        vim.wo.sidescrolloff = 0
+      end
+    end,
+  })
+
   -- Track sessions when created
   local original_new_terminal = M.new_terminal
   M.new_terminal = function(cmd, session_name, switch_to_buffer)
@@ -348,7 +328,7 @@ function M.setup(opts)
     if final_session_name then
       -- Get the buffer name that was set
       local buffer_name = vim.api.nvim_buf_get_name(buf_nr)
-      track_session(final_session_name, {
+      require('custom.session').track(final_session_name, {
         cmd = cmd,
         created = os.time(),
         buffer_name = buffer_name,
@@ -362,10 +342,24 @@ function M.setup(opts)
   vim.api.nvim_create_autocmd({ 'BufDelete', 'BufWipeout' }, {
     callback = function(args)
       local buf_nr = args.buf
-      -- Only handle buffers created by terminal-persist (not other terminal plugins)
-      if vim.b[buf_nr].terminal_persist_managed then
-        local session = vim.b[buf_nr].tmux_session
-        if session then
+
+      -- Check if buffer is still valid before accessing properties
+      if not vim.api.nvim_buf_is_valid(buf_nr) then
+        return
+      end
+
+      -- Safely check for buffer variables
+      local ok, buf_vars = pcall(function()
+        return vim.b[buf_nr]
+      end)
+      if not ok or not buf_vars or not buf_vars.terminal_persist_managed then
+        return
+      end
+
+      local session = buf_vars.tmux_session
+      if session then
+        -- Defer the cleanup to avoid interfering with the deletion process
+        vim.defer_fn(function()
           -- Debug: check if session exists first
           local check_result = vim.fn.system(string.format('tmux has-session -t "%s" 2>&1', session))
           local check_exit = vim.v.shell_error
@@ -375,21 +369,17 @@ function M.setup(opts)
             local result = vim.fn.system(string.format('tmux kill-session -t "%s" 2>&1', session))
             local exit_code = vim.v.shell_error
 
-            if exit_code == 0 then
-              vim.notify(string.format('Killed tmux session: %s', session))
-            else
+            -- Only notify on error, not success (to avoid screen disruption)
+            if exit_code ~= 0 then
               vim.notify(string.format('Failed to kill tmux session %s: %s', session, result))
             end
-          else
-            -- Session already dead (normal when terminal exits) - just clean up silently
-            vim.notify 'Terminal session closed'
           end
 
           -- Remove from project state regardless
-          local state = read_project_state()
+          local state = require('custom.session').read_state()
           state[session] = nil
-          write_project_state(state)
-        end
+          require('custom.session').write_state(state)
+        end, 100) -- Small delay to let buffer cleanup finish
       end
     end,
   })
@@ -408,11 +398,11 @@ function M.setup(opts)
 
           if custom_name then
             -- Update the state with new custom name
-            local state = read_project_state()
+            local state = require('custom.session').read_state()
             if state[session] then
               state[session].custom_name = custom_name
               state[session].buffer_name = new_name
-              write_project_state(state)
+              require('custom.session').write_state(state)
             end
           end
         end
@@ -424,15 +414,104 @@ function M.setup(opts)
   vim.api.nvim_create_autocmd('VimLeavePre', {
     callback = function()
       -- Update last accessed time for all tracked sessions
-      local state = read_project_state()
+      local state = require('custom.session').read_state()
       for session_name, info in pairs(state) do
         if session_exists(session_name) then
           info.last_accessed = os.time()
         end
       end
-      write_project_state(state)
+      require('custom.session').write_state(state)
     end,
   })
+end
+
+-- TEST ORIGINAL: Current approach (for comparison)
+function M.test_original_attach(session_name)
+  vim.cmd 'enew'
+  local buf = vim.api.nvim_get_current_buf()
+
+  -- Use default scrollback (10000) like original
+  -- vim.bo[buf].scrollback = 10000  -- This is the default, so we don't need to set it
+
+  -- Use the current attach method
+  vim.cmd(M.attach_method(session_name))
+
+  vim.b[buf].tmux_session = session_name
+  vim.b[buf].tmux_persistent = true
+  vim.b[buf].terminal_persist_managed = true
+  vim.cmd 'startinsert'
+  vim.notify 'Testing Original: Current approach with default scrollback=10000'
+end
+
+-- TEST OPTION 2: PTY Buffer - Unbuffered output
+function M.test_option2_attach(session_name)
+  vim.cmd 'enew'
+  local buf = vim.api.nvim_get_current_buf()
+
+  -- Set scrollback limit higher
+  vim.bo[buf].scrollback = 100000
+
+  -- Use termopen to attach to tmux session
+  -- WARNING: Do NOT use stdout_buffered/stderr_buffered options - they are deprecated in Neovim 0.10+
+  local socket = require('custom.socket')
+  vim.fn.termopen(string.format('NVIM=%s ~/.config/scripts/tmux-attach-with-history.sh %s', socket.get(), session_name))
+
+  vim.b[buf].tmux_session = session_name
+  vim.b[buf].tmux_persistent = true
+  vim.b[buf].terminal_persist_managed = true
+  vim.cmd 'startinsert'
+  vim.notify 'Testing Option 2: Unbuffered PTY output'
+end
+
+-- TEST OPTION 4: Rate limiting with c0-change settings
+function M.test_option4_attach(session_name)
+  -- First set tmux c0-change options
+  vim.fn.system(string.format('tmux set-option -t %s c0-change-interval 50', session_name))
+  vim.fn.system(string.format('tmux set-option -t %s c0-change-trigger 250', session_name))
+
+  vim.cmd 'enew'
+  local buf = vim.api.nvim_get_current_buf()
+
+  -- Set scrollback limit higher
+  vim.bo[buf].scrollback = 100000
+
+  local socket = require('custom.socket')
+  vim.fn.termopen(string.format('NVIM=%s ~/.config/scripts/tmux-attach-with-history.sh %s', socket.get(), session_name))
+
+  vim.b[buf].tmux_session = session_name
+  vim.b[buf].tmux_persistent = true
+  vim.b[buf].terminal_persist_managed = true
+  vim.cmd 'startinsert'
+  vim.notify 'Testing Option 4: Tmux c0-change throttling'
+end
+
+-- TEST OPTION 7: Explicit output handlers
+function M.test_option7_attach(session_name)
+  vim.cmd 'enew'
+  local buf = vim.api.nvim_get_current_buf()
+
+  -- Set scrollback limit higher
+  vim.bo[buf].scrollback = 100000
+
+  -- Use termopen with explicit handlers to ensure all output is captured
+  local socket = require('custom.socket')
+  vim.fn.termopen(string.format('NVIM=%s ~/.config/scripts/tmux-attach-with-history.sh %s', socket.get(), session_name), {
+    -- Explicitly handle all output
+    on_stdout = function(_, data, _)
+      -- Default handler, but explicitly set
+      -- This ensures we're not accidentally filtering
+      return false -- Let default handler process
+    end,
+    on_stderr = function(_, data, _)
+      return false -- Let default handler process
+    end,
+  })
+
+  vim.b[buf].tmux_session = session_name
+  vim.b[buf].tmux_persistent = true
+  vim.b[buf].terminal_persist_managed = true
+  vim.cmd 'startinsert'
+  vim.notify 'Testing Option 7: Explicit output handlers'
 end
 
 return M
