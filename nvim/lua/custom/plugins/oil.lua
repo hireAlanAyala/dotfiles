@@ -371,19 +371,25 @@ return {
   keys = {
     { '-', function() 
       local oil = require('oil')
-      local current_dir = oil.get_current_dir()
       
-      -- If we're in an invalid oil buffer (like v:null), go to cwd or last visited directory
-      if not current_dir or current_dir:match('v:null') then
-        -- Try to get the last visited directory from global variable or use cwd
-        local last_dir = vim.g.oil_last_dir or vim.fn.getcwd()
-        oil.open(last_dir)
-      else
-        -- Store current directory as last visited
-        vim.g.oil_last_dir = current_dir
+      -- If we're in an oil buffer, use oil.open() to go to parent
+      if vim.bo.filetype == 'oil' then
         oil.open()
+      else
+        -- Get the directory of the current file
+        local current_file = vim.fn.expand('%:p:h')
+        
+        -- Check if we're in a terminal buffer or if the path is invalid
+        if vim.bo.buftype == 'terminal' or current_file == '' or current_file:match('term://') then
+          -- Use the last visited oil directory or current working directory
+          local fallback_dir = vim.g.oil_last_dir or vim.fn.getcwd()
+          oil.open(fallback_dir)
+        else
+          -- Open oil at the current file's directory
+          oil.open(current_file)
+        end
       end
-    end, desc = 'Open parent directory', mode = 'n' },
+    end, desc = 'Open file explorer', mode = 'n' },
     { '<C-\\>-', function() 
       local oil = require('oil')
       local current_dir = oil.get_current_dir()
