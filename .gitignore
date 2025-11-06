@@ -28,3 +28,7 @@ go/telemetry/
 .ssh/*_dsa
 .ssh/*.pub
 
+# Home-manager nix store symlinks (auto-generated)
+git/config
+tmux/tmux.conf
+
