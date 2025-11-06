@@ -127,7 +127,11 @@ return {
       }),
     })
 
-    cmp.setup.cmdline('/', {
+    cmp.setup.cmdline({ '/', '?' }, {
+      mapping = cmp.mapping.preset.cmdline {
+        ['<C-n>'] = cmp.mapping.select_next_item(),
+        ['<C-p>'] = cmp.mapping.select_prev_item(),
+      },
       sources = {
         { name = 'buffer' },
       },
