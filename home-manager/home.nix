@@ -27,13 +27,12 @@
     (callPackage ../derivations/discordo.nix { })
     (callPackage ../derivations/extract-otp-secrets.nix { })
     (callPackage ../derivations/mcp-chrome-bridge.nix { })
-    (callPackage ../derivations/claude.nix { })
     (writeShellScriptBin "show-2fa" (builtins.readFile ../scripts/show_all_2fa.sh))
     (writeShellScriptBin "hm" (builtins.readFile ../scripts/hm.sh))
     #(writeShellScriptBin "mouse-jiggle" (builtins.readFile ../scripts/mouse-jiggle.sh))
 
     # core
-    gcc
+    # gcc  # Using system gcc for better CGO compatibility
     unzip
 
     # ai
@@ -41,8 +40,8 @@
     ollama
 
     # Development languages and runtimes
-    go
-    nodejs_22
+    # go  # Using system Go for better CGO/OpenCV compatibility
+    # nodejs_22  # Using Arch's nodejs instead for npm global install flexibility
     python3Packages.git-filter-repo
     temurin-bin # java openJDK
     jbang
@@ -52,12 +51,12 @@
     rustc
     cargo
 
-    # Node.js ecosystem
-    nodePackages.typescript
-    nodePackages.typescript-language-server
-    nodePackages.nodemon
-    pnpm
-    yarn-berry
+    # Node.js ecosystem (managed via Arch's npm now)
+    # nodePackages.typescript
+    # nodePackages.typescript-language-server
+    # nodePackages.nodemon
+    # pnpm  # install via: npm i -g pnpm
+    # yarn-berry  # install via: npm i -g yarn
 
     # .NET ecosystem
     dotnetCorePackages.dotnet_8.sdk
@@ -133,14 +132,14 @@
 
   home.file = { };
 
-  sops = {
-    defaultSopsFile = ../secrets.yaml;
-    gnupg.home = "${config.home.homeDirectory}/.gnupg";
-    secrets = {
-      # keys to decrypt
-      hpg_plus_supabase_access_token = { };
-    };
-  };
+  # sops = {
+  #   defaultSopsFile = ../secrets.yaml;
+  #   gnupg.home = "${config.home.homeDirectory}/.gnupg";
+  #   secrets = {
+  #     # keys to decrypt
+  #     hpg_plus_supabase_access_token = { };
+  #   };
+  # };
 
   # GPG configuration for SOPS automation
   programs.gpg = {
@@ -168,8 +167,8 @@
     # not the whole system
     SHELL = "${pkgs.zsh}/bin/zsh";
 
-    # API keys from SOPS secrets
-    HPG_PLUS_SUPABASE_ACCESS_TOKEN = "$(cat ${config.sops.secrets.hpg_plus_supabase_access_token.path})";
+    # API keys from SOPS secrets (disabled until sops is configured)
+    # HPG_PLUS_SUPABASE_ACCESS_TOKEN = "$(cat ${config.sops.secrets.hpg_plus_supabase_access_token.path})";
   };
 
   home.sessionPath = [
