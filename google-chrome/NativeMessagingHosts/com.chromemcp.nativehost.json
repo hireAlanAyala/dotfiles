@@ -1,7 +1,7 @@
 {
   "name": "com.chromemcp.nativehost",
   "description": "Node.js Host for Browser Bridge Extension",
-  "path": "/home/developer/.npm-global/lib/node_modules/mcp-chrome-bridge/dist/run_host.sh",
+  "path": "/home/walker/.npm-global/lib/node_modules/mcp-chrome-bridge/dist/run_host.sh",
   "type": "stdio",
   "allowed_origins": [
     "chrome-extension://hbdgbgagpkpjffpklnamcljpakneikee/"

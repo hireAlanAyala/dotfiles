@@ -1,2 +1,2 @@
-powershell.exe -command "Get-Clipboard"
+wl-paste
 

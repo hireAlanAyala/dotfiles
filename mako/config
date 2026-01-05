@@ -1,0 +1,29 @@
+# theme
+text-color=#FFB000
+border-color=#CC9900
+background-color=#1A1612
+
+anchor=top-center
+default-timeout=5000
+width=420
+height=110
+outer-margin=5
+padding=10
+border-size=2
+icons=0
+font=FiraCode Nerd Font 12
+max-visible=5
+max-history=100
+
+# Disable "X notifications hidden" message (visible during screen recording)
+[hidden]
+format=
+
+[mode=do-not-disturb]
+invisible=true
+
+[mode=do-not-disturb app-name=notify-send]
+invisible=false
+
+[urgency=critical]
+default-timeout=0

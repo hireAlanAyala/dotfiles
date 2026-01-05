@@ -1,0 +1,20 @@
+# Atuin configuration
+# See https://docs.atuin.sh/configuration/config/
+
+# Search mode: fuzzy, fulltext, prefix, skim
+search_mode = "fuzzy"
+
+# Up arrow = session-local history only
+filter_mode_shell_up_key_binding = "session"
+
+# Ctrl-R = search all history (global)
+filter_mode = "global"
+
+# Show preview of full command
+show_preview = true
+
+# Inline height (0 = fullscreen TUI)
+inline_height = 20
+
+# Don't sync to remote server
+auto_sync = false

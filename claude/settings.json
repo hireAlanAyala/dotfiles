@@ -1,10 +1,10 @@
 {
+  "env": {
+    "DISABLE_TELEMETRY": "1",
+    "CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL": "1"
+  },
   "includeCoAuthoredBy": false,
-  "enableAllProjectMcpServers": true,
   "permissions": {
-    "additionalDirectories": [
-      "~/.config"
-    ],
     "allow": [
       "Bash(npm run :*)",
       "Bash(pnpm run :*)",
@@ -62,6 +62,19 @@
       "Read(**/.gitignore)",
       "TodoWrite"
     ],
+    "deny": [
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(**/secrets.*)",
+      "Read(**/*secret*)",
+      "Read(**/private*)",
+      "Read(**/.aws/**)",
+      "Read(**/.azure/**)",
+      "Bash(rm -rf /)",
+      "Bash(sudo rm -rf:*)",
+      "Bash(chmod 777 :*)",
+      "Bash(chmod -R 777 .)"
+    ],
     "ask": [
       "Bash(git push:*)",
       "Bash(rm :*)",
@@ -78,22 +91,16 @@
       "Read(**/.ssh/**)",
       "Read(**/node_modules/**)"
     ],
-    "deny": [
-      "Read(**/.env)",
-      "Read(**/.env.*)",
-      "Read(**/secrets.*)",
-      "Read(**/*secret*)",
-      "Read(**/private*)",
-      "Read(**/.aws/**)",
-      "Read(**/.azure/**)",
-      "Bash(rm -rf /)",
-      "Bash(sudo rm -rf:*)",
-      "Bash(chmod 777 :*)",
-      "Bash(chmod -R 777 .)"
+    "additionalDirectories": [
+      "~/.config"
     ]
   },
-  "env": {
-    "DISABLE_TELEMETRY": 1,
-    "CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL": 1
-  }
+  "enableAllProjectMcpServers": true,
+  "enabledPlugins": {
+    "lua-lsp@claude-plugins-official": true,
+    "typescript-lsp@claude-plugins-official": true,
+    "gopls-lsp@claude-plugins-official": true,
+    "pyright-lsp@claude-plugins-official": true
+  },
+  "alwaysThinkingEnabled": true
 }

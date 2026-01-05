@@ -1,0 +1,18 @@
+<user-mapping>
+    <!--
+    IMPORTANT: Change the password before exposing to the internet!
+    You can use MD5 hash: echo -n "yourpassword" | md5sum
+    Then use: <param name="password" class="md5">hash_here</param>
+    -->
+    <authorize username="walker" password="changeme">
+        <connection name="Hyprland Desktop">
+            <protocol>vnc</protocol>
+            <param name="hostname">host.containers.internal</param>
+            <param name="port">5900</param>
+            <!-- Performance tuning -->
+            <param name="color-depth">16</param>
+            <param name="enable-audio">false</param>
+            <param name="clipboard-encoding">UTF-8</param>
+        </connection>
+    </authorize>
+</user-mapping>
