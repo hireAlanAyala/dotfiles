@@ -22,9 +22,6 @@ return {
       max_height = 0.9,
       min_height = { 5, 0.1 },
       border = 'rounded',
-      win_options = {
-        winblend = 0,
-      },
     },
     view_options = {
       show_hidden = true,
@@ -366,6 +363,147 @@ return {
           require('oil').open(vim.fn.getcwd())
         end
       end,
+    })
+
+    -- Image extensions for preview
+    local image_extensions = { 'png', 'jpg', 'jpeg', 'gif', 'webp', 'avif' }
+    local function is_image(filename)
+      local ext = filename:match('%.([^%.]+)$')
+      if ext then
+        ext = ext:lower()
+        for _, img_ext in ipairs(image_extensions) do
+          if ext == img_ext then return true end
+        end
+      end
+      return false
+    end
+
+    -- Track image preview state
+    local image_preview_state = {
+      image = nil,
+      win = nil,
+      buf = nil,
+      last_file = nil,
+    }
+
+    local function close_image_preview()
+      if image_preview_state.image then
+        pcall(function() image_preview_state.image:clear() end)
+        image_preview_state.image = nil
+      end
+      if image_preview_state.win and vim.api.nvim_win_is_valid(image_preview_state.win) then
+        vim.api.nvim_win_close(image_preview_state.win, true)
+      end
+      image_preview_state.win = nil
+      if image_preview_state.buf and vim.api.nvim_buf_is_valid(image_preview_state.buf) then
+        vim.api.nvim_buf_delete(image_preview_state.buf, { force = true })
+      end
+      image_preview_state.buf = nil
+      image_preview_state.last_file = nil
+    end
+
+    local function open_image_preview(filepath)
+      -- Skip if same file
+      if image_preview_state.last_file == filepath then
+        return
+      end
+
+      local ok, image_api = pcall(require, 'image')
+      if not ok then return end
+
+      -- Close any existing oil preview first
+      local oil_util_ok, oil_util = pcall(require, 'oil.util')
+      if oil_util_ok then
+        local oil_preview_win = oil_util.get_preview_win()
+        if oil_preview_win and vim.api.nvim_win_is_valid(oil_preview_win) then
+          pcall(vim.api.nvim_win_close, oil_preview_win, true)
+        end
+      end
+
+      -- Close previous image preview
+      close_image_preview()
+
+      -- Get oil window dimensions for positioning
+      local oil_win = vim.api.nvim_get_current_win()
+      local oil_width = vim.api.nvim_win_get_width(oil_win)
+
+      -- Create preview buffer
+      local buf = vim.api.nvim_create_buf(false, true)
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, { '' })
+
+      -- Calculate window size - maximize available space
+      -- Leave space for oil buffer on the left
+      local width = math.max(20, vim.o.columns - oil_width - 4)
+      local height = math.max(10, vim.o.lines - 4)
+      local col = math.min(oil_width + 2, vim.o.columns - width - 2)
+      local row = 1
+
+      -- Create floating window (not a preview window to avoid conflicts)
+      local win = vim.api.nvim_open_win(buf, false, {
+        relative = 'editor',
+        width = width,
+        height = height,
+        col = col,
+        row = row,
+        style = 'minimal',
+        border = 'rounded',
+        title = ' ' .. vim.fn.fnamemodify(filepath, ':t') .. ' ',
+        title_pos = 'center',
+      })
+
+      image_preview_state.win = win
+      image_preview_state.buf = buf
+      image_preview_state.last_file = filepath
+
+      -- Render image
+      vim.defer_fn(function()
+        if vim.api.nvim_win_is_valid(win) then
+          image_preview_state.image = image_api.hijack_buffer(filepath, win, buf)
+        end
+      end, 10)
+    end
+
+    -- Debounce timer for preview
+    local preview_timer = nil
+
+    -- Auto-preview files when cursor moves in oil buffer
+    vim.api.nvim_create_autocmd('CursorMoved', {
+      pattern = 'oil://*',
+      callback = function()
+        -- Debounce rapid cursor movements
+        if preview_timer then
+          vim.fn.timer_stop(preview_timer)
+        end
+
+        preview_timer = vim.fn.timer_start(50, function()
+          preview_timer = nil
+          vim.schedule(function()
+            local oil = require('oil')
+            local entry = oil.get_cursor_entry()
+            if not entry or entry.type ~= 'file' then
+              close_image_preview()
+              return
+            end
+
+            local current_dir = oil.get_current_dir()
+            if not current_dir then return end
+            local filepath = current_dir .. entry.name
+
+            if is_image(entry.name) then
+              open_image_preview(filepath)
+            else
+              close_image_preview()
+              oil.open_preview()
+            end
+          end)
+        end)
+      end,
+    })
+
+    -- Clean up image preview when leaving oil buffer
+    vim.api.nvim_create_autocmd('BufLeave', {
+      pattern = 'oil://*',
+      callback = close_image_preview,
     })
   end,
   keys = {
