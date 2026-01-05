@@ -28,7 +28,7 @@ echo "✅ Flake inputs updated"
 
 # Apply Home Manager configuration using flakes
 echo "=== Applying Home Manager configuration ==="
-nix run home-manager/master -- switch --flake .#developer -b backup
+nix run home-manager/master -- switch --flake .#walker -b backup
 echo "✅ Home Manager configuration applied"
 
 # Source home-manager environment
@@ -41,5 +41,5 @@ echo ""
 echo "🎉 Home Manager setup complete!"
 echo ""
 echo "📝 To update your configuration in the future:"
-echo "  cd ~/.config && git pull && home-manager switch --flake .#developer"
+echo "  cd ~/.config && git pull && home-manager switch --flake .#walker"
 echo ""

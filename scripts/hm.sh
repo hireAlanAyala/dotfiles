@@ -4,7 +4,7 @@
 echo "Current login shell: $(getent passwd $(whoami) | cut -d: -f7)"
 cd ~/.config || exit 1
 git add .
-home-manager switch --flake "./home-manager#developer"
+home-manager switch --flake "./home-manager#walker"
 
 if [ $? -eq 0 ]; then
     # Only source .zshrc if we're actually in zsh
