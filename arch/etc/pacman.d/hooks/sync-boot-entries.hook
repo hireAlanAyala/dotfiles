@@ -1,0 +1,11 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = linux
+Target = intel-ucode
+
+[Action]
+Description = Syncing boot entries from dotfiles...
+When = PostTransaction
+Exec = /usr/bin/cp /home/walker/.config/arch/etc/boot/loader/entries/arch.conf /boot/loader/entries/arch.conf

@@ -1,0 +1,6 @@
+[Unit]
+Description=Clean stale user data
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/cache-cleanup

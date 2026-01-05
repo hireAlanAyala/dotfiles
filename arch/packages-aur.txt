@@ -1,0 +1,10 @@
+admesh
+bambustudio-bin
+dtach
+microsoft-edge-stable-bin
+mpvpaper
+pipe-viewer-git
+sunshine
+walker
+yay-bin
+yay-bin-debug

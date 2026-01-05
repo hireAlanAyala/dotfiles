@@ -15,7 +15,7 @@ gh/
 
 # Tool-specific sensitive data
 pulse/
-systemd/
+/systemd/
 sops-nix/secrets
 
 # Go telemetry data
@@ -36,3 +36,28 @@ tmux/tmux.conf
 derivations/
 github-copilot/
 
+# apps
+chromium
+QtProject.conf
+microsoft-edge/
+BambuStudio/
+OpenSCAD/
+kicad/
+pipe-viewer/
+xournalpp/
+mise/
+
+# Runtime state/binaries
+dconf/user
+elephant/providers/*.so
+pavucontrol.ini
+mimeapps.list
+tmp
+
+# Sunshine runtime
+sunshine/sunshine.log
+sunshine/sunshine_state.json
+sunshine/credentials/
+
+# XDG generated
+menus/

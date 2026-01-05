@@ -1,0 +1,79 @@
+# Arch Linux system configuration
+# Run `just` to see available recipes
+
+set shell := ["bash", "-euo", "pipefail", "-c"]
+set quiet
+
+dir := justfile_directory()
+
+# Full system setup
+all: etc sudoers systemd firewall
+
+# /etc symlinks and configs
+# Only tracks customized configs - the rest of /etc stays system-managed
+etc:
+    sudo cp "{{dir}}/etc/pacman.conf" /etc/pacman.conf
+    sudo mkdir -p /etc/boot /etc/pacman.d /etc/systemd
+    sudo ln -sfn "{{dir}}/etc/bluetooth" /etc/bluetooth
+    sudo ln -sfn "{{dir}}/etc/boot/loader" /etc/boot/loader
+    sudo ln -sfn "{{dir}}/etc/pacman.d/hooks" /etc/pacman.d/hooks
+    sudo ln -sf "{{dir}}/etc/systemd/zram-generator.conf" /etc/systemd/zram-generator.conf
+    sudo ln -sfn "{{dir}}/etc/tlp" /etc/tlp
+
+# Allow wheel group to use sudo
+# Generated instead of symlinked to avoid tracking root-owned files in git
+sudoers:
+    echo '%wheel ALL=(ALL:ALL) ALL' | sudo tee /etc/sudoers.d/wheel > /dev/null
+    sudo chmod 440 /etc/sudoers.d/wheel
+
+# Systemd services (system + user)
+systemd: systemd-symlinks systemd-system systemd-user
+
+# Symlink user units
+systemd-symlinks:
+    mkdir -p ~/.config/systemd/user
+    ln -sf "{{dir}}"/systemd/user/*.{service,timer} ~/.config/systemd/user/
+    systemctl --user daemon-reload
+
+# Enable system services
+systemd-system:
+    -sudo systemctl disable --now NetworkManager
+    sudo systemctl enable --now iwd systemd-networkd systemd-resolved
+    sudo ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+    sudo systemctl enable --now bluetooth fstrim.timer earlyoom tlp.service reflector.timer ufw
+    -sudo systemctl mask systemd-rfkill.service systemd-rfkill.socket
+
+# Enable user services
+systemd-user:
+    systemctl --user enable pipewire pipewire-pulse wireplumber p11-kit-server.socket
+    systemctl --user enable elephant.service battery-monitor.timer pipewire-session-manager.service cache-cleanup.timer
+
+# UFW firewall rules
+firewall:
+    sudo ufw default deny incoming
+    sudo ufw default allow outgoing
+    sudo ufw allow 53317/udp
+    sudo ufw allow 53317/tcp
+    sudo ufw allow in proto udp from 172.16.0.0/12 to 172.17.0.1 port 53 comment 'allow-docker-dns'
+    sudo ufw --force enable
+
+# Docker UFW integration (run after docker installed)
+firewall-docker:
+    sudo ufw-docker install
+    sudo ufw reload
+
+# Install official repo packages
+packages:
+    grep -v '^#\|^\s*$' "{{dir}}/packages-pacman.txt" | sudo pacman -S --needed -
+
+# Install AUR packages (requires yay)
+packages-aur:
+    grep -v '^#\|^\s*$' "{{dir}}/packages-aur.txt" | yay -S --needed -
+
+# Install all packages (pacman + AUR)
+packages-all: packages packages-aur
+
+# Show what will be linked
+check:
+    @echo "etc: pacman.conf bluetooth boot/loader pacman.d/hooks systemd/zram-generator.conf tlp"
+    @echo "systemd/user:" && ls "{{dir}}/systemd/user/"

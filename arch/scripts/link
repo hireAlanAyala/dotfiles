@@ -1,0 +1,25 @@
+#!/bin/bash
+# Create symlink and log it
+# Usage: link <target> <linkname>
+
+set -euo pipefail
+
+if [[ $# -ne 2 ]]; then
+    echo "Usage: link <target> <linkname>"
+    echo "Example: link ~/.config/arch/etc/foo /etc/foo"
+    exit 1
+fi
+
+target="$1"
+linkname="$2"
+logfile="$HOME/.config/arch/symlinks.txt"
+
+# Use sudo if linking to system location
+if [[ "$linkname" == /etc/* || "$linkname" == /usr/* ]]; then
+    sudo ln -sfn "$target" "$linkname"
+else
+    ln -sfn "$target" "$linkname"
+fi
+
+echo "$linkname → $target" >> "$logfile"
+echo "Linked: $linkname → $target"
