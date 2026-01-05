@@ -32,18 +32,16 @@ vim.keymap.set('n', '<C-k>', '<cmd>TmuxNavigateUp<cr>', { desc = 'Navigate up (n
 -- Terminal persist keymaps
 local terminal_persist = require 'custom.terminal-persist'
 vim.keymap.set('n', '<leader>tn', function()
-  vim.ui.input({ prompt = 'Terminal name: ' }, function(name)
-    if name and name ~= '' then
-      terminal_persist.new_terminal(nil, name, true)
-    elseif name == '' then
+  vim.ui.input({ prompt = 'Terminal name: ' }, function(input)
+    if not input then return end
+    if input == '' then
       vim.notify('Terminal name is required', vim.log.levels.WARN)
+      return
     end
+    local name, cmd = input:match '^(.-)  (.+)$'
+    terminal_persist.new(name or input, true, cmd)
   end)
 end, { desc = 'new persistent terminal' })
-
-vim.keymap.set('n', '<leader>ac', function()
-  terminal_persist.new_terminal('claude /commit', 'commits', true)
-end, { desc = 'commit' })
 
 -- Task runner keymaps (lazy loaded to avoid telescope dependency issues)
 vim.keymap.set('n', '<leader>tt', function()
@@ -82,20 +80,3 @@ vim.keymap.set('n', 'gx', function()
 end, { desc = 'Open file or URL under cursor' })
 
 -- CSV Viewer - automatically opens CSV files in special viewer format
-
--- TEST COMMANDS for scrollback options
-vim.api.nvim_create_user_command('TestOriginal', function()
-  terminal_persist.test_original_attach('_config_c858e7_claude_scrollback')
-end, { desc = 'Test Original: Current approach with scrollback=10000' })
-
-vim.api.nvim_create_user_command('TestOption2', function()
-  terminal_persist.test_option2_attach('_config_c858e7_claude_scrollback')
-end, { desc = 'Test Option 2: Unbuffered PTY output' })
-
-vim.api.nvim_create_user_command('TestOption4', function()
-  terminal_persist.test_option4_attach('_config_c858e7_claude_scrollback')
-end, { desc = 'Test Option 4: Tmux c0-change throttling' })
-
-vim.api.nvim_create_user_command('TestOption7', function()
-  terminal_persist.test_option7_attach('_config_c858e7_claude_scrollback')
-end, { desc = 'Test Option 7: Explicit output handlers' })
