@@ -24,10 +24,12 @@ export GPG_TTY
 # use esc to enter vi mode
 set -o vi
 
-# Enable zle and bind Ctrl+V to edit command line in editor
-autoload -U edit-command-line
-zle -N edit-command-line
-bindkey '^e' edit-command-line
+# Enable zle and bind Ctrl+E to edit command line in editor
+if [[ -o interactive ]]; then
+    autoload -U edit-command-line
+    zle -N edit-command-line
+    bindkey '^e' edit-command-line
+fi
 
 export VISUAL=nvim
 
@@ -42,13 +44,19 @@ if [[ -z "$TMUX" ]]; then
 fi
 
 # ---------------------- Aliases ------------------------
-alias fd='fd --hidden --no-ignore'
-alias v="nvim"
+alias battery='cat /sys/class/power_supply/BAT0/capacity'
+alias keyboard='upower -i /org/freedesktop/UPower/devices/keyboard_dev_E4_EC_E9_C1_11_5B | grep percentage'
+
+alias cls='printf "\e[2J\e[3J\e[H"'
 alias path="echo -e ${PATH//:/\\n}"
 alias fucking='sudo env "PATH=$PATH"'
 alias sshgen="bash ~/.config/.ssh/generate_ssh_key.sh"
 alias gpg-restart="pkill -f gpg-agent; pkill -f gpg; gpg-connect-agent /bye"
 alias 2fa="show-2fa"
+
+alias v="nvim"
+alias c="~/.config/scripts/c"
+alias fd='fd --hidden --no-ignore'
 alias tinit="~/.config/tmux/tmux-init.sh"
 alias nvim-control="$HOME/.config/scripts/nvim-control.sh"
 
@@ -135,6 +143,12 @@ fi
 # allows nix to apply shell packages when I cd into a repo with nix as the package manager
 eval "$(direnv hook zsh)"
 
+# mise - polyglot runtime manager (node, python, etc)
+eval "$(mise activate zsh)"
+
+# Allow Node to require() global npm packages
+export NODE_PATH="$HOME/.npm-global/lib/node_modules"
+
 # History options should be set in .zshrc and after oh-my-zsh sourcing.
 # See https://github.com/nix-community/home-manager/issues/177.
 HISTSIZE="10000"
@@ -144,12 +158,13 @@ HISTFILE="$HOME/.zsh_history"
 mkdir -p "$(dirname "$HISTFILE")"
 
 setopt HIST_FCNTL_LOCK
-unsetopt APPEND_HISTORY
+setopt APPEND_HISTORY
+setopt INC_APPEND_HISTORY
 setopt HIST_IGNORE_DUPS
 unsetopt HIST_IGNORE_ALL_DUPS
 setopt HIST_IGNORE_SPACE
 unsetopt HIST_EXPIRE_DUPS_FIRST
-setopt SHARE_HISTORY
+unsetopt SHARE_HISTORY
 setopt EXTENDED_HISTORY
 
 # allows terminal emulator to show true color
@@ -159,3 +174,18 @@ autoload -U colors && colors
 
 # Docker Desktop Socket
 export DOCKER_HOST=unix://$HOME/.docker/desktop/docker.sock
+
+# Starship prompt
+eval "$(starship init zsh)"
+
+# Atuin - shell history manager
+# Vanilla zsh has no concept of "session" - all shells share one history file with interleaved commands.
+# Atuin tracks session metadata, so up arrow = current session only, ctrl-r = search all history.
+eval "$(atuin init zsh)"
+
+# Use clean environment for yay to avoid Nix linker conflicts
+# Nix adds its own linker to PATH which can't find Arch libraries during AUR builds
+# This ensures AUR packages link against system glibc, not Nix's
+yay() {
+    PATH="/usr/bin:/usr/local/bin:$HOME/.local/bin" command yay "$@"
+}

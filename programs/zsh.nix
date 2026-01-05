@@ -12,5 +12,11 @@
       plugins = [ "git" "vi-mode" "web-search" ];
     };
     initContent = builtins.readFile ../zsh/init_extra.zsh;
+    profileExtra = ''
+      # Auto-start Hyprland via uwsm on TTY1
+      if [ -z "$DISPLAY" ] && [ "$XDG_VTNR" = 1 ]; then
+        exec uwsm start hyprland-uwsm.desktop
+      fi
+    '';
   };
 }
