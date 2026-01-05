@@ -220,6 +220,86 @@ end
 
 local previewers = require 'telescope.previewers'
 local utils = require 'telescope.utils'
+local from_entry = require 'telescope.from_entry'
+
+-- Image preview support using image.nvim with Kitty protocol
+local supported_images = { 'png', 'jpg', 'jpeg', 'gif', 'webp', 'avif' }
+
+local function is_image_file(filepath)
+  local ext = filepath:match '%.([^%.]+)$'
+  if ext then
+    ext = ext:lower()
+    for _, supported in ipairs(supported_images) do
+      if ext == supported then
+        return true
+      end
+    end
+  end
+  return false
+end
+
+-- Track current preview image for cleanup
+local current_preview_image = nil
+
+-- Custom buffer previewer with image support
+local buffer_previewer_with_images = function(opts)
+  opts = opts or {}
+  local default_previewer = previewers.buffer_previewer_maker
+
+  return function(filepath, bufnr, preview_opts)
+    -- Clear previous image if exists
+    if current_preview_image then
+      pcall(function()
+        current_preview_image:clear()
+      end)
+      current_preview_image = nil
+    end
+
+    if is_image_file(filepath) then
+      local ok, image_api = pcall(require, 'image')
+      if ok then
+        -- Clear all images first
+        pcall(function()
+          for _, img in ipairs(image_api.get_images()) do
+            img:clear()
+          end
+        end)
+
+        -- Make buffer modifiable temporarily
+        vim.api.nvim_buf_set_option(bufnr, 'modifiable', true)
+        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { '' })
+
+        -- Defer image rendering to allow telescope preview window to be ready
+        vim.defer_fn(function()
+          -- Find the preview window
+          local preview_win = nil
+          for _, win in ipairs(vim.api.nvim_list_wins()) do
+            if vim.api.nvim_win_get_buf(win) == bufnr then
+              preview_win = win
+              break
+            end
+          end
+
+          if preview_win and vim.api.nvim_win_is_valid(preview_win) then
+            pcall(function()
+              current_preview_image = image_api.hijack_buffer(filepath, preview_win, bufnr)
+            end)
+          end
+        end, 50)
+      else
+        -- Fallback: show file info
+        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {
+          '',
+          '  Image: ' .. vim.fn.fnamemodify(filepath, ':t'),
+          '',
+          '  (image.nvim not loaded)',
+        })
+      end
+    else
+      default_previewer(filepath, bufnr, preview_opts)
+    end
+  end
+end
 
 -- local function git_history_search(opts)
 --   opts = opts or {}
@@ -305,6 +385,7 @@ require('telescope').setup {
   --  All the info you're looking for is in `:help telescope.setup()`
   --
   defaults = {
+    buffer_previewer_maker = buffer_previewer_with_images(),
     mappings = {
       n = {
         ['n'] = 'move_selection_next',
@@ -404,8 +485,8 @@ pcall(require('telescope').load_extension, 'ui-select')
 pcall(require('telescope').load_extension, 'live_grep_args')
 pcall(require('telescope').load_extension, 'media_files')
 
--- Setup telescope keymaps
-require('config.keymaps').setup_telescope_keymaps()
+-- Setup telescope keymaps (disabled - using fzf-lua now)
+-- require('config.keymaps').setup_telescope_keymaps()
 
 -- Helper to run tmux commands on parent server (non-nested)
 local function parent_tmux(cmd)

@@ -3,7 +3,7 @@
 -- <leader>g - Git (git status, blame, diff, commits)
 -- <leader>l - LSP/Language (code actions, diagnostics, formatting)
 -- <leader>s - Search (grep, find and replace, symbols)
--- <leader>b - Buffers (buffer navigation, close, list)
+-- <leader>b - Browser/Buffers (browser dev tools, buffer operations)
 -- <leader>t - Terminal (terminal operations)
 -- <leader>d - Debug/Diagnostics (DAP, error navigation)
 -- <leader>c - Code (commenting, refactoring, snippets)
@@ -154,9 +154,9 @@ M.setup = function()
   -- Search - <leader>s
   -- Search keymaps are configured in telescope plugin setup
 
-  -- Buffers - <leader>b
-  map('n', '<leader>bd', '<cmd>bdelete<CR>', { desc = 'buffer delete' })
-  map('n', '<leader>bD', '<cmd>%bd|e#<CR>', { desc = 'buffer delete others' })
+  -- Buffers - <leader>bx (buffer operations)
+  map('n', '<leader>bx', '<cmd>bdelete<CR>', { desc = 'buffer close' })
+  map('n', '<leader>bX', '<cmd>%bd|e#<CR>', { desc = 'buffer close others' })
 
   -- Buffer history navigation (like <C-o>/<C-i> but for whole buffers)
   map('n', '<leader>bo', function()
@@ -207,16 +207,16 @@ M.setup = function()
 
     local cwd = vim.fn.getcwd()
     local task_dir = cwd .. '/' .. task_folder
-    
+
     -- Check if the task folder exists
     if vim.fn.isdirectory(task_dir) == 0 then
       vim.notify('No ' .. task_folder .. ' directory found in ' .. cwd, vim.log.levels.WARN)
       return
     end
-    
+
     -- Get all files in the task folder
     local files = vim.fn.glob(task_dir .. '/*', false, true)
-    
+
     -- Filter out directories, keep only files
     local task_files = {}
     for _, file in ipairs(files) do
@@ -224,12 +224,12 @@ M.setup = function()
         table.insert(task_files, file)
       end
     end
-    
+
     if #task_files == 0 then
       vim.notify('No task files found in ' .. task_folder, vim.log.levels.WARN)
       return
     end
-    
+
     vim.ui.select(task_files, {
       prompt = 'Select task to run:',
       format_item = function(item)
@@ -242,7 +242,7 @@ M.setup = function()
       end
 
       local lines = vim.fn.readfile(choice)
-      
+
       if #lines == 0 then
         vim.notify(choice .. ' is empty', vim.log.levels.WARN)
         return
@@ -374,9 +374,6 @@ M.setup = function()
   -- Special double leader mapping for buffers
   -- This is configured in telescope plugin setup
 
-  -- LuaSnip reload
-  map('n', '<leader><leader>s', '<cmd>source ~/.config/nvim/after/plugin/luasnip.lua<CR>', { desc = 'Reload LuaSnip' })
-
   -- Diagnostic navigation (bracket style)
   map('n', '[d', vim.diagnostic.goto_prev, { desc = 'Go to previous diagnostic message' })
   map('n', ']d', vim.diagnostic.goto_next, { desc = 'Go to next diagnostic message' })
@@ -399,111 +396,6 @@ end
 -- to ensure they're available when the keymaps are actually registered
 
 -- Functions for plugin-specific keymaps that require plugins to be loaded
-M.setup_telescope_keymaps = function()
-  local builtin = require 'telescope.builtin'
-  local map = vim.keymap.set
-  local wk = require 'which-key'
-
-  -- Ensure groups are defined
-  wk.add {
-    { '<leader>f', group = 'file' },
-    { '<leader>s', group = 'search' },
-    { '<leader>h', group = 'help' },
-  }
-
-  -- File operations
-  map('n', '<leader>fp', function()
-    local path = vim.fn.expand '%:p'
-    vim.fn.setreg('+', path)
-    vim.notify('Copied path: ' .. path)
-  end, { desc = 'copy file path' })
-
-  -- Git operations
-  map('n', '<leader>gc', builtin.git_commits, { desc = 'git commits' })
-  map('n', '<leader>gb', builtin.git_branches, { desc = 'git branches' })
-  map('n', '<leader>gw', function()
-    require('custom.git-worktree').git_worktrees()
-  end, { desc = 'git worktrees' })
-
-  -- Search operations
-  map('n', '<leader>sh', builtin.help_tags, { desc = 'search help' })
-  map('n', '<leader>sk', builtin.keymaps, { desc = 'search keymaps' })
-  map('n', '<leader>sf', builtin.find_files, { desc = 'search files' })
-  map('n', '<leader>ss', builtin.lsp_document_symbols, { desc = 'search symbols' })
-  map('n', '<leader>sS', builtin.lsp_dynamic_workspace_symbols, { desc = 'search symbols (project)' })
-  map('n', '<leader>sT', builtin.builtin, { desc = 'search telescope' })
-  map('n', '<leader>sw', builtin.grep_string, { desc = 'search word' })
-  map('n', '<leader>sg', require('telescope').extensions.live_grep_args.live_grep_args, { desc = 'search grep' })
-  map('n', '<leader>sd', builtin.diagnostics, { desc = 'search diagnostics' })
-  map('n', '<leader>sr', builtin.resume, { desc = 'search resume' })
-  map('n', '<leader>s.', builtin.oldfiles, { desc = 'search recent files' })
-  map('n', '<leader>st', '<cmd>TodoTelescope<CR>', { desc = 'search todos' })
-  map('n', '<leader>sm', '<cmd>Telescope media_files<CR>', { desc = 'search media files' })
-  
-  -- Terminal operations
-  map('n', '<leader>ts', function()
-    require('custom.telescope').tmux_sessions()
-  end, { desc = 'tmux sessions' })
-
-  -- Help/Documentation
-  map('n', '<leader>hh', builtin.help_tags, { desc = 'help tags' })
-  map('n', '<leader>hk', builtin.keymaps, { desc = 'keymaps' })
-  map('n', '<leader>hm', builtin.man_pages, { desc = 'man pages' })
-  map('n', '<leader>hi', '<cmd>Inspect<CR>', { desc = 'inspect' })
-  map('n', '<leader>hn', '<cmd>h news<CR>', { desc = 'news' })
-
-  -- Special double leader mapping for buffers
-  map('n', '<leader><leader>', builtin.buffers, { desc = 'find buffers' })
-
-  -- Search in current buffer (fuzzy matching, unlike / which is exact match only)
-  map('n', '<leader>sb', function()
-    builtin.current_buffer_fuzzy_find(require('telescope.themes').get_dropdown {
-      winblend = 10,
-      previewer = false,
-    })
-  end, { desc = 'search buffer' })
-
-  -- Search in open files
-  map('n', '<leader>s/', function()
-    builtin.live_grep {
-      grep_open_files = true,
-      prompt_title = 'Live Grep in Open Files',
-    }
-  end, { desc = 'search in open files' })
-
-  -- Search Neovim config
-  map('n', '<leader>sn', function()
-    builtin.find_files { cwd = vim.fn.stdpath 'config' }
-  end, { desc = 'search neovim files' })
-
-  -- Search folders and open in Oil
-  map('n', '<leader>sF', function()
-    builtin.find_files {
-      find_command = { 'find', '.', '-type', 'd', '-not', '-path', '*/.*' },
-      prompt_title = 'Search Folders',
-      previewer = false,
-      layout_config = { height = 0.6 },
-      attach_mappings = function(_, map_key)
-        map_key('i', '<CR>', function(prompt_bufnr)
-          local selection = require('telescope.actions.state').get_selected_entry()
-          require('telescope.actions').close(prompt_bufnr)
-          if selection then
-            vim.cmd('Oil ' .. vim.fn.fnameescape(selection.value))
-          end
-        end)
-        map_key('n', '<CR>', function(prompt_bufnr)
-          local selection = require('telescope.actions.state').get_selected_entry()
-          require('telescope.actions').close(prompt_bufnr)
-          if selection then
-            vim.cmd('Oil ' .. vim.fn.fnameescape(selection.value))
-          end
-        end)
-        return true
-      end,
-    }
-  end, { desc = 'search folders' })
-end
-
 M.setup_lsp_keymaps = function(event)
   local map = function(keys, func, desc, mode)
     mode = mode or 'n'
