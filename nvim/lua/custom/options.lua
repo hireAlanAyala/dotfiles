@@ -1,5 +1,6 @@
 -- Shell and environment setup
 vim.o.shell = os.getenv 'HOME' .. '/.nix-profile/bin/zsh'
+vim.o.shellcmdflag = '-ic' -- Run as interactive shell so :! commands have access to .zshrc aliases/functions
 vim.env.PATH = vim.env.PATH .. ':' .. os.getenv 'HOME' .. '/.nix-profile/bin'
 -- helps mason find the dotnet env
 vim.env.DOTNET_ROOT = os.getenv 'HOME' .. '/.nix-profile'

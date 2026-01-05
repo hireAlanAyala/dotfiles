@@ -29,5 +29,6 @@ require 'custom.terminal-input-proxy'
 require('custom.task-runner').setup()
 require('custom.smart-notes').setup()
 require 'custom.csv'
+require('custom.browser').setup()
 
 require 'custom.lazy'
