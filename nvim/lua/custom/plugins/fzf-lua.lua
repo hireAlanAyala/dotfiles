@@ -572,9 +572,9 @@ return {
       -- header-lines=0 ensures current buffer is selectable (not treated as a header)
       -- this allows hovering and deleting the current buffer with dd
       fzf_opts = { ["--header-lines"] = 0 },
-      buf_ignore = function(bufnr)
-        local name = vim.api.nvim_buf_get_name(bufnr)
-        return name:match("^oil://") ~= nil
+      -- Filter out oil buffers
+      filter = function(bufnr)
+        return vim.bo[bufnr].filetype ~= "oil"
       end,
       -- Use buffer name instead of terminal title (programs like Claude Code can change
       -- the terminal title dynamically, making items unreliable to fuzzy search)
