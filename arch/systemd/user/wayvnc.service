@@ -1,0 +1,13 @@
+[Unit]
+Description=WayVNC - VNC server for Wayland
+After=graphical-session.target
+BindsTo=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/wayvnc --render-cursor 0.0.0.0 5900
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target
