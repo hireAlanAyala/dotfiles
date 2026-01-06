@@ -1,0 +1,2 @@
+gpg-agent.service
+sops-nix.service
