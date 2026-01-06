@@ -1,6 +1,0 @@
-^[[01;32mdeveloper@host^[[00m:^[[01;34m~/projects/demo^[[00m$ echo "Hello"
-Hello
-^[[01;32mdeveloper@host^[[00m:^[[01;34m~/projects/demo^[[00m$ ls
-demo.typescript  demo.time  notes.txt  project/
-^[[01;32mdeveloper@host^[[00m:^[[01;34m~/projects/demo^[[00m$ exit
-exit
