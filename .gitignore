@@ -15,6 +15,7 @@ gh/
 
 # Tool-specific sensitive data
 pulse/
+gcloud/
 # systemd configs are tracked in arch/systemd/, this ignores the symlinked location
 /systemd/
 sops-nix/secrets
