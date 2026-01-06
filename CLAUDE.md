@@ -7,3 +7,5 @@ To add a new service:
 2. Run `just systemd-symlinks` to symlink and reload
 3. Add the enable command to the `systemd-user` recipe in `arch/justfile`
 4. Run `just systemd-user`
+
+`arch/systemd-ignore.txt` lists services intentionally not tracked in git. A pre-commit hook uses this to suppress warnings about untracked systemd files.
