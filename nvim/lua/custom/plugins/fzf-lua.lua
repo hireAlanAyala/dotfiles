@@ -558,16 +558,6 @@ return {
         ["-"] = function()
           require('fzf-lua').files({ cwd = "~" })
         end,
-        -- Entry format: "original_path<TAB>icon truncated_display"
-        ["ctrl-y"] = {
-          fn = function(selected)
-            if selected and selected[1] then
-              local original = selected[1]:match("^([^\t]+)")
-              vim.fn.setreg("+", original or selected[1])
-            end
-          end,
-          exec_silent = true,
-        },
       },
     },
 
@@ -612,10 +602,26 @@ return {
     local fzf = require('fzf-lua')
     local actions = require('fzf-lua.actions')
 
+    -- Universal yank: grab the raw entry text (strip tab-separated display formatting)
+    local function yank_entry(selected)
+      if not selected or not selected[1] then return end
+      -- Files picker uses "raw<TAB>formatted" with --with-nth=2, so strip after tab
+      -- Other pickers (grep, buffers, etc.) don't use tabs, so this is a no-op
+      local to_copy = selected[1]:match("^([^\t]+)") or selected[1]
+      vim.fn.setreg("+", to_copy)
+      vim.notify("Copied: " .. to_copy)
+    end
+
     fzf.setup({
       winopts = opts.winopts,
       fzf_opts = opts.fzf_opts,
-      -- To use these bindings in normal mode, add a mapping in the FileType autocmd below
+      -- Global defaults apply to ALL pickers
+      defaults = {
+        actions = {
+          ["ctrl-y"] = { fn = yank_entry, exec_silent = true },
+        },
+      },
+      -- File-specific actions (inherits defaults + adds more)
       actions = {
         files = {
           true,
