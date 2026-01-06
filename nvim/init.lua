@@ -13,7 +13,8 @@ require('custom.socket').init()
 -- overseer (task runner, people are using it to automate tasks they'd usually have in a separate window/pane)
 -- nvim-better-n
 -- nvim-various-textobjs (text object ideas)
-
+-- term-edit.nvim
+--
 -- Load all modules
 require 'config.options'
 require 'custom.options'
