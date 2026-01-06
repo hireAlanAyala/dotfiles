@@ -15,8 +15,10 @@ gh/
 
 # Tool-specific sensitive data
 pulse/
+# systemd configs are tracked in arch/systemd/, this ignores the symlinked location
 /systemd/
 sops-nix/secrets
+rustic/gcs-credentials.json
 
 # Go telemetry data
 go/telemetry/

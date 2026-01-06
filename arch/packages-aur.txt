@@ -1,6 +1,7 @@
 admesh
 bambustudio-bin
 dtach
+google-cloud-cli
 microsoft-edge-stable-bin
 mpvpaper
 pipe-viewer-git

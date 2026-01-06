@@ -49,6 +49,7 @@ qt5-wayland
 qt6-wayland
 reflector
 rofi
+rustic
 slurp
 socat
 sof-firmware

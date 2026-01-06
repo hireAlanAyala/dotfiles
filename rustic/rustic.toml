@@ -1,0 +1,74 @@
+[repository]
+repository = "opendal:gcs"
+password-command = "pass show backup/rustic"
+
+[repository.options]
+bucket = "dotfiles-infra-backups"
+root = "/"
+credential_path = "/home/walker/.config/rustic/gcs-credentials.json"
+
+[backup]
+one-file-system = true
+exclude-if-present = [".nobackup", "CACHEDIR.TAG"]
+globs = [
+  # Caches
+  "!cache/",
+  "!Cache/",
+  "!.cache/",
+
+  # JavaScript / Node
+  "!node_modules/",
+  "!.next/",
+  "!.nuxt/",
+  "!.output/",
+  "!.turbo/",
+  "!.parcel-cache/",
+
+  # Python
+  "!__pycache__/",
+  "!.venv/",
+  "!venv/",
+  "!.mypy_cache/",
+  "!.pytest_cache/",
+  "!*.egg-info/",
+  "!.tox/",
+
+  # Rust
+  "!target/",
+
+  # Go
+  "!vendor/",
+
+  # C# / .NET
+  "!bin/",
+  "!obj/",
+  "!.vs/",
+  "!packages/",
+
+  # Java / Kotlin
+  "!.gradle/",
+  "!.idea/",
+  "!*.iml",
+
+  # General build outputs
+  "!dist/",
+  "!build/",
+  "!out/",
+  "!.output/",
+
+  # App bloat in .config
+  "!chromium/",
+  "!microsoft-edge/",
+  "!BambuStudio/",
+  "!github-copilot/",
+]
+
+[[backup.snapshots]]
+sources = [
+  "/home/walker/.config",
+  "/home/walker/.password-store",
+  "/home/walker/.gnupg",
+  "/home/walker/.ssh",
+  "/home/walker/.local/bin",
+  "/home/walker/Documents",
+]
