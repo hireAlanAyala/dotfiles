@@ -1,0 +1,16 @@
+[Unit]
+Description=Guacamole Pod
+After=network-online.target
+
+[Service]
+Type=simple
+Restart=always
+TimeoutStartSec=300
+ExecStartPre=-/home/walker/.nix-profile/bin/podman pod rm -f guacamole-pod
+ExecStartPre=/home/walker/.nix-profile/bin/podman pod create --name guacamole-pod -p 8080:8080 -p 4822:4822
+ExecStart=/bin/sleep infinity
+ExecStop=/home/walker/.nix-profile/bin/podman pod stop guacamole-pod
+ExecStopPost=/home/walker/.nix-profile/bin/podman pod rm -f guacamole-pod
+
+[Install]
+WantedBy=default.target

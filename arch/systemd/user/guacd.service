@@ -1,0 +1,17 @@
+[Unit]
+Description=Guacamole Proxy Daemon
+After=guacamole-pod.service
+Requires=guacamole-pod.service
+
+[Service]
+Type=simple
+Restart=always
+TimeoutStartSec=300
+ExecStartPre=-/home/walker/.nix-profile/bin/podman rm -f guacd
+ExecStart=/home/walker/.nix-profile/bin/podman run --rm --name guacd \
+    --pod guacamole-pod \
+    docker.io/guacamole/guacd:latest
+ExecStop=/home/walker/.nix-profile/bin/podman stop guacd
+
+[Install]
+WantedBy=default.target

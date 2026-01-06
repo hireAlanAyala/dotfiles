@@ -1,0 +1,21 @@
+[Unit]
+Description=Guacamole Web Application
+After=guacd.service
+Requires=guacd.service
+
+[Service]
+Type=simple
+Restart=always
+TimeoutStartSec=300
+ExecStartPre=-/home/walker/.nix-profile/bin/podman rm -f guacamole-web
+ExecStart=/home/walker/.nix-profile/bin/podman run --rm --name guacamole-web \
+    --pod guacamole-pod \
+    -e GUACD_HOSTNAME=127.0.0.1 \
+    -e GUACD_PORT=4822 \
+    -e GUACAMOLE_HOME=/etc/guacamole \
+    -v %h/.config/guacamole:/etc/guacamole:Z \
+    docker.io/guacamole/guacamole:latest
+ExecStop=/home/walker/.nix-profile/bin/podman stop guacamole-web
+
+[Install]
+WantedBy=default.target
