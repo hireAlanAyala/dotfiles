@@ -1,0 +1,56 @@
+#!/bin/bash
+# EXPERIMENTAL: Scaffolding a claude session restore system
+# Claude Code wrapper with session persistence
+# Usage:
+#   c                 - inside nvim terminal: auto-resume or create tracked session
+#   c                 - outside nvim: plain claude (no tracking)
+#   c -r, --resume    - passthrough to claude's resume
+#   c <any args>      - passthrough to claude
+
+STATE_FILE="$PWD/.nvim/terminal-sessions.json"
+
+# Helper to read UUID from state file
+read_uuid() {
+  local key="$1"
+  if [[ -f "$STATE_FILE" ]]; then
+    jq -r --arg k "$key" '.[$k].claude_session_id // empty' "$STATE_FILE" 2>/dev/null
+  fi
+}
+
+# Helper to write UUID to state file
+write_uuid() {
+  local key="$1"
+  local uuid="$2"
+
+  mkdir -p "$(dirname "$STATE_FILE")"
+
+  if [[ -f "$STATE_FILE" ]]; then
+    jq --arg k "$key" --arg u "$uuid" '.[$k].claude_session_id = $u' "$STATE_FILE" > "$STATE_FILE.tmp" \
+      && mv "$STATE_FILE.tmp" "$STATE_FILE"
+  else
+    echo "{\"$key\":{\"claude_session_id\":\"$uuid\"}}" | jq . > "$STATE_FILE"
+  fi
+}
+
+# If inside nvim terminal with session tracking
+if [[ -n "$NVIM_TERMINAL_SESSION" ]]; then
+  # Check if --restore flag passed (from terminal-persist restore)
+  if [[ "$1" == "--restore" ]]; then
+    shift
+    UUID=$(read_uuid "$NVIM_TERMINAL_SESSION")
+    if [[ -n "$UUID" ]]; then
+      exec claude --resume "$UUID" "$@"
+    else
+      echo "No session to restore for: $NVIM_TERMINAL_SESSION"
+      exit 1
+    fi
+  fi
+
+  # New session - create and track
+  UUID=$(uuidgen)
+  write_uuid "$NVIM_TERMINAL_SESSION" "$UUID"
+  exec claude --session-id "$UUID" "$@"
+fi
+
+# Outside nvim - passthrough to claude
+exec claude "$@"
