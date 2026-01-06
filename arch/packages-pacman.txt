@@ -82,3 +82,5 @@ xdg-desktop-portal-hyprland
 xournalpp
 ydotool
 zram-generator
+zsh-autosuggestions
+zsh-syntax-highlighting
