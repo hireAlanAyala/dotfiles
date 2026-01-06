@@ -540,10 +540,34 @@ return {
 
     files = {
       fd_opts = "--color=never --type f --hidden --no-ignore --exclude .git --exclude node_modules",
+      fn_transform = [[return function(entry, opts)
+        local max_len = 55
+        local display = entry
+        if #entry > max_len then
+          local head_len = math.floor(max_len * 0.4)
+          local tail_len = max_len - head_len - 5
+          display = entry:sub(1, head_len) .. "<...>" .. entry:sub(-tail_len)
+        end
+        local formatted = FzfLua.make_entry.file(display, opts)
+        return entry .. "\t" .. formatted
+      end]],
+      fzf_opts = { ["--with-nth"] = "2" },
+      file_icons = true,
+      color_icons = true,
       actions = {
         ["-"] = function()
           require('fzf-lua').files({ cwd = "~" })
         end,
+        -- Entry format: "original_path<TAB>icon truncated_display"
+        ["ctrl-y"] = {
+          fn = function(selected)
+            if selected and selected[1] then
+              local original = selected[1]:match("^([^\t]+)")
+              vim.fn.setreg("+", original or selected[1])
+            end
+          end,
+          exec_silent = true,
+        },
       },
     },
 
@@ -619,6 +643,10 @@ return {
         -- Tab for toggle selection in normal mode
         vim.keymap.set('n', '<Tab>', 'i<Tab><C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
         vim.keymap.set('n', '<S-Tab>', 'i<S-Tab><C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
+        -- yy to copy the file path
+        vim.keymap.set('n', 'yy', 'i<C-y><C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
+        -- - to switch to home directory
+        vim.keymap.set('n', '-', 'i-', { buffer = buf, noremap = true, silent = true })
         -- Alt-q to send selected to quickfix in normal mode
         vim.keymap.set('n', '<A-q>', 'i<A-q>', { buffer = buf, noremap = true, silent = true })
       end,

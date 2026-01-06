@@ -13,7 +13,7 @@ vim.opt.rtp:prepend(lazypath)
 require('lazy').setup({
   { import = 'custom.plugins' },
 }, {
-  -- change_detection = { notify = false }, -- Disable change detection notifications
+  change_detection = { notify = false },
   rocks = {
     enabled = false, -- Disable luarocks support since no plugins require it
   },
