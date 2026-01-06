@@ -670,7 +670,6 @@ return {
         wk.add {
           { '<leader>f', group = 'file' },
           { '<leader>s', group = 'search' },
-          { '<leader>h', group = 'help' },
         }
       end
     end, 100)
@@ -701,10 +700,6 @@ return {
     -- Search in open files only
     map('n', '<leader>s/', grep_open_buffers, { desc = 'search in open files' })
 
-    -- Search neovim config
-    map('n', '<leader>sn', function()
-      fzf.files({ cwd = vim.fn.stdpath("config") })
-    end, { desc = 'search neovim files' })
 
     -- Search folders and open in Oil
     map('n', '<leader>sF', folders_oil, { desc = 'search folders' })
@@ -719,12 +714,6 @@ return {
     -- Quickfix
     map('n', '<leader>sq', function() fzf.quickfix() end, { desc = 'search quickfix' })
 
-    -- === Help/Documentation ===
-    map('n', '<leader>sh', function() fzf.help_tags() end, { desc = 'search help' })
-    map('n', '<leader>sk', function() fzf.keymaps() end, { desc = 'search keymaps' })
-    map('n', '<leader>hh', function() fzf.help_tags() end, { desc = 'help tags' })
-    map('n', '<leader>hk', function() fzf.keymaps() end, { desc = 'keymaps' })
-    map('n', '<leader>hm', function() fzf.man_pages() end, { desc = 'man pages' })
 
     -- === Git ===
     map('n', '<leader>gc', function() fzf.git_commits() end, { desc = 'git commits' })
@@ -748,8 +737,6 @@ return {
     end, { desc = 'copy file path' })
 
     -- === Misc ===
-    map('n', '<leader>sT', function() fzf.builtin() end, { desc = 'search fzf builtins' })
-    map('n', '<leader>sc', function() fzf.commands() end, { desc = 'search commands' })
     map('n', '<leader>sC', function() fzf.command_history() end, { desc = 'search command history' })
     map('n', '<leader>sm', function() fzf.marks() end, { desc = 'search marks' })
     map('n', '<leader>sj', function() fzf.jumps() end, { desc = 'search jumps' })
