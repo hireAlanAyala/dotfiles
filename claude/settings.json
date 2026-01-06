@@ -1,9 +1,16 @@
 {
   "env": {
+    "CLAUDE_CODE_DISABLE_TERMINAL_TITLE": "1",
     "DISABLE_TELEMETRY": "1",
+    "DISABLE_BUG_COMMAND": "1",
+    "DISABLE_ERROR_REPORTING": "1",
+    "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "1",
     "CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL": "1"
   },
-  "includeCoAuthoredBy": false,
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
   "permissions": {
     "allow": [
       "Bash(npm run :*)",
@@ -91,11 +98,16 @@
       "Read(**/.ssh/**)",
       "Read(**/node_modules/**)"
     ],
+    "defaultMode": "acceptEdits",
     "additionalDirectories": [
       "~/.config"
     ]
   },
   "enableAllProjectMcpServers": true,
+  "statusLine": {
+    "type": "command",
+    "command": "bash /home/walker/.claude/statusline.sh"
+  },
   "enabledPlugins": {
     "lua-lsp@claude-plugins-official": true,
     "typescript-lsp@claude-plugins-official": true,

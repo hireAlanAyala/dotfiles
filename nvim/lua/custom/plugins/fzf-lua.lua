@@ -586,6 +586,9 @@ return {
         local name = vim.api.nvim_buf_get_name(bufnr)
         return name:match("^oil://") ~= nil
       end,
+      -- Use buffer name instead of terminal title (programs like Claude Code can change
+      -- the terminal title dynamically, making items unreliable to fuzzy search)
+      formatter = "path",
       actions = { ["ctrl-x"] = { fn = smart_buf_del, reload = true } },
     },
 
