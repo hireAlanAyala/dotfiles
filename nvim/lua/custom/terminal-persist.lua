@@ -113,7 +113,16 @@ local function create_terminal(session_name, name, use_vanilla, switch)
   vim.b[buf_nr].persist_session = session_name
   vim.b[buf_nr].persist_name = name
   vim.b[buf_nr].is_vanilla = use_vanilla
-  vim.api.nvim_buf_set_name(buf_nr, string.format('term://%s', name or session_name))
+  -- Use vim.schedule (not defer) to run after termopen() finishes in the same event loop,
+  -- without an arbitrary delay. termopen() overwrites buffer name with the shell command.
+  -- We also set term_title because fzf-lua's buffer picker uses vim.b.term_title
+  -- for terminal buffers instead of the buffer name (see fzf-lua/providers/buffers.lua)
+  vim.schedule(function()
+    if vim.api.nvim_buf_is_valid(buf_nr) then
+      pcall(vim.api.nvim_buf_set_name, buf_nr, string.format('term://%s', name))
+      vim.b[buf_nr].term_title = name
+    end
+  end)
 
   if switch then
     vim.cmd('buffer ' .. buf_nr)
