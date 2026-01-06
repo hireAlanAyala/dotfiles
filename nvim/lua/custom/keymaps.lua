@@ -43,11 +43,7 @@ vim.keymap.set('n', '<leader>tn', function()
   end)
 end, { desc = 'new persistent terminal' })
 
--- Task runner keymaps (lazy loaded to avoid telescope dependency issues)
-vim.keymap.set('n', '<leader>tt', function()
-  require('custom.telescope-tasks').task_picker()
-end, { desc = 'List tasks' })
-
+-- Task runner keymaps
 vim.keymap.set('n', '<leader>tc', function()
   require('custom.task-runner').create_task()
 end, { desc = 'Create task' })
@@ -61,8 +57,8 @@ vim.keymap.set('n', '<A-i>', function()
   vim.notify('Alt+I pressed - Jump forward', vim.log.levels.INFO, { timeout = 1000 })
 end, { desc = 'Test Alt+I notification' })
 
--- Telescope quickfix
-vim.keymap.set('n', 'sq', '<cmd>Telescope quickfix<cr>', { desc = 'Search [Q]uickfix' })
+-- Quickfix (using fzf-lua)
+vim.keymap.set('n', 'sq', function() require('fzf-lua').quickfix() end, { desc = 'Search [Q]uickfix' })
 
 -- Open file or URL under cursor
 vim.keymap.set('n', 'gx', function()

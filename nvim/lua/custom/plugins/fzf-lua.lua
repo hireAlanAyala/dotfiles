@@ -385,6 +385,76 @@ local function git_worktrees()
   })
 end
 
+-- Custom picker: Task runner
+local function task_picker()
+  local fzf = require("fzf-lua")
+  local task_runner = require("custom.task-runner")
+
+  local tasks = task_runner.load_tasks()
+  local task_file = vim.fn.getcwd() .. '/.nvim/tasks.yaml'
+
+  if #tasks == 0 then
+    if vim.fn.filereadable(task_file) == 1 then
+      vim.notify('Tasks file exists but no tasks loaded. Check ' .. task_file .. ' for syntax errors', vim.log.levels.WARN)
+    else
+      vim.notify('No tasks found. Create tasks in .nvim/tasks.yaml', vim.log.levels.INFO)
+    end
+    return
+  end
+
+  -- Build entries with running status
+  local entries = {}
+  local task_data = {}
+  local project_id = vim.fn.fnamemodify(vim.fn.getcwd(), ':t'):gsub('[^%w%-_]', '_') .. '_' .. vim.fn.sha256(vim.fn.getcwd()):sub(1, 6)
+
+  for _, task in ipairs(tasks) do
+    local session_name = project_id .. '_' .. task.name
+    local is_running = vim.fn.system('tmux has-session -t ' .. vim.fn.shellescape(session_name) .. ' 2>/dev/null; echo $?'):gsub('%s+', '') == '0'
+
+    local display = task.name
+    if is_running then
+      display = display .. ' ✅'
+    end
+
+    table.insert(entries, display)
+    task_data[display] = task
+  end
+
+  fzf.fzf_exec(entries, {
+    prompt = "> ",
+    actions = {
+      ["default"] = function(selected)
+        if selected then
+          if #selected > 1 then
+            -- Multi-select: run all in background
+            for _, sel in ipairs(selected) do
+              local task = task_data[sel]
+              if task then
+                task_runner.run_task(task, false)
+              end
+            end
+          elseif #selected == 1 then
+            -- Single select: run and switch to terminal
+            local task = task_data[selected[1]]
+            if task then
+              task_runner.run_task(task, true)
+            end
+          end
+        end
+      end,
+    },
+    fzf_opts = {
+      ["--multi"] = true,
+    },
+    previewer = false,
+    winopts = {
+      height = 0.5,
+      width = 0.33,
+      title = " Tasks ",
+    },
+  })
+end
+
 -- Custom picker: Git log -S search (find commits that changed content)
 local function git_pickaxe()
   local fzf = require("fzf-lua")
@@ -446,10 +516,10 @@ return {
       width = 0.80,
     },
 
-    -- Styling to match amber palette
     fzf_opts = {
+      ["--multi"] = true,
       ["--pointer"] = " ",
-      ["--marker"] = " ",
+      ["--marker"] = "+",
       ["--color"] = table.concat({
         "fg:#FFB000",
         "bg:#0A0A08",
@@ -513,22 +583,44 @@ return {
 
   config = function(_, opts)
     local fzf = require('fzf-lua')
-    fzf.setup(opts)
+    local actions = require('fzf-lua.actions')
+
+    fzf.setup({
+      winopts = opts.winopts,
+      fzf_opts = opts.fzf_opts,
+      -- To use these bindings in normal mode, add a mapping in the FileType autocmd below
+      actions = {
+        files = {
+          true,
+          ["alt-q"] = actions.file_sel_to_qf,
+        },
+      },
+      files = opts.files,
+      grep = opts.grep,
+      buffers = opts.buffers,
+      previewers = opts.previewers,
+    })
 
     -- Make matches stand out with background highlight
     vim.api.nvim_set_hl(0, 'FzfLuaSearch', { fg = '#0A0A08', bg = '#FFBB00', bold = true })
 
-    -- Terminal normal mode keybindings for fzf buffers
+    -- Terminal keybindings for fzf buffers
     vim.api.nvim_create_autocmd("FileType", {
       pattern = "fzf",
       callback = function()
         local buf = vim.api.nvim_get_current_buf()
+        -- Normal mode mappings
         vim.keymap.set('n', '<CR>', 'i<CR>', { buffer = buf, noremap = true, silent = true })
         vim.keymap.set('n', '<Esc>', 'i<C-c>', { buffer = buf, noremap = true, silent = true })
         vim.keymap.set('n', 'j', 'i<Down><C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
         vim.keymap.set('n', 'k', 'i<Up><C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
         vim.keymap.set('n', 'dd', 'i<C-x><C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
         vim.keymap.set('n', 'o', 'i<A-o>', { buffer = buf, noremap = true, silent = true })
+        -- Tab for toggle selection in normal mode
+        vim.keymap.set('n', '<Tab>', 'i<Tab><C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
+        vim.keymap.set('n', '<S-Tab>', 'i<S-Tab><C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
+        -- Alt-q to send selected to quickfix in normal mode
+        vim.keymap.set('n', '<A-q>', 'i<A-q>', { buffer = buf, noremap = true, silent = true })
       end,
     })
 
@@ -607,6 +699,9 @@ return {
 
     -- === Tmux ===
     map('n', '<leader>ts', tmux_sessions, { desc = 'tmux sessions' })
+
+    -- === Tasks ===
+    map('n', '<leader>tt', task_picker, { desc = 'tasks' })
 
     -- === File operations ===
     map('n', '<leader>fp', function()

@@ -3,11 +3,7 @@ return {
   dependencies = {
     'nvim-lua/plenary.nvim', -- required
     'sindrets/diffview.nvim', -- optional - Diff integration
-
-    -- Only one of these is needed.
-    'nvim-telescope/telescope.nvim', -- optional
     'ibhagwan/fzf-lua', -- optional
-    'echasnovski/mini.pick', -- optional
   },
   config = function()
     -- Clear any existing OptionSet autocmds for foldminlines before Neogit loads
@@ -23,11 +19,10 @@ return {
     end
     
     require('neogit').setup {
-      -- Disable all integrations that might cause issues
       integrations = {
-        telescope = true,
+        telescope = false,
         diffview = true,
-        fzf_lua = false,
+        fzf_lua = true,
       },
       -- Disable features that might trigger treesitter
       disable_hint = true,
@@ -39,8 +34,6 @@ return {
       auto_refresh = true,
       -- Disable auto-close to prevent buffer issues
       auto_close = false,
-      -- Use telescope for branch selection instead of native selectors
-      use_telescope = true,
       -- Configure signs
       signs = {
         -- { CLOSED, OPENED }

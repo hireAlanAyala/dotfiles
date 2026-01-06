@@ -146,14 +146,6 @@ M.setup = function()
   map('n', '<leader>gp', '<cmd>Git push<CR>', { desc = 'git push' })
   map('n', '<leader>gP', '<cmd>Git pull<CR>', { desc = 'git pull' })
 
-  -- Git Hunks are configured in gitsigns plugin setup
-
-  -- LSP/Language - <leader>l
-  -- LSP keymaps are configured in the LSP on_attach function
-
-  -- Search - <leader>s
-  -- Search keymaps are configured in telescope plugin setup
-
   -- Buffers - <leader>bx (buffer operations)
   map('n', '<leader>bx', '<cmd>bdelete<CR>', { desc = 'buffer close' })
   map('n', '<leader>bX', '<cmd>%bd|e#<CR>', { desc = 'buffer close others' })
@@ -367,12 +359,6 @@ M.setup = function()
   map('n', '<leader>rs', '<cmd>TestSuite<CR>', { desc = 'test suite' })
   map('n', '<leader>rl', '<cmd>TestLast<CR>', { desc = 'test last' })
   map('n', '<leader>rv', '<cmd>TestVisit<CR>', { desc = 'test visit' })
-
-  -- Help/Documentation - <leader>h
-  -- Help keymaps are configured in telescope plugin setup
-
-  -- Special double leader mapping for buffers
-  -- This is configured in telescope plugin setup
 
   -- Diagnostic navigation (bracket style)
   map('n', '[d', vim.diagnostic.goto_prev, { desc = 'Go to previous diagnostic message' })
