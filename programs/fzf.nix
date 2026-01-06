@@ -1,6 +1,4 @@
 {
-  programs.fzf = {
-    enable = true;
-    enableZshIntegration = true;
-  };
+  # zsh integration loaded in init_extra.zsh with TTY guard
+  programs.fzf.enable = true;
 }

@@ -3,7 +3,6 @@
 # enables extra zsh glob matching features, and sets behavior to remove things that don't match the glob
 setopt extended_glob null_glob
 
-
 # 	$HOME/bin
 # 	$HOME/.local/bin
 # 	$SCRIPTS
@@ -23,13 +22,6 @@ export GPG_TTY
 
 # use esc to enter vi mode
 set -o vi
-
-# Enable zle and bind Ctrl+E to edit command line in editor
-if [[ -o interactive ]]; then
-    autoload -U edit-command-line
-    zle -N edit-command-line
-    bindkey '^e' edit-command-line
-fi
 
 export VISUAL=nvim
 
@@ -175,17 +167,37 @@ autoload -U colors && colors
 # Docker Desktop Socket
 export DOCKER_HOST=unix://$HOME/.docker/desktop/docker.sock
 
-# Starship prompt
-eval "$(starship init zsh)"
-
-# Atuin - shell history manager
-# Vanilla zsh has no concept of "session" - all shells share one history file with interleaved commands.
-# Atuin tracks session metadata, so up arrow = current session only, ctrl-r = search all history.
-eval "$(atuin init zsh)"
-
 # Use clean environment for yay to avoid Nix linker conflicts
 # Nix adds its own linker to PATH which can't find Arch libraries during AUR builds
 # This ensures AUR packages link against system glibc, not Nix's
 yay() {
     PATH="/usr/bin:/usr/local/bin:$HOME/.local/bin" command yay "$@"
 }
+
+# TTY-only: zle plugins and prompt integrations
+# We use [[ -t 0 ]] instead of [[ -o zle ]] or [[ -o interactive ]] because:
+# - [[ -o zle ]] reports "on" even when zle isn't actually usable (e.g., vim :! commands)
+# - [[ -o interactive ]] is true for vim :! shells but zle widgets still fail
+# - [[ -t 0 ]] correctly detects when there's no real terminal attached
+if [[ -t 0 ]]; then
+    # completion
+    autoload -U compinit && compinit
+
+    # edit command line in $EDITOR with ctrl+e
+    autoload -U edit-command-line
+    zle -N edit-command-line
+    bindkey '^e' edit-command-line
+
+    # plugins (pacman)
+    source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
+    source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+
+    # fzf keybindings and completion
+    source <(fzf --zsh)
+
+    # starship prompt
+    eval "$(starship init zsh)"
+
+    # atuin shell history (up arrow = session, ctrl-r = all)
+    eval "$(atuin init zsh)"
+fi
