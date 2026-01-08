@@ -246,9 +246,24 @@ function M.restore()
         pcall(create_terminal, item.session_name, item.info.name, false, item.strategy_name, true)
 
         if item.info.claude_session_id and item.strategy_name == 'tmux' then
-          vim.defer_fn(function()
-            vim.fn.system(string.format("tmux send-keys -t '%s' 'c -t' Enter", item.session_name))
-          end, 200)
+          -- Wait for client to attach before sending keys (detach-client -E requires a client)
+          local attempts = 0
+          local max_attempts = 20 -- 2 seconds max
+          local function wait_for_client()
+            attempts = attempts + 1
+            vim.fn.jobstart(string.format("tmux list-clients -t '%s' 2>/dev/null", item.session_name), {
+              stdout_buffered = true,
+              on_stdout = function(_, data)
+                local has_client = data and data[1] and data[1] ~= ''
+                if has_client then
+                  vim.fn.jobstart(string.format("tmux send-keys -t '%s' 'c -t' Enter", item.session_name))
+                elseif attempts < max_attempts then
+                  vim.defer_fn(wait_for_client, 100)
+                end
+              end,
+            })
+          end
+          vim.defer_fn(wait_for_client, 100)
         end
 
         vim.schedule(restore_next)

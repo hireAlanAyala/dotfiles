@@ -125,7 +125,9 @@ local function files_with_flags(opts)
     actions = fzf.defaults.actions.files,
     previewer = fzf.config.globals.previewers,
     winopts = fzf.config.globals.winopts,
-    fzf_opts = fzf.config.globals.fzf_opts,
+    fzf_opts = vim.tbl_extend("force", fzf.config.globals.fzf_opts, {
+      ["--scheme"] = "path",
+    }),
   })
 end
 
@@ -672,7 +674,11 @@ return {
       callback = function()
         local buf = vim.api.nvim_get_current_buf()
         -- Normal mode mappings
-        vim.keymap.set('n', '<CR>', 'i<CR>', { buffer = buf, noremap = true, silent = true })
+        -- Use feedkeys instead of 'i<CR>' string to ensure proper key sequence timing;
+        -- string mapping can cause file to open inside picker window instead of closing first
+        vim.keymap.set('n', '<CR>', function()
+          vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('i<CR>', true, false, true), 'n', false)
+        end, { buffer = buf, noremap = true, silent = true })
         vim.keymap.set('n', '<Esc>', 'i<C-c>', { buffer = buf, noremap = true, silent = true })
         vim.keymap.set('n', 'j', 'i<Down><C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
         vim.keymap.set('n', 'k', 'i<Up><C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
@@ -684,12 +690,12 @@ return {
         -- yy to copy the file path
         vim.keymap.set('n', 'yy', 'i<C-y><C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
         -- - to switch to home directory (normal mode only)
+        -- files_with_flags({ cwd = "~" }); vim.cmd('startinsert')
         vim.keymap.set('n', '-', function()
           -- Close current fzf window and open files at home
           vim.cmd('close')
           vim.schedule(function()
-            files_with_flags({ cwd = "~" })
-            vim.cmd('startinsert')
+            fzf.files({ cwd = "~" })
           end)
         end, { buffer = buf, noremap = true, silent = true })
         -- Alt-q to send selected to quickfix in normal mode
