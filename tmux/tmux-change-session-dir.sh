@@ -53,7 +53,7 @@ windows=$(tmux list-windows -t "$session_name" -F '#I')
 for window_id in $windows; do
     # Get all panes in this window
     panes=$(tmux list-panes -t "$session_name:$window_id" -F '#P')
-    
+
     for pane_id in $panes; do
         # Send cd command to each pane
         tmux send-keys -t "$session_name:$window_id.$pane_id" "cd '$path'" Enter

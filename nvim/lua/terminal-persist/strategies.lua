@@ -23,7 +23,7 @@ M.strategies.tmux = {
         session_name, vim.fn.getcwd(), session_name
       ))
     end
-    return string.format('~/.config/scripts/tmux-attach-with-history.sh %s', session_name)
+    return string.format('~/.config/nvim/lua/terminal-persist/tmux-attach-with-history.sh %s', session_name)
   end,
 
   kill = function(self, session_name)

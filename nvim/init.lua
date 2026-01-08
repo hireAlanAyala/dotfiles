@@ -26,7 +26,6 @@ require('custom.transparency').setup()
 require 'custom.commands'
 require 'custom.terminal-paste-fix'
 require('terminal-persist').setup()
-require 'custom.terminal-input-proxy'
 require('custom.task-runner').setup()
 require('custom.smart-notes').setup()
 require 'custom.csv'

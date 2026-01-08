@@ -1,4 +1,7 @@
 #!/bin/bash
+# Dumps tmux scrollback into nvim's terminal buffer before attaching.
+# nvim needs an in-memory copy for search, text-objects, and scrolling motions to work.
+
 session="$1"
 
 # Function to remove only trailing blank lines from input

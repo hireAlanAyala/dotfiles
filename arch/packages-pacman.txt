@@ -26,6 +26,7 @@ iwd
 just
 kicad
 kitty
+less
 libnotify
 libva-utils
 linux

@@ -195,27 +195,30 @@ function M.restore()
       end
 
       for _, item in ipairs(to_restore) do
-        local strategy_name = item.info.strategy or M.config.default_strategy
-        local strategy = get_strategy(strategy_name)
+        local ok, err = pcall(function()
+          local strategy_name = item.info.strategy or M.config.default_strategy
+          local strategy = get_strategy(strategy_name)
+          if not strategy then return end
 
-        -- Use pre-fetched tmux_sessions for tmux, strategy:session_exists for others
-        local exists = strategy_name == 'tmux'
-          and tmux_sessions[item.session_name]
-          or strategy:session_exists(item.session_name)
+          -- Use pre-fetched tmux_sessions for tmux, strategy:session_exists for others
+          local exists = strategy_name == 'tmux'
+            and tmux_sessions[item.session_name]
+            or strategy:session_exists(item.session_name)
 
-        if exists then
-          create_terminal(item.session_name, item.info.name, false, strategy_name)
-          restored = restored + 1
+          if exists then
+            create_terminal(item.session_name, item.info.name, false, strategy_name)
+            restored = restored + 1
 
-          -- Auto-resume claude session if interrupted (claude_session_id exists in state).
-          -- We auto-resume rather than restore scrollback because claude's inline editing
-          -- causes nvim and tmux scrollback to desync.
-          if item.info.claude_session_id and strategy_name == 'tmux' then
-            vim.defer_fn(function()
-              vim.fn.system(string.format("tmux send-keys -t '%s' 'c -t' Enter", item.session_name))
-            end, 200)
+            -- Auto-resume claude session if interrupted (claude_session_id exists in state).
+            -- We auto-resume rather than restore scrollback because claude's inline editing
+            -- causes nvim and tmux scrollback to desync.
+            if item.info.claude_session_id and strategy_name == 'tmux' then
+              vim.defer_fn(function()
+                vim.fn.system(string.format("tmux send-keys -t '%s' 'c -t' Enter", item.session_name))
+              end, 200)
+            end
           end
-        end
+        end)
       end
 
       if vim.api.nvim_win_is_valid(current_win) then
