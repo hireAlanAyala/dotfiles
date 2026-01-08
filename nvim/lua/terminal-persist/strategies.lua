@@ -1,8 +1,9 @@
 local M = {}
 
 -- Strategy interface:
---   session_exists(self, session_name) -> boolean
---   create_or_attach(self, session_name) -> string (command for termopen)
+--   session_exists(self, session_name) -> boolean  [BLOCKING - avoid in hot paths]
+--   attach(self, session_name) -> string           [NON-BLOCKING - use for restore]
+--   create_or_attach(self, session_name) -> string [BLOCKING - use for new terminals]
 --   kill(self, session_name)
 
 M.strategies = {}
@@ -16,6 +17,11 @@ M.strategies.tmux = {
     return vim.v.shell_error == 0
   end,
 
+  -- Attach to existing session (skip existence check - caller must verify)
+  attach = function(self, session_name)
+    return string.format('~/.config/nvim/lua/terminal-persist/tmux-attach-with-history.sh %s', session_name)
+  end,
+
   create_or_attach = function(self, session_name)
     if not self:session_exists(session_name) then
       vim.fn.system(string.format(
@@ -23,7 +29,7 @@ M.strategies.tmux = {
         session_name, vim.fn.getcwd(), session_name
       ))
     end
-    return string.format('~/.config/nvim/lua/terminal-persist/tmux-attach-with-history.sh %s', session_name)
+    return self:attach(session_name)
   end,
 
   kill = function(self, session_name)

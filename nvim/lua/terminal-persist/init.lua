@@ -1,5 +1,10 @@
 -- Terminal persistence plugin
 -- Terminals are backed by a configurable strategy (default: tmux)
+--
+-- PERFORMANCE CRITICAL:
+-- - restore() must not call blocking vim.fn.system() for tmux sessions
+-- - Use pre-fetched tmux_sessions table from async jobstart, not strategy:session_exists()
+-- - Use strategy:attach() during restore (skips existence check), not create_or_attach()
 
 local M = {}
 local strategies = require 'terminal-persist.strategies'
@@ -84,13 +89,13 @@ end
 -- Terminal Creation
 -- ============================================================================
 
-local function create_terminal(session_name, name, switch, strategy_name)
+local function create_terminal(session_name, name, switch, strategy_name, attach_only)
   strategy_name = strategy_name or get_strategy_for_name(name)
   local strategy = get_strategy(strategy_name)
   local buf_nr = vim.api.nvim_create_buf(true, false)
 
   vim.api.nvim_buf_call(buf_nr, function()
-    local cmd = strategy:create_or_attach(session_name)
+    local cmd = attach_only and strategy:attach(session_name) or strategy:create_or_attach(session_name)
     vim.fn.termopen(cmd)
     vim.bo[buf_nr].scrollback = M.config.scrollback
   end)
@@ -164,8 +169,11 @@ function M.new(name, switch, cmd)
   return buf_nr, session_name
 end
 
+-- Performance threshold for restore (warn if exceeded)
+local RESTORE_WARN_MS = 500
+
 function M.restore()
-  -- State file read is sync but fast (local file, small JSON)
+  local t_start = vim.loop.hrtime()
   local state = read_state()
   local project_id = get_project_id()
 
@@ -181,7 +189,6 @@ function M.restore()
 
   if #to_restore == 0 then return end
 
-  local restored = 0
   local current_win = vim.api.nvim_get_current_win()
   local current_buf = vim.api.nvim_get_current_buf()
 
@@ -194,42 +201,60 @@ function M.restore()
         if session ~= '' then tmux_sessions[session] = true end
       end
 
+      -- Filter to sessions that exist (use pre-fetched tmux_sessions for tmux strategy)
+      local valid = {}
       for _, item in ipairs(to_restore) do
-        local ok, err = pcall(function()
-          local strategy_name = item.info.strategy or M.config.default_strategy
-          local strategy = get_strategy(strategy_name)
-          if not strategy then return end
-
-          -- Use pre-fetched tmux_sessions for tmux, strategy:session_exists for others
-          local exists = strategy_name == 'tmux'
-            and tmux_sessions[item.session_name]
-            or strategy:session_exists(item.session_name)
-
-          if exists then
-            create_terminal(item.session_name, item.info.name, false, strategy_name)
-            restored = restored + 1
-
-            -- Auto-resume claude session if interrupted (claude_session_id exists in state).
-            -- We auto-resume rather than restore scrollback because claude's inline editing
-            -- causes nvim and tmux scrollback to desync.
-            if item.info.claude_session_id and strategy_name == 'tmux' then
-              vim.defer_fn(function()
-                vim.fn.system(string.format("tmux send-keys -t '%s' 'c -t' Enter", item.session_name))
-              end, 200)
-            end
+        local strategy_name = item.info.strategy or M.config.default_strategy
+        local strategy = get_strategy(strategy_name)
+        if strategy then
+          local exists
+          if strategy_name == 'tmux' then
+            exists = tmux_sessions[item.session_name]
+          else
+            exists = strategy:session_exists(item.session_name)
           end
-        end)
+          if exists then
+            item.strategy_name = strategy_name
+            table.insert(valid, item)
+          end
+        end
       end
 
-      if vim.api.nvim_win_is_valid(current_win) then
-        vim.api.nvim_set_current_win(current_win)
+      if #valid == 0 then return end
+
+      -- Restore one terminal per event loop tick to avoid blocking
+      local i = 0
+      local function restore_next()
+        i = i + 1
+        if i > #valid then
+          -- Done - restore focus and notify
+          if vim.api.nvim_win_is_valid(current_win) then
+            vim.api.nvim_set_current_win(current_win)
+          end
+          if vim.api.nvim_buf_is_valid(current_buf) then
+            vim.api.nvim_set_current_buf(current_buf)
+          end
+          local elapsed_ms = (vim.loop.hrtime() - t_start) / 1e6
+          if elapsed_ms > RESTORE_WARN_MS then
+            vim.notify(string.format('terminal-persist: restore took %.0fms (threshold: %dms) - possible regression!', elapsed_ms, RESTORE_WARN_MS), vim.log.levels.WARN)
+          end
+          vim.notify(string.format('Restored %d terminal(s)', #valid))
+          return
+        end
+
+        local item = valid[i]
+        pcall(create_terminal, item.session_name, item.info.name, false, item.strategy_name, true)
+
+        if item.info.claude_session_id and item.strategy_name == 'tmux' then
+          vim.defer_fn(function()
+            vim.fn.system(string.format("tmux send-keys -t '%s' 'c -t' Enter", item.session_name))
+          end, 200)
+        end
+
+        vim.schedule(restore_next)
       end
-      if vim.api.nvim_buf_is_valid(current_buf) then
-        vim.api.nvim_set_current_buf(current_buf)
-      end
-      if restored > 0 then
-        vim.notify(string.format('Restored %d terminal(s)', restored))
-      end
+
+      vim.schedule(restore_next)
     end,
   })
 end

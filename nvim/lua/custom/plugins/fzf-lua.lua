@@ -111,10 +111,10 @@ local function files_with_flags(opts)
     if flags then
       -- Has delimiter: use search term + flags, let fd filter
       local pattern = search ~= "" and vim.fn.shellescape(search) or ""
-      return base_fd .. " " .. flags .. " " .. pattern
+      return base_fd .. " " .. flags .. " " .. pattern .. " " .. vim.fn.shellescape(cwd)
     else
       -- No delimiter: let fzf handle all fuzzy matching
-      return base_fd
+      return base_fd .. " . " .. vim.fn.shellescape(cwd)
     end
   end, {
     prompt = "> " .. display_cwd .. "/",
