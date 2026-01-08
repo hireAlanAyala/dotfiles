@@ -61,17 +61,61 @@ end, { desc = 'Test Alt+I notification' })
 vim.keymap.set('n', 'sq', function() require('fzf-lua').quickfix() end, { desc = 'Search [Q]uickfix' })
 
 -- Open file or URL under cursor
-vim.keymap.set('n', 'gx', function()
-  local path = vim.fn.expand '<cfile>'
-  if vim.fn.filereadable(path) == 1 then
-    vim.cmd('edit ' .. vim.fn.fnameescape(path))
-  else
-    -- Handle URLs or external paths
-    if vim.fn.has 'wsl' == 1 then
-      vim.fn.system('wslview ' .. vim.fn.shellescape(path))
-    else
-      vim.fn.system('xdg-open ' .. vim.fn.shellescape(path))
+local common_tlds = { 'com', 'org', 'io', 'net', 'dev', 'co', 'app', 'sh', 'me', 'info', 'xyz' }
+
+local function is_url(str)
+  if str:match '^https?://' or str:match '^www%.' or str:match '^localhost:%d+' then
+    return true
+  end
+  for _, tld in ipairs(common_tlds) do
+    if str:match('^[%w%-]+%.' .. tld) or str:match('^[%w%-]+%.[%w%-]+%.' .. tld) then
+      return true
     end
+  end
+  return false
+end
+
+local function search_and_open(target)
+  -- Check if exists directly
+  if vim.fn.filereadable(target) == 1 or vim.fn.isdirectory(target) == 1 then
+    vim.cmd('edit ' .. vim.fn.fnameescape(target))
+    return
+  end
+
+  -- Search from home directory
+  local root = vim.env.HOME
+
+  local basename = target:match '[^/]+$' or target
+  local escaped = basename:gsub('([%[%]%(%)%{%}%+%?%^%$%.|\\])', '\\%1')
+  local results = vim.fn.systemlist('fd "^' .. escaped .. '$" ' .. vim.fn.shellescape(root))
+
+  if #results == 0 then
+    -- Fallback: if looks like URI scheme, try xdg-open
+    if target:match '^%w+:' then
+      local cmd = vim.fn.has 'wsl' == 1 and 'wslview' or 'xdg-open'
+      vim.fn.system(cmd .. ' ' .. vim.fn.shellescape(target))
+    else
+      vim.notify('Not found: ' .. target, vim.log.levels.WARN)
+    end
+  elseif #results == 1 then
+    vim.cmd('edit ' .. vim.fn.fnameescape(results[1]))
+  else
+    -- Multiple matches - use files picker with query from home
+    require('fzf-lua').files({ query = basename, cwd = vim.env.HOME })
+  end
+end
+
+vim.keymap.set('n', 'gx', function()
+  local raw = vim.fn.expand '<cWORD>'
+  -- Extract URL from markdown link [title](url)
+  local target = raw:match '%[.-%]%((.-)%)' or raw
+  target = target:gsub('[.,;:!?%)%]>]+$', ''):gsub('^~', vim.env.HOME)
+  if is_url(target) then
+    local url = target:match('^https?://') and target or ('https://' .. target)
+    local cmd = vim.fn.has 'wsl' == 1 and 'wslview' or 'xdg-open'
+    vim.fn.system(cmd .. ' ' .. vim.fn.shellescape(url))
+  else
+    search_and_open(target)
   end
 end, { desc = 'Open file or URL under cursor' })
 
