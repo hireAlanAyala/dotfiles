@@ -1,3 +1,4 @@
+abduco
 alsa-utils
 atuin
 base

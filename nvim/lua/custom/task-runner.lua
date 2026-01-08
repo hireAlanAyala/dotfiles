@@ -168,7 +168,7 @@ function M.run_task(task, switch_to_buffer)
     return
   end
   
-  local terminal_persist = require('custom.terminal-persist')
+  local terminal_persist = require('terminal-persist')
   terminal_persist.new_terminal(task.command, task.name, switch_to_buffer)
 end
 

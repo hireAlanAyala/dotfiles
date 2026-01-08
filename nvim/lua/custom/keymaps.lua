@@ -30,7 +30,7 @@ vim.keymap.set('n', '<C-j>', '<cmd>TmuxNavigateDown<cr>', { desc = 'Navigate dow
 vim.keymap.set('n', '<C-k>', '<cmd>TmuxNavigateUp<cr>', { desc = 'Navigate up (nvim/tmux)' })
 
 -- Terminal persist keymaps
-local terminal_persist = require 'custom.terminal-persist'
+local terminal_persist = require 'terminal-persist'
 vim.keymap.set('n', '<leader>tn', function()
   vim.ui.input({ prompt = 'Terminal name: ' }, function(input)
     if not input then return end

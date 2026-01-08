@@ -49,7 +49,7 @@ local function start_capture(target_id)
 end
 
 local function open_network_terminal()
-  local terminal_persist = require 'custom.terminal-persist'
+  local terminal_persist = require 'terminal-persist'
 
   -- Check if "network" terminal already exists
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do

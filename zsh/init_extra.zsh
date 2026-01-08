@@ -47,7 +47,7 @@ alias gpg-restart="pkill -f gpg-agent; pkill -f gpg; gpg-connect-agent /bye"
 alias 2fa="show-2fa"
 
 alias v="nvim"
-alias c="~/.config/scripts/c"
+alias c='~/.config/nvim/lua/terminal-persist/claude-wrapper.sh' 
 alias fd='fd --hidden --no-ignore'
 alias tinit="~/.config/tmux/tmux-init.sh"
 alias nvim-control="$HOME/.config/scripts/nvim-control.sh"
