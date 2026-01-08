@@ -88,6 +88,48 @@ local function folders_oil(opts)
   })
 end
 
+-- Custom picker: Files with dynamic fd flags via "  " delimiter
+-- Usage: type "pattern  -u" to include ignored files
+local function files_with_flags(opts)
+  opts = opts or {}
+  local fzf = require("fzf-lua")
+  local base_fd = "fd --color=never --type f --hidden --exclude .git"
+
+  local cwd = opts.cwd and vim.fn.expand(opts.cwd) or vim.fn.getcwd()
+  local home = vim.fn.expand("~")
+  local display_cwd = cwd:gsub("^" .. vim.pesc(home), "~")
+
+  fzf.fzf_live(function(query)
+    -- query can be string or table depending on fzf-lua version
+    local query_str = ""
+    if type(query) == "string" then
+      query_str = query
+    elseif type(query) == "table" then
+      query_str = query[1] or query.query or ""
+    end
+    local search, flags = query_str:match("^(.-)  (.+)$")
+    if flags then
+      -- Has delimiter: use search term + flags
+      local pattern = search ~= "" and vim.fn.shellescape(search) or ""
+      return base_fd .. " " .. flags .. " " .. pattern
+    else
+      -- No delimiter: use whole query as search
+      local pattern = query_str ~= "" and vim.fn.shellescape(query_str) or ""
+      return base_fd .. " " .. pattern
+    end
+  end, {
+    prompt = "> " .. display_cwd .. "/",
+    cwd = cwd,
+    exec_empty_query = true,
+    file_icons = true,
+    color_icons = true,
+    actions = fzf.defaults.actions.files,
+    previewer = fzf.config.globals.previewers,
+    winopts = fzf.config.globals.winopts,
+    fzf_opts = fzf.config.globals.fzf_opts,
+  })
+end
+
 -- Custom picker: Grep in open buffers only
 local function grep_open_buffers()
   local fzf = require("fzf-lua")
@@ -124,14 +166,13 @@ end
 local function tmux_sessions()
   local fzf = require("fzf-lua")
 
-  -- Get current session name from parent tmux
-  local current_session_handle = io.popen(parent_tmux('display-message -p "#{session_name}"') .. ' 2>/dev/null || echo ""')
-  local current_session = current_session_handle:read('*a'):gsub('%s+$', '')
-  current_session_handle:close()
+  -- Get current session and list in one call
+  local cmd = parent_tmux('display-message -p "CURRENT:#{session_name}"') .. ' && ' ..
+              parent_tmux('list-sessions -F "#{session_name}#{?session_attached, (attached),}"') .. ' 2>/dev/null || echo ""'
+  local output = vim.fn.system(cmd)
 
-  local handle = io.popen(parent_tmux('list-sessions -F "#{session_name}#{?session_attached, (attached),}"') .. ' 2>/dev/null || echo ""')
-  local result = handle:read('*a')
-  handle:close()
+  local current_session = output:match('CURRENT:([^\n]+)')
+  local result = output:gsub('CURRENT:[^\n]+\n?', '')
 
   -- Parse all sessions and separate parent sessions from sub-sessions
   local all_sessions = {}
@@ -265,20 +306,16 @@ end
 local function git_worktrees()
   local fzf = require("fzf-lua")
 
-  -- Get list of worktrees
-  local handle = io.popen('git worktree list 2>/dev/null || echo ""')
-  local result = handle:read('*a')
-  handle:close()
-
-  if result == '' then
+  -- Get current path and worktree list in one call
+  local output = vim.fn.system('git rev-parse --show-toplevel && git worktree list 2>/dev/null')
+  if vim.v.shell_error ~= 0 or output == '' then
     vim.notify('No git worktrees found', vim.log.levels.INFO)
     return
   end
 
-  -- Get current worktree path
-  local current_handle = io.popen('git rev-parse --show-toplevel 2>/dev/null || echo ""')
-  local current_path = current_handle:read('*a'):gsub('%s+$', '')
-  current_handle:close()
+  -- First line is current path, rest is worktree list
+  local current_path = output:match('^([^\n]+)')
+  local result = output:gsub('^[^\n]+\n', '')
 
   -- Parse worktrees into display strings and store data
   local entries = {}
@@ -402,6 +439,13 @@ local function task_picker()
     return
   end
 
+  -- Get all running tmux sessions with one call (instead of N has-session calls)
+  local running_sessions = {}
+  local sessions_output = vim.fn.system('tmux list-sessions -F "#{session_name}" 2>/dev/null')
+  for session in sessions_output:gmatch('[^\n]+') do
+    running_sessions[session] = true
+  end
+
   -- Build entries with running status
   local entries = {}
   local task_data = {}
@@ -409,7 +453,7 @@ local function task_picker()
 
   for _, task in ipairs(tasks) do
     local session_name = project_id .. '_' .. task.name
-    local is_running = vim.fn.system('tmux has-session -t ' .. vim.fn.shellescape(session_name) .. ' 2>/dev/null; echo $?'):gsub('%s+', '') == '0'
+    local is_running = running_sessions[session_name] ~= nil
 
     local display = task.name
     if is_running then
@@ -529,6 +573,7 @@ return {
         "hl+:#FFCC00",
         "info:#996600",
         "prompt:#FFBB00",
+        "query:#FFBB00",
         "pointer:#FFBB00",
         "marker:#FF8800",
         "spinner:#FFBB00",
@@ -539,26 +584,11 @@ return {
     },
 
     files = {
-      fd_opts = "--color=never --type f --hidden --no-ignore --exclude .git --exclude node_modules",
-      fn_transform = [[return function(entry, opts)
-        local max_len = 55
-        local display = entry
-        if #entry > max_len then
-          local head_len = math.floor(max_len * 0.4)
-          local tail_len = max_len - head_len - 5
-          display = entry:sub(1, head_len) .. "<...>" .. entry:sub(-tail_len)
-        end
-        local formatted = FzfLua.make_entry.file(display, opts)
-        return entry .. "\t" .. formatted
-      end]],
-      fzf_opts = { ["--with-nth"] = "2" },
+      fd_opts = "--color=never --type f --hidden --exclude .git",
+      fzf_opts = {},
       file_icons = true,
       color_icons = true,
-      actions = {
-        ["-"] = function()
-          require('fzf-lua').files({ cwd = "~" })
-        end,
-      },
+      actions = {},
     },
 
     grep = {
@@ -654,8 +684,15 @@ return {
         vim.keymap.set('n', '<S-Tab>', 'i<S-Tab><C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
         -- yy to copy the file path
         vim.keymap.set('n', 'yy', 'i<C-y><C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
-        -- - to switch to home directory
-        vim.keymap.set('n', '-', 'i-', { buffer = buf, noremap = true, silent = true })
+        -- - to switch to home directory (normal mode only)
+        vim.keymap.set('n', '-', function()
+          -- Close current fzf window and open files at home
+          vim.cmd('close')
+          vim.schedule(function()
+            files_with_flags({ cwd = "~" })
+            vim.cmd('startinsert')
+          end)
+        end, { buffer = buf, noremap = true, silent = true })
         -- Alt-q to send selected to quickfix in normal mode
         vim.keymap.set('n', '<A-q>', 'i<A-q>', { buffer = buf, noremap = true, silent = true })
       end,
@@ -680,7 +717,8 @@ return {
     map('n', '<leader><leader>', function() fzf.buffers() end, { desc = 'buffers' })
 
     -- Find files
-    map('n', '<leader>sf', function() fzf.files() end, { desc = 'search files' })
+    map('n', '<leader>sf', files_with_flags, { desc = 'search files (live)' })
+    map('n', '<leader>s<C-f>', function() fzf.files() end, { desc = 'search files (standard)' })
 
     -- Live grep (with glob support via "-- *.lua" syntax)
     map('n', '<leader>sg', function() fzf.live_grep() end, { desc = 'search grep' })
