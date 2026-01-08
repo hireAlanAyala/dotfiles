@@ -70,22 +70,27 @@ function M.get_all()
   return M.read_state()
 end
 
--- Check if tmux session exists
-local function session_exists(session_name)
-  local result = vim.fn.system(string.format('tmux has-session -t %s 2>/dev/null', session_name))
-  return vim.v.shell_error == 0
+-- Get all running tmux sessions as a lookup table
+local function get_running_sessions()
+  local sessions = {}
+  local output = vim.fn.system('tmux list-sessions -F "#{session_name}" 2>/dev/null')
+  for session in output:gmatch('[^\n]+') do
+    sessions[session] = true
+  end
+  return sessions
 end
 
 -- Clean up stale sessions (sessions that no longer exist in tmux)
 function M.cleanup_stale()
   local state = M.read_state()
+  local running = get_running_sessions()
   local new_state = {}
   local cleaned = 0
 
   for session_name, info in pairs(state) do
     -- Skip non-session keys (like nvim_socket)
     if session_name ~= 'nvim_socket' then
-      if session_exists(session_name) then
+      if running[session_name] then
         new_state[session_name] = info
       else
         cleaned = cleaned + 1
