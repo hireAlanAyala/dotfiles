@@ -93,7 +93,7 @@ end
 local function files_with_flags(opts)
   opts = opts or {}
   local fzf = require("fzf-lua")
-  local base_fd = "fd --color=never --type f --hidden --exclude .git"
+  local base_fd = "fd --color=never --type f --hidden --full-path --exclude .git"
 
   local cwd = opts.cwd and vim.fn.expand(opts.cwd) or vim.fn.getcwd()
   local home = vim.fn.expand("~")
@@ -109,13 +109,12 @@ local function files_with_flags(opts)
     end
     local search, flags = query_str:match("^(.-)  (.+)$")
     if flags then
-      -- Has delimiter: use search term + flags
+      -- Has delimiter: use search term + flags, let fd filter
       local pattern = search ~= "" and vim.fn.shellescape(search) or ""
       return base_fd .. " " .. flags .. " " .. pattern
     else
-      -- No delimiter: use whole query as search
-      local pattern = query_str ~= "" and vim.fn.shellescape(query_str) or ""
-      return base_fd .. " " .. pattern
+      -- No delimiter: let fzf handle all fuzzy matching
+      return base_fd
     end
   end, {
     prompt = "> " .. display_cwd .. "/",
@@ -717,8 +716,8 @@ return {
     map('n', '<leader><leader>', function() fzf.buffers() end, { desc = 'buffers' })
 
     -- Find files
-    map('n', '<leader>sf', files_with_flags, { desc = 'search files (live)' })
-    map('n', '<leader>s<C-f>', function() fzf.files() end, { desc = 'search files (standard)' })
+    map('n', '<leader>sf', function() fzf.files() end, { desc = 'search files' })
+    map('n', '<leader>s<C-f>', files_with_flags, { desc = 'search files (live flags)' })
 
     -- Live grep (with glob support via "-- *.lua" syntax)
     map('n', '<leader>sg', function() fzf.live_grep() end, { desc = 'search grep' })
