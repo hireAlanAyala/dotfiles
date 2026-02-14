@@ -199,15 +199,13 @@ if [[ -t 0 ]]; then
     # starship prompt
     eval "$(starship init zsh)"
 
-    # atuin shell history (up arrow = session, ctrl-r = all)
-    eval "$(atuin init zsh)"
-
-    # Override atuin session with a stable ID derived from tmux session name.
-    # terminal-persist names tmux sessions as {dir}_{cwdhash}_{name} — strip
-    # the cwd hash so reopening the same terminal reuses its atuin history.
+    # Per-session history files for tmux-backed terminals.
+    # Each terminal gets its own HISTFILE so up-arrow is session-local
+    # and history survives terminal restarts.
     if [[ -n "$TMUX" ]]; then
       local _tsess=$(tmux display-message -p '#S')
       local _cwdhash=$(printf '%s' "$PWD" | sha256sum | cut -c1-6)
-      export ATUIN_SESSION=$(printf '%s' "${_tsess//_${_cwdhash}_/_}" | sha256sum | cut -c1-32)
+      local _session_key=${_tsess//_${_cwdhash}_/_}
+      HISTFILE="$HOME/.zsh_history_${_session_key}"
     fi
 fi
