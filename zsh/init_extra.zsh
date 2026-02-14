@@ -48,8 +48,8 @@ alias 2fa="show-2fa"
 
 alias v="nvim"
 alias c='~/.config/nvim/lua/terminal-persist/claude-wrapper.sh' 
+alias codex="$HOME/.config/arch/bin/codex-wrap"
 alias fd='fd --hidden --no-ignore'
-alias tinit="~/.config/tmux/tmux-init.sh"
 alias nvim-control="$HOME/.config/scripts/nvim-control.sh"
 
 # Docker helpers
@@ -115,7 +115,8 @@ if command -v keychain &> /dev/null; then
     fi
 fi
 
-# PATH is handled by NIX
+# PATH is handled by NIX (except for GOBIN)
+export PATH="$HOME/.local/bin:$PATH"
 
 # Directories
 export GOBIN="$HOME/.local/bin"
@@ -200,4 +201,13 @@ if [[ -t 0 ]]; then
 
     # atuin shell history (up arrow = session, ctrl-r = all)
     eval "$(atuin init zsh)"
+
+    # Override atuin session with a stable ID derived from tmux session name.
+    # terminal-persist names tmux sessions as {dir}_{cwdhash}_{name} — strip
+    # the cwd hash so reopening the same terminal reuses its atuin history.
+    if [[ -n "$TMUX" ]]; then
+      local _tsess=$(tmux display-message -p '#S')
+      local _cwdhash=$(printf '%s' "$PWD" | sha256sum | cut -c1-6)
+      export ATUIN_SESSION=$(printf '%s' "${_tsess//_${_cwdhash}_/_}" | sha256sum | cut -c1-32)
+    fi
 fi
