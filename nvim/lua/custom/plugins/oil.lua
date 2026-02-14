@@ -301,6 +301,86 @@ return {
         end,
         desc = 'Convert media file',
       },
+      ['<leader>ot'] = {
+        function()
+          local oil = require 'oil'
+          local dir = oil.get_current_dir()
+          if not dir then
+            vim.notify('Not in oil buffer', vim.log.levels.WARN)
+            return
+          end
+
+          -- Derive session name from directory basename, replacing dots with dashes
+          local name = vim.fn.fnamemodify(dir:gsub('/$', ''), ':t'):gsub('%.', '-')
+          if name == '' then name = 'root' end
+
+          -- Check if session already exists
+          local result = vim.system({ 'tmux', 'has-session', '-t', name }, { env = { TMUX = '' } }):wait()
+          if result.code == 0 then
+            -- Session exists, switch to it
+            vim.fn.jobstart({ 'tmux', 'switch-client', '-t', name }, { env = { TMUX = '' } })
+            vim.notify('Switched to tmux session: ' .. name)
+          else
+            -- Create new session and switch to it
+            vim.system({ 'tmux', 'new-session', '-d', '-s', name, '-c', dir }, { env = { TMUX = '' } }):wait()
+            vim.fn.jobstart({ 'tmux', 'switch-client', '-t', name }, { env = { TMUX = '' } })
+            vim.notify('Created tmux session: ' .. name)
+          end
+        end,
+        desc = 'Tmux session here',
+      },
+      ['<leader>od'] = {
+        function()
+          local oil = require 'oil'
+          local current_dir = oil.get_current_dir()
+          if not current_dir then
+            vim.notify('Not in oil buffer', vim.log.levels.WARN)
+            return
+          end
+
+          local paths = {}
+          local mode = vim.fn.mode()
+
+          if mode == 'v' or mode == 'V' or mode == '\22' then
+            -- Visual mode: get all selected lines
+            local start_line = vim.fn.line 'v'
+            local end_line = vim.fn.line '.'
+            if start_line > end_line then
+              start_line, end_line = end_line, start_line
+            end
+
+            for lnum = start_line, end_line do
+              local entry = oil.get_entry_on_line(0, lnum)
+              if entry and entry.name ~= '..' then
+                table.insert(paths, current_dir .. entry.name)
+              end
+            end
+            -- Exit visual mode
+            vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Esc>', true, false, true), 'n', false)
+          else
+            -- Normal mode: just the current entry
+            local entry = oil.get_cursor_entry()
+            if entry and entry.name ~= '..' then
+              table.insert(paths, current_dir .. entry.name)
+            end
+          end
+
+          if #paths == 0 then
+            vim.notify('No files selected', vim.log.levels.WARN)
+            return
+          end
+
+          local cmd = { 'dragon-drop', '--and-exit', '--all' }
+          for _, path in ipairs(paths) do
+            table.insert(cmd, path)
+          end
+
+          vim.fn.jobstart(cmd, { detach = true })
+          vim.notify('Drag ' .. #paths .. ' file(s)')
+        end,
+        desc = 'Drag file(s)',
+        mode = { 'n', 'v' },
+      },
     },
   },
   config = function(_, opts)
@@ -328,6 +408,8 @@ return {
           { '<leader>os', desc = 'Sort files', buffer = 0 },
           { '<leader>oi', desc = 'Toggle inline file info', buffer = 0 },
           { '<leader>oc', desc = 'Convert media file', buffer = 0 },
+          { '<leader>od', desc = 'Drag file(s)', buffer = 0 },
+          { '<leader>ot', desc = 'Tmux session here', buffer = 0 },
         }
       end,
     })
@@ -357,6 +439,59 @@ return {
     -- Open oil at startup when no file is specified
     vim.api.nvim_create_autocmd('VimEnter', {
       callback = function()
+        -- Skip for clipboard picker
+        if vim.g.clipboard_picker then return end
+
+        -- Filechooser mode - open oil at the specified directory
+        if vim.g.filechooser_mode then
+          local oil = require('oil')
+          local start_dir = vim.g.filechooser_start_dir or vim.fn.getcwd()
+          local mode_text = vim.g.filechooser_mode == 'save' and 'SAVE' or
+                           vim.g.filechooser_mode == 'directory' and 'DIRECTORY' or 'OPEN'
+
+          -- Global keymaps (ephemeral nvim instance)
+          -- Using <Tab> because <S-CR> and <C-CR> don't work reliably:
+          -- terminal escape sequences aren't recognized by nvim even with CSI u encoding
+          vim.keymap.set({'n', 'v'}, '<Tab>', function()
+            local current_dir = oil.get_current_dir()
+            if not current_dir then return end
+
+            local paths = {}
+            local entry = oil.get_cursor_entry()
+
+            if entry and (entry.type == 'file' or (entry.type == 'directory' and vim.g.filechooser_directory == 1)) then
+              table.insert(paths, current_dir .. entry.name)
+            end
+
+            if #paths == 0 then
+              vim.notify('No file selected', vim.log.levels.WARN)
+              return
+            end
+
+            local output_file = vim.g.filechooser_output
+            if output_file and output_file ~= '' then
+              local file = io.open(output_file, 'w')
+              if file then
+                for _, path in ipairs(paths) do
+                  file:write(path .. '\n')
+                end
+                file:close()
+              end
+            end
+
+            vim.cmd('qa!')
+          end, { desc = 'Confirm selection' })
+
+          vim.keymap.set('n', '<Esc>', function() vim.cmd('qa!') end, { desc = 'Cancel' })
+          vim.keymap.set('n', 'q', function() vim.cmd('qa!') end, { desc = 'Cancel' })
+
+          vim.defer_fn(function()
+            oil.open(start_dir)
+            vim.notify('File Picker: ' .. mode_text .. ' | <Tab> confirm | <Esc> cancel')
+          end, 50)
+          return
+        end
+
         local arg = vim.fn.argv(0)
         -- Only open oil if no file argument was provided
         if arg == '' then
@@ -364,6 +499,7 @@ return {
         end
       end,
     })
+
 
     -- Image extensions for preview
     local image_extensions = { 'png', 'jpg', 'jpeg', 'gif', 'webp', 'avif' }

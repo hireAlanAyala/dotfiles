@@ -58,9 +58,17 @@ local function folders_oil(opts)
   local is_home = cwd == home
   local fzf = require("fzf-lua")
   -- fd outputs relative paths when run from cwd
-  fzf.fzf_exec("fd --type d --hidden --exclude .git --exclude node_modules", {
+  local no_ignore = opts.no_ignore or false
+  local fd_cmd = "fd --type d --hidden --exclude .git"
+  if not no_ignore then
+    fd_cmd = fd_cmd .. " --exclude node_modules"
+  else
+    fd_cmd = fd_cmd .. " --no-ignore"
+  end
+  fzf.fzf_exec(fd_cmd, {
     cwd = cwd,
     prompt = is_home and "~> " or "> ",
+    query = opts.query,
     fn_transform = function(entry)
       return is_home and "~/" .. entry or entry
     end,
@@ -68,16 +76,15 @@ local function folders_oil(opts)
       ["default"] = function(selected)
         if selected and selected[1] then
           local path = selected[1]
-          if is_home then
-            path = path:gsub("^~/", home .. "/")
-          else
-            path = cwd .. "/" .. path
-          end
+          path = cwd .. "/" .. path
           vim.cmd("Oil " .. vim.fn.fnameescape(path))
         end
       end,
-      ["-"] = function()
+      ["alt--"] = function()
         folders_oil({ cwd = "~" })
+      end,
+      ["alt-g"] = function(_, o)
+        folders_oil({ cwd = cwd, no_ignore = true, query = o.last_query })
       end,
     },
     previewer = false,
@@ -167,19 +174,20 @@ end
 local function tmux_sessions()
   local fzf = require("fzf-lua")
 
-  -- Get current session and list in one call
-  local cmd = parent_tmux('display-message -p "CURRENT:#{session_name}"') .. ' && ' ..
-              parent_tmux('list-sessions -F "#{session_name}#{?session_attached, (attached),}"') .. ' 2>/dev/null || echo ""'
-  local output = vim.fn.system(cmd)
+  -- Get current session and list in one tmux connection
+  -- Use vim.system() instead of vim.fn.system() - it uses libuv directly and is much faster
+  local cmd = { 'tmux', 'display-message', '-p', 'CURRENT:#{session_name}', ';', 'list-sessions', '-F', '#{session_name}#{?session_attached, (attached),}' }
+  local result = vim.system(cmd, { env = { TMUX = '' } }):wait()
+  local output = result.stdout or ''
 
   local current_session = output:match('CURRENT:([^\n]+)')
-  local result = output:gsub('CURRENT:[^\n]+\n?', '')
+  local sessions_output = output:gsub('CURRENT:[^\n]+\n?', '')
 
   -- Parse all sessions and separate parent sessions from sub-sessions
   local all_sessions = {}
   local sub_sessions = {}
 
-  for line in result:gmatch('[^\n]+') do
+  for line in sessions_output:gmatch('[^\n]+') do
     local name, is_attached = line:match('^([^%(]+)(.*)$')
     if name then
       name = name:gsub('%s+$', '') -- trim whitespace
@@ -238,7 +246,8 @@ local function tmux_sessions()
         if selected and selected[1] then
           -- Extract session name (remove +N and * indicators)
           local session_name = selected[1]:match('^([^%s]+)')
-          vim.fn.system(parent_tmux('switch-client -t ' .. vim.fn.shellescape(session_name)))
+          -- jobstart is async, avoiding blocking nvim during session switch
+          vim.fn.jobstart({ 'tmux', 'switch-client', '-t', session_name }, { env = { TMUX = '' } })
         end
       end,
       ["ctrl-x"] = function(selected)
@@ -689,15 +698,10 @@ return {
         vim.keymap.set('n', '<S-Tab>', 'i<S-Tab><C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
         -- yy to copy the file path
         vim.keymap.set('n', 'yy', 'i<C-y><C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
-        -- - to switch to home directory (normal mode only)
-        -- files_with_flags({ cwd = "~" }); vim.cmd('startinsert')
-        vim.keymap.set('n', '-', function()
-          -- Close current fzf window and open files at home
-          vim.cmd('close')
-          vim.schedule(function()
-            fzf.files({ cwd = "~" })
-          end)
-        end, { buffer = buf, noremap = true, silent = true })
+        -- Forward - to alt-- so individual pickers can define ["alt--"] actions
+        vim.keymap.set('n', '-', 'i<A--><C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
+        -- Forward g to alt-g so individual pickers can define ["alt-g"] to drop ignores
+        vim.keymap.set('n', 'g', 'i<A-g><C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
         -- Alt-q to send selected to quickfix in normal mode
         vim.keymap.set('n', '<A-q>', 'i<A-q>', { buffer = buf, noremap = true, silent = true })
       end,
@@ -722,11 +726,24 @@ return {
     map('n', '<leader><leader>', function() fzf.buffers() end, { desc = 'buffers' })
 
     -- Find files
-    map('n', '<leader>sf', function() fzf.files() end, { desc = 'search files' })
+    map('n', '<leader>sf', function()
+      fzf.files({
+        actions = {
+          ["alt--"] = function() fzf.files({ cwd = "~" }) end,
+          ["alt-g"] = function(_, opts) fzf.files({ fd_opts = "--color=never --type f --hidden --no-ignore --exclude .git", query = opts.last_query }) end,
+        },
+      })
+    end, { desc = 'search files' })
     map('n', '<leader>s<C-f>', files_with_flags, { desc = 'search files (live flags)' })
 
     -- Live grep (with glob support via "-- *.lua" syntax)
-    map('n', '<leader>sg', function() fzf.live_grep() end, { desc = 'search grep' })
+    map('n', '<leader>sg', function()
+      fzf.live_grep({
+        actions = {
+          ["alt-g"] = function(_, opts) fzf.live_grep({ rg_opts = "--color=always --line-number --column --smart-case --hidden --no-ignore --glob '!.git'", query = opts.last_query }) end,
+        },
+      })
+    end, { desc = 'search grep' })
 
     -- Grep word under cursor
     map('n', '<leader>sw', function() fzf.grep_cword() end, { desc = 'search word' })
@@ -767,7 +784,7 @@ return {
     map('n', '<leader>gw', git_worktrees, { desc = 'git worktrees' })
 
     -- === Tmux ===
-    map('n', '<leader>ts', tmux_sessions, { desc = 'tmux sessions' })
+    map('n', '<leader>ss', tmux_sessions, { desc = 'search sessions' })
 
     -- === Tasks ===
     map('n', '<leader>tt', task_picker, { desc = 'tasks' })
