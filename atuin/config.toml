@@ -11,10 +11,12 @@ filter_mode_shell_up_key_binding = "session"
 filter_mode = "global"
 
 # Show preview of full command
-show_preview = true
+style = "compact"
+show_preview = false
 
 # Inline height (0 = fullscreen TUI)
-inline_height = 20
+inline_height = 1
+show_help = false
 
 # Don't sync to remote server
 auto_sync = false
