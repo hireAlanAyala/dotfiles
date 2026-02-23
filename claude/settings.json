@@ -30,7 +30,8 @@
       "Bash(test:*)",
       "Bash(node:*)",
       "Bash(python:*)",
-      "Bash(go run:*)",
+      "Bash(go:*)",
+      "Bash(templ:*)",
       "Bash(cargo build)",
       "Bash(cargo test)",
       "Bash(cargo run)",
@@ -114,5 +115,6 @@
     "gopls-lsp@claude-plugins-official": true,
     "pyright-lsp@claude-plugins-official": true
   },
-  "alwaysThinkingEnabled": true
+  "alwaysThinkingEnabled": true,
+  "effortLevel": "medium"
 }
