@@ -130,6 +130,7 @@ return {
         Whitespace = { fg = 'palette.black.bright' },
         NonText = { fg = 'palette.black.bright' },
         IncSearch = { bg = 'palette.sel1' },
+        Visual = { bg = c.from_hex('#0A0A08'):blend(c.from_hex '#FFCC00', 0.25):to_css() },
         CursorLine = { bg = c.from_hex('#0A0A08'):blend(c.from_hex '#FFCC00', 0.08):to_css() },
         Normal = { fg = 'palette.fg1' },
 

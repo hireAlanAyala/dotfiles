@@ -48,14 +48,6 @@ vim.keymap.set('n', '<leader>tc', function()
   require('custom.task-runner').create_task()
 end, { desc = 'Create task' })
 
--- Alt+I/O test notifications
-vim.keymap.set('n', '<A-o>', function()
-  vim.notify('Alt+O pressed - Jump back', vim.log.levels.INFO, { timeout = 1000 })
-end, { desc = 'Test Alt+O notification' })
-
-vim.keymap.set('n', '<A-i>', function()
-  vim.notify('Alt+I pressed - Jump forward', vim.log.levels.INFO, { timeout = 1000 })
-end, { desc = 'Test Alt+I notification' })
 
 -- Quickfix (using fzf-lua)
 vim.keymap.set('n', 'sq', function() require('fzf-lua').quickfix() end, { desc = 'Search [Q]uickfix' })
