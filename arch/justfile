@@ -7,7 +7,7 @@ set quiet
 dir := justfile_directory()
 
 # Full system setup
-all: etc sudoers systemd firewall
+all: etc sudoers systemd firewall bin
 
 # /etc symlinks and configs
 # Only tracks customized configs - the rest of /etc stays system-managed
@@ -18,6 +18,9 @@ etc:
     sudo ln -sfn "{{dir}}/etc/boot/loader" /etc/boot/loader
     sudo ln -sfn "{{dir}}/etc/pacman.d/hooks" /etc/pacman.d/hooks
     sudo ln -sf "{{dir}}/etc/systemd/zram-generator.conf" /etc/systemd/zram-generator.conf
+    sudo mkdir -p /etc/systemd/network /etc/systemd/system
+    sudo cp "{{dir}}"/etc/systemd/network/*.network /etc/systemd/network/
+    sudo cp "{{dir}}"/etc/systemd/system/*.{service,timer} /etc/systemd/system/
     sudo ln -sfn "{{dir}}/etc/tlp" /etc/tlp
 
 # Allow wheel group to use sudo
@@ -40,13 +43,13 @@ systemd-system:
     -sudo systemctl disable --now NetworkManager
     sudo systemctl enable --now iwd systemd-networkd systemd-resolved
     sudo ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
-    sudo systemctl enable --now bluetooth fstrim.timer earlyoom tlp.service reflector.timer ufw
+    -sudo systemctl enable --now bluetooth fstrim.timer earlyoom tlp.service reflector.timer ufw pacman-sync.timer
     -sudo systemctl mask systemd-rfkill.service systemd-rfkill.socket
 
 # Enable user services
 systemd-user:
-    systemctl --user enable pipewire pipewire-pulse wireplumber p11-kit-server.socket
-    systemctl --user enable elephant.service battery-monitor.timer pipewire-session-manager.service cache-cleanup.timer rustic-backup.timer
+    -systemctl --user enable pipewire pipewire-pulse wireplumber p11-kit-server.socket
+    -systemctl --user enable elephant.service battery-monitor.timer pipewire-session-manager.service cache-cleanup.timer rustic-backup.timer wifi-prefer.timer claude-throttle.service
 
 # UFW firewall rules
 firewall:
@@ -73,7 +76,13 @@ packages-aur:
 # Install all packages (pacman + AUR)
 packages-all: packages packages-aur
 
+# Symlink bin scripts
+bin:
+    mkdir -p ~/.local/bin
+    for f in "{{dir}}"/bin/*; do ln -sf "$f" ~/.local/bin/; done
+
 # Show what will be linked
 check:
     @echo "etc: pacman.conf bluetooth boot/loader pacman.d/hooks systemd/zram-generator.conf tlp"
     @echo "systemd/user:" && ls "{{dir}}/systemd/user/"
+    @echo "bin:" && ls "{{dir}}/bin/"
