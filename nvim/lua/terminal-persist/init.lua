@@ -287,16 +287,75 @@ function M.setup(opts)
     vim.defer_fn(M.restore, 100)
   end
 
-  -- Terminal buffer options
+  -- Terminal buffer options: disable line numbers and signcolumn for terminals.
+  -- We use vim.wo (window-local), so settings persist when switching buffers in the same window.
+  -- To avoid clobbering the window's original settings, we save them on BufEnter and restore on BufLeave.
   vim.api.nvim_create_autocmd('BufEnter', {
     callback = function(args)
       if vim.b[args.buf].terminal_persist_managed then
+        local win = vim.api.nvim_get_current_win()
+        vim.w[win]._terminal_persist_saved = {
+          number = vim.wo.number,
+          relativenumber = vim.wo.relativenumber,
+          signcolumn = vim.wo.signcolumn,
+        }
         vim.wo.number = false
         vim.wo.relativenumber = false
         vim.wo.signcolumn = 'no'
       end
     end,
   })
+
+  vim.api.nvim_create_autocmd('BufLeave', {
+    callback = function(args)
+      if vim.b[args.buf].terminal_persist_managed then
+        local win = vim.api.nvim_get_current_win()
+        local saved = vim.w[win]._terminal_persist_saved
+        if saved then
+          vim.wo.number = saved.number
+          vim.wo.relativenumber = saved.relativenumber
+          vim.wo.signcolumn = saved.signcolumn
+        end
+      end
+    end,
+  })
+
+  -- Write focused terminal job PID for claude-throttle daemon
+  local function write_throttle_focus()
+    local buf = vim.api.nvim_get_current_buf()
+    if vim.bo[buf].buftype ~= 'terminal' then return end
+    local name = vim.b[buf].persist_name
+    if name and name:match('^a_') then
+      local chan = vim.b[buf].terminal_job_id
+      if chan then
+        local pid = vim.fn.jobpid(chan)
+        local f = io.open('/tmp/claude-throttle-focused', 'w')
+        if f then f:write(tostring(pid)); f:close() end
+      end
+    end
+  end
+
+  -- Update focus immediately on tmux session/pane switch
+  vim.api.nvim_create_autocmd('FocusGained', {
+    callback = write_throttle_focus,
+  })
+
+  -- Clear focus file when leaving so daemon doesn't throttle based on stale data
+  vim.api.nvim_create_autocmd('FocusLost', {
+    callback = function()
+      os.remove('/tmp/claude-throttle-focused')
+    end,
+  })
+
+  -- Also update on keypress in terminal buffers (debounced)
+  local throttle_last_write = 0
+  vim.on_key(function()
+    if vim.bo.buftype ~= 'terminal' then return end
+    local now = vim.uv.now() -- ms
+    if now - throttle_last_write < 2000 then return end
+    throttle_last_write = now
+    write_throttle_focus()
+  end)
 
   -- Cleanup on buffer close
   vim.api.nvim_create_autocmd({ 'BufDelete', 'BufWipeout' }, {

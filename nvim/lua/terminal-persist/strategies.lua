@@ -33,9 +33,8 @@ M.strategies.tmux = {
   end,
 
   kill = function(self, session_name)
-    if self:session_exists(session_name) then
-      vim.fn.system(string.format('tmux kill-session -t "%s" 2>&1', session_name))
-    end
+    -- Fire-and-forget, no need to check existence first
+    vim.system({ 'tmux', 'kill-session', '-t', session_name }, { text = true })
   end,
 }
 

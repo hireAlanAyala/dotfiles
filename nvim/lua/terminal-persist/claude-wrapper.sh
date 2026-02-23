@@ -30,6 +30,12 @@
 #   6. Reattach to tmux session (back to shell)
 
 STATE_FILE="${PWD}/.nvim/terminal-sessions.json"
+DEBUG_SCRIPT="$HOME/.config/nvim/lua/terminal-persist/claude-wrapper-debug.sh"
+
+debug() {
+  [[ "${CLAUDE_WRAPPER_DEBUG:-0}" == "1" && -x "$DEBUG_SCRIPT" ]] || return 0
+  "$DEBUG_SCRIPT" "$@"
+}
 
 # Cleanup helper (called after claude exits)
 [[ "$1" == "--cleanup" ]] && {
@@ -38,15 +44,32 @@ STATE_FILE="${PWD}/.nvim/terminal-sessions.json"
     jq --arg s "$2" 'if .[$s] then .[$s] |= del(.claude_session_id) else . end' \
       "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
   }
+  debug "cleanup session=$2 state_file=$STATE_FILE"
   exit 0
 }
 
+# Determine if this should be treated as an interactive TUI run
+# TUI runs get the tmux "dance"; non-interactive (pipes, -p, -h/--help, -v/--version) do not.
+is_tui=1
+for arg in "$@"; do
+  case "$arg" in
+    -h|--help|-p|-v|--version) is_tui=0 ;;
+  esac
+done
+[[ -t 0 && -t 1 ]] || is_tui=0
+
 # Get tmux session name if in tmux
-# If not in tmux, SESSION stays empty and we fall through to vanilla pass-through
 [[ -n "$TMUX" ]] && SESSION=$(tmux display-message -p '#S')
 
-# Only manage if in a terminal-persist tmux session (SESSION set + exists in state file)
-if [[ -n "$SESSION" ]] && jq -e --arg s "$SESSION" '.[$s]' "$STATE_FILE" &>/dev/null; then
+# Only manage sessions if inside a terminal-persist tmux session
+manage_session=0
+if [[ -n "$SESSION" && $is_tui -eq 1 ]]; then
+  if jq -e --arg s "$SESSION" '.[$s]' "$STATE_FILE" &>/dev/null; then
+    manage_session=1
+  fi
+fi
+
+if [[ $manage_session -eq 1 ]]; then
   case "$1" in
     -t)
       # Resume stored session for this terminal
@@ -59,7 +82,12 @@ if [[ -n "$SESSION" ]] && jq -e --arg s "$SESSION" '.[$s]' "$STATE_FILE" &>/dev/
       shift
       args=(--continue "$@")
       ;;
-    -h|-p|-r|-v)
+    -r)
+      # Resume by user-specified session ID (tmux dance, no state tracking)
+      shift
+      args=(-r "$@")
+      ;;
+    -h|-p|-v)
       # Vanilla pass-through (see header for rationale)
       exec claude "$@"
       ;;
@@ -72,15 +100,21 @@ if [[ -n "$SESSION" ]] && jq -e --arg s "$SESSION" '.[$s]' "$STATE_FILE" &>/dev/
       args=(--session-id "$id" "$@")
       ;;
   esac
+else
+  args=("$@")
+fi
 
+debug "session=$SESSION tmux=${TMUX:-0} is_tui=$is_tui manage_session=$manage_session args=${args[*]}"
+
+if [[ -n "$SESSION" && $is_tui -eq 1 ]]; then
   # Detach tmux, run claude directly, cleanup on graceful exit, reattach
   # Post-detach command runs in nvim's terminal (outside tmux):
   post=""
   # 1. Run claude TUI
   post+="claude ${args[*]}; "
-  # 2. Graceful exit (code 0): cleanup session ID from state
+  # 3. Graceful exit (code 0): cleanup session ID from state
   post+="[ \$? -eq 0 ] && ~/.config/nvim/lua/terminal-persist/claude-wrapper.sh --cleanup '$SESSION'; "
-  # 3. Reattach to tmux session
+  # 4. Reattach to tmux session
   post+="tmux attach -t '$SESSION'"
   exec tmux detach-client -E "$post"
 fi
