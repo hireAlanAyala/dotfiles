@@ -48,6 +48,9 @@
 # # Just for example:
 # resize-overlay-duration = 4s 200ms
 font-family = FiraCode Nerd Font
+font-feature = -calt
+font-feature = -liga
+font-feature = -dlig
 
 keybind = shift+enter=text:\x1b\r
 # force paste from regular clipboard instead of primary clipboard om SUPER + V
