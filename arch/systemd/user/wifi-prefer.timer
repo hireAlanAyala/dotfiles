@@ -1,0 +1,11 @@
+[Unit]
+Description=Preferred WiFi network check
+Requires=wifi-prefer.service
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+AccuracySec=30sec
+
+[Install]
+WantedBy=timers.target

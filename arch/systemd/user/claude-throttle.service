@@ -1,0 +1,12 @@
+[Unit]
+Description=Auto-throttle unfocused Claude Code instances
+After=graphical-session.target
+
+[Service]
+ExecStart=%h/.local/bin/claude-throttle daemon
+ExecStop=%h/.local/bin/claude-throttle stop
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,11 @@
+[Unit]
+Description=Auto-extract archives in Downloads
+After=default.target
+
+[Service]
+ExecStart=%h/.local/bin/auto-extract
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
