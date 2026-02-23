@@ -1,6 +1,6 @@
+7zip
 abduco
 alsa-utils
-atuin
 base
 base-devel
 bemenu
@@ -11,7 +11,9 @@ btop
 chromium
 cliphist
 cool-retro-term
+deno
 earlyoom
+foot
 freecad
 fuzzel
 ghostty
@@ -20,6 +22,7 @@ grim
 hyprland
 hyprpaper
 impala
+inotify-tools
 intel-media-driver
 intel-ucode
 iwd
@@ -28,6 +31,7 @@ kicad
 kitty
 less
 libnotify
+libpst
 libva-utils
 linux
 linux-firmware
@@ -37,6 +41,7 @@ mise
 mpv
 noto-fonts-cjk
 noto-fonts-emoji
+openbsd-netcat
 opencv
 openscad
 openssh
@@ -71,6 +76,7 @@ ttf-cascadia-mono-nerd
 ttf-firacode-nerd
 ufw
 unpaper
+unrar
 upower
 uwsm
 vim
@@ -79,9 +85,12 @@ wf-recorder
 which
 wl-clipboard
 wofi
+wrangler
 wtype
+xclip
 xdg-desktop-portal-hyprland
 xournalpp
+yazi
 ydotool
 zram-generator
 zsh-autosuggestions
