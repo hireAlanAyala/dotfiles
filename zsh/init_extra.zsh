@@ -50,6 +50,7 @@ alias v="nvim"
 alias c='~/.config/nvim/lua/terminal-persist/claude-wrapper.sh' 
 alias codex="$HOME/.config/arch/bin/codex-wrap"
 alias fd='fd --hidden --no-ignore'
+alias vm='cd ~/vms/windows && quickemu --vm windows-11.conf --display spice'
 alias nvim-control="$HOME/.config/scripts/nvim-control.sh"
 
 # Docker helpers

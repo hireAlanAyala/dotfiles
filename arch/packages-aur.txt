@@ -1,11 +1,16 @@
 admesh
 bambustudio-bin
+dragon-drop
 dtach
 google-cloud-cli
 microsoft-edge-stable-bin
 mpvpaper
+ookla-speedtest-bin
+opencode-bin
 pipe-viewer-git
+quickemu
 sunshine
 walker
+xdg-desktop-portal-termfilechooser-hunkyburrito-git
 yay-bin
 yay-bin-debug
