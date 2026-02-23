@@ -1,0 +1,59 @@
+#!/bin/bash
+# Wrapper script for xdg-desktop-portal-termfilechooser
+# Launches nvim with oil in picker mode
+#
+# Args from portal (see xdg-desktop-portal-termfilechooser(5)):
+# $1 = multiple (0 or 1)
+# $2 = directory (0 or 1)
+# $3 = save (0 or 1)
+# $4 = path (starting directory)
+# $5 = out (output file to write selected paths)
+# $6 = debug level
+
+set -e
+
+multiple="${1:-0}"
+directory="${2:-0}"
+save="${3:-0}"
+path="${4:-$HOME}"
+out="$5"
+
+# In save mode, path is a full file path (dir + suggested filename)
+if [[ "$save" = "1" && ! -d "$path" ]]; then
+    save_filename="$(basename "$path")"
+    path="$(dirname "$path")"
+fi
+
+# Validate directory
+if [[ ! -d "$path" ]]; then
+    path="$HOME"
+fi
+
+# Escape single quotes for vim strings
+escape_vim() {
+    printf '%s' "$1" | sed "s/'/\\\\'/g"
+}
+
+path_esc=$(escape_vim "$path")
+out_esc=$(escape_vim "$out")
+save_filename_esc=$(escape_vim "${save_filename:-}")
+
+# Determine mode for UI feedback
+if [[ "$save" = "1" ]]; then
+    mode="save"
+elif [[ "$directory" = "1" ]]; then
+    mode="directory"
+else
+    mode="open"
+fi
+
+# Launch ghostty with nvim in picker mode
+# Variables are set via --cmd (runs before plugins load)
+# Oil opening is handled by the VimEnter autocmd in oil.lua
+exec ghostty --title="File Picker" -e nvim \
+    --cmd "let g:filechooser_mode='$mode'" \
+    --cmd "let g:filechooser_output='$out_esc'" \
+    --cmd "let g:filechooser_multiple=$multiple" \
+    --cmd "let g:filechooser_directory=$directory" \
+    --cmd "let g:filechooser_start_dir='$path_esc'" \
+    --cmd "let g:filechooser_save_filename='$save_filename_esc'"

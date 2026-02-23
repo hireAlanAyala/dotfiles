@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+# Test different CPU throttling mechanisms on Claude Code
+set -euo pipefail
+
+PROMPT="Write a 1000 word essay about the history of unix. Include details about every major version and variant."
+
+measure_cpu() {
+    local pid=$1
+    local duration=${2:-5}
+    local hz=$(getconf CLK_TCK)
+
+    local t1=$(awk '{print $14+$15}' /proc/$pid/stat 2>/dev/null || echo 0)
+    local start=$(date +%s.%N)
+    sleep "$duration"
+    local t2=$(awk '{print $14+$15}' /proc/$pid/stat 2>/dev/null || echo 0)
+    local end=$(date +%s.%N)
+
+    awk -v t1="$t1" -v t2="$t2" -v s="$start" -v e="$end" -v hz="$hz" \
+        'BEGIN { printf "%.1f", (t2-t1) / ((e-s) * hz) * 100 }'
+}
+
+echo "Starting headless Claude for streaming test..."
+echo "$PROMPT" | claude -p --output-format stream-json --verbose > /tmp/claude-throttle-test.out 2>&1 &
+CLAUDE_PID=$!
+
+# Wait for process to start
+sleep 2
+
+if ! kill -0 $CLAUDE_PID 2>/dev/null; then
+    echo "Claude failed to start"
+    cat /tmp/claude-throttle-test.out
+    exit 1
+fi
+
+echo "Claude PID: $CLAUDE_PID"
+echo ""
+
+case "${1:-baseline}" in
+    baseline)
+        echo "=== BASELINE (no throttling) ==="
+        echo "Measuring for 10s..."
+        cpu=$(measure_cpu $CLAUDE_PID 10)
+        echo "CPU: ${cpu}%"
+        ;;
+
+    nice)
+        echo "=== TEST: nice +19 ==="
+        echo "Baseline (5s)..."
+        cpu1=$(measure_cpu $CLAUDE_PID 5)
+        echo "Before: ${cpu1}%"
+
+        echo "Applying nice +19..."
+        renice +19 -p $CLAUDE_PID > /dev/null
+
+        echo "After nice (5s)..."
+        cpu2=$(measure_cpu $CLAUDE_PID 5)
+        echo "After: ${cpu2}%"
+        ;;
+
+    idle)
+        echo "=== TEST: SCHED_IDLE ==="
+        echo "Baseline (5s)..."
+        cpu1=$(measure_cpu $CLAUDE_PID 5)
+        echo "Before: ${cpu1}%"
+
+        echo "Applying SCHED_IDLE..."
+        chrt -i 0 -p $CLAUDE_PID 2>/dev/null || echo "(may need root)"
+
+        echo "After SCHED_IDLE (5s)..."
+        cpu2=$(measure_cpu $CLAUDE_PID 5)
+        echo "After: ${cpu2}%"
+        ;;
+
+    pulse)
+        echo "=== TEST: Pulse SIGSTOP (20% duty) ==="
+        echo "Baseline (5s)..."
+        cpu1=$(measure_cpu $CLAUDE_PID 5)
+        echo "Before: ${cpu1}%"
+
+        echo "Starting pulse (5s)..."
+        (
+            end=$((SECONDS + 5))
+            while [[ $SECONDS -lt $end ]] && kill -0 $CLAUDE_PID 2>/dev/null; do
+                kill -CONT $CLAUDE_PID 2>/dev/null
+                sleep 0.1
+                kill -STOP $CLAUDE_PID 2>/dev/null
+                sleep 0.4
+            done
+            kill -CONT $CLAUDE_PID 2>/dev/null
+        ) &
+        PULSE_PID=$!
+
+        cpu2=$(measure_cpu $CLAUDE_PID 5)
+        wait $PULSE_PID 2>/dev/null || true
+        kill -CONT $CLAUDE_PID 2>/dev/null
+        echo "After: ${cpu2}%"
+        ;;
+
+    *)
+        echo "Usage: $0 [baseline|nice|idle|pulse]"
+        kill $CLAUDE_PID 2>/dev/null
+        exit 1
+        ;;
+esac
+
+echo ""
+echo "Waiting for Claude to finish..."
+wait $CLAUDE_PID 2>/dev/null || true
+
+echo ""
+echo "Response received:"
+tail -3 /tmp/claude-throttle-test.out | jq -r 'select(.type=="result") | "Duration: \(.duration_ms)ms, Tokens: \(.usage.output_tokens)"' 2>/dev/null || echo "(check /tmp/claude-throttle-test.out)"

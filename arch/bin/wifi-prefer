@@ -1,0 +1,16 @@
+#!/bin/bash
+# Switch to preferred network if available
+
+PREFERRED="alan phone"
+IFACE="wlan0"
+
+CURRENT=$(iwctl station "$IFACE" show | awk '/Connected network/{print $3, $4}')
+
+[[ "$CURRENT" == "$PREFERRED" ]] && exit 0
+
+iwctl station "$IFACE" scan
+sleep 2
+
+if iwctl station "$IFACE" get-networks | grep -qF "$PREFERRED"; then
+    iwctl station "$IFACE" connect "$PREFERRED"
+fi

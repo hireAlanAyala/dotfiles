@@ -1,0 +1,294 @@
+#!/usr/bin/env bash
+# Auto-throttle unfocused Claude Code instances
+#
+# Focus is determined by nvim's terminal-persist plugin, which writes
+# the terminal job PID to FOCUSED_FILE on keyboard input in a_* buffers.
+# The focused claude (matched by TTY) always runs unthrottled.
+# Unfocused active instances: controlled by UNFOCUSED_ACTIVE_THROTTLE.
+#   "none"  = unthrottled (default)
+#   number  = pulse duty cycle, e.g. 0.2 = 20% on / 80% off
+#
+# Usage:
+#   claude-throttle daemon   - Run daemon (focus set automatically by nvim)
+#   claude-throttle status   - Show all instances and their state
+#   claude-throttle stop     - Stop daemon and resume all
+
+set -euo pipefail
+
+POLL_INTERVAL=0.5
+FOCUSED_FILE="/tmp/claude-throttle-focused"
+PID_FILE="/tmp/claude-throttle.pid"
+
+# Unfocused active throttle: "none" or a duty cycle ratio (0.0-1.0)
+UNFOCUSED_ACTIVE_THROTTLE="${UNFOCUSED_ACTIVE_THROTTLE:-none}"
+
+# Pulse timing (total cycle = 0.5s, ratio controls on/off split)
+PULSE_CYCLE=0.5
+
+# Grace period for new processes (don't throttle during startup)
+GRACE_PERIOD=15  # seconds
+
+# Kill idle instances after this many seconds
+IDLE_KILL_TIMEOUT=300  # 5 minutes
+
+# Track per-PID state for transition notifications
+declare -A PREV_STATE   # pid -> focused|pulse|stopped
+declare -A STOPPED_AT   # pid -> epoch when first stopped
+
+get_claude_pids() {
+    pgrep -f "^claude" 2>/dev/null | while read pid; do
+        # Filter to actual claude processes (not wrappers)
+        if [[ -f "/proc/$pid/exe" ]] && readlink "/proc/$pid/exe" 2>/dev/null | grep -q "claude"; then
+            echo "$pid"
+        fi
+    done
+}
+
+get_focused_tty() {
+    local pid=""
+    if [[ -f "$FOCUSED_FILE" ]]; then
+        pid=$(cat "$FOCUSED_FILE" 2>/dev/null || true)
+    fi
+    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+        ps -o tty= -p "$pid" 2>/dev/null | tr -d ' '
+    else
+        echo ""
+    fi
+}
+
+get_proc_tty() {
+    local pid=$1
+    ps -o tty= -p "$pid" 2>/dev/null | tr -d ' '
+}
+
+is_focused() {
+    local pid=$1
+    local focused_tty=$2
+
+    [[ -z "$focused_tty" || "$focused_tty" == "?" ]] && return 1
+
+    local pid_tty
+    pid_tty=$(get_proc_tty "$pid")
+    [[ "$pid_tty" == "$focused_tty" ]]
+}
+
+is_active() {
+    local pid=$1
+    local w1 w2
+
+    w1=$(awk '/^wchar/{print $2}' /proc/$pid/io 2>/dev/null) || return 1
+    sleep 0.3
+    w2=$(awk '/^wchar/{print $2}' /proc/$pid/io 2>/dev/null) || return 1
+
+    [[ $((w2 - w1)) -gt 0 ]]
+}
+
+get_state() {
+    local pid=$1
+    ps -o state= -p "$pid" 2>/dev/null | head -c1
+}
+
+do_stop() {
+    local pid=$1
+    local state=$(get_state "$pid")
+    if [[ "$state" != "T" ]]; then
+        kill -STOP "$pid" 2>/dev/null
+        return 0
+    fi
+    return 1
+}
+
+do_cont() {
+    local pid=$1
+    local state=$(get_state "$pid")
+    if [[ "$state" == "T" ]]; then
+        kill -CONT "$pid" 2>/dev/null
+        return 0
+    fi
+    return 1
+}
+
+pulse_throttle() {
+    local pid=$1
+    local ratio=$2
+    local on=$(awk "BEGIN{printf \"%.2f\", $PULSE_CYCLE * $ratio}")
+    local off=$(awk "BEGIN{printf \"%.2f\", $PULSE_CYCLE * (1 - $ratio)}")
+    kill -CONT "$pid" 2>/dev/null
+    sleep "$on"
+    kill -STOP "$pid" 2>/dev/null
+    sleep "$off"
+}
+
+status_cmd() {
+    local focused_tty=$(get_focused_tty)
+    echo "Claude instances:"
+    echo ""
+    printf "  %-8s %-6s %-8s %-10s %s\n" "PID" "STATE" "CPU%" "STATUS" "NOTE"
+    echo "  ──────────────────────────────────────────────────"
+
+    for pid in $(get_claude_pids); do
+        local state=$(get_state "$pid")
+        local cpu=$(ps -o %cpu= -p "$pid" 2>/dev/null | tr -d ' ')
+        local status=""
+        local note=""
+
+        if is_focused "$pid" "$focused_tty"; then
+            note="(focused)"
+        fi
+
+        if [[ "$state" == "T" ]]; then
+            status="STOPPED"
+        elif is_active "$pid"; then
+            status="ACTIVE"
+        else
+            status="IDLE"
+        fi
+
+        printf "  %-8s %-6s %-8s %-10s %s\n" "$pid" "$state" "$cpu" "$status" "$note"
+    done
+
+    echo ""
+    if [[ -n "$focused_tty" && "$focused_tty" != "?" ]]; then
+        echo "Focused TTY: $focused_tty"
+    else
+        echo "No focused session"
+    fi
+
+    if [[ -f "$PID_FILE" ]] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+        echo "Daemon: running (PID $(cat "$PID_FILE"))"
+    else
+        echo "Daemon: not running"
+    fi
+}
+
+daemon_cmd() {
+    echo $$ > "$PID_FILE"
+
+    trap 'echo "Stopping daemon..."; for pid in $(get_claude_pids); do kill -CONT "$pid" 2>/dev/null; done; rm -f "$PID_FILE"; exit 0' INT TERM
+
+    echo "Claude throttle daemon started (PID $$)"
+    echo "Focus is set automatically by nvim terminal-persist (TermInput)"
+    echo "Press Ctrl+C to stop"
+    echo ""
+
+    while true; do
+        local focused_tty=$(get_focused_tty)
+        local claude_pids
+        claude_pids=$(get_claude_pids)
+        local count=$(echo "$claude_pids" | grep -c . 2>/dev/null || echo 0)
+
+        for pid in $claude_pids; do
+            # Skip new processes still starting up
+            local age
+            age=$(ps -o etimes= -p "$pid" 2>/dev/null | tr -d ' ') || continue
+            [[ "$age" -lt "$GRACE_PERIOD" ]] && continue
+
+            local prev="${PREV_STATE[$pid]:-}"
+
+            # Only 1 instance — never throttle it
+            if [[ "$count" -le 1 ]]; then
+                do_cont "$pid" || true
+                if [[ "$prev" != "focused" ]]; then
+                    echo "[$(date +%H:%M:%S)] Only instance $pid — unthrottled"
+                fi
+                PREV_STATE[$pid]="focused"
+                unset "STOPPED_AT[$pid]"
+                continue
+            fi
+
+            # Focused instance — always unthrottled
+            if is_focused "$pid" "$focused_tty"; then
+                do_cont "$pid" || true
+                if [[ "$prev" != "focused" ]]; then
+                    notify-send -t 3000 "Claude Throttle" "Resumed $pid (focused)"
+                    echo "[$(date +%H:%M:%S)] Resumed focused instance $pid"
+                fi
+                PREV_STATE[$pid]="focused"
+                unset "STOPPED_AT[$pid]"
+                continue
+            fi
+
+            # Unfocused but active
+            if is_active "$pid"; then
+                unset "STOPPED_AT[$pid]"
+                if [[ "$UNFOCUSED_ACTIVE_THROTTLE" == "none" ]]; then
+                    do_cont "$pid" || true
+                    if [[ "$prev" != "active" ]]; then
+                        notify-send -t 3000 "Claude Throttle" "Unthrottled $pid (active, unfocused)"
+                        echo "[$(date +%H:%M:%S)] Unthrottled active instance $pid"
+                    fi
+                    PREV_STATE[$pid]="active"
+                    continue
+                else
+                    if [[ "$prev" != "pulse" ]]; then
+                        notify-send -t 3000 "Claude Throttle" "Pulse throttling $pid (${UNFOCUSED_ACTIVE_THROTTLE} duty, unfocused)"
+                        echo "[$(date +%H:%M:%S)] Pulse throttling instance $pid (${UNFOCUSED_ACTIVE_THROTTLE} duty)"
+                    fi
+                    PREV_STATE[$pid]="pulse"
+                    pulse_throttle "$pid" "$UNFOCUSED_ACTIVE_THROTTLE"
+                fi
+            else
+                if [[ "$prev" != "stopped" ]]; then
+                    STOPPED_AT[$pid]=$(date +%s)
+                    notify-send -t 3000 "Claude Throttle" "Stopped $pid (idle, unfocused)"
+                    echo "[$(date +%H:%M:%S)] Stopped idle instance $pid"
+                fi
+                PREV_STATE[$pid]="stopped"
+                do_stop "$pid" || true
+
+                # Kill if idle too long
+                local stopped_at="${STOPPED_AT[$pid]:-}"
+                if [[ -n "$stopped_at" ]]; then
+                    local idle_secs=$(( $(date +%s) - stopped_at ))
+                    if [[ $idle_secs -ge $IDLE_KILL_TIMEOUT ]]; then
+                        kill -CONT "$pid" 2>/dev/null || true
+                        kill "$pid" 2>/dev/null || true
+                        notify-send -t 5000 "Claude Throttle" "Killed $pid (idle ${idle_secs}s)"
+                        echo "[$(date +%H:%M:%S)] Killed instance $pid (idle ${idle_secs}s)"
+                        unset "PREV_STATE[$pid]"
+                        unset "STOPPED_AT[$pid]"
+                    fi
+                fi
+            fi
+        done
+
+        sleep "$POLL_INTERVAL"
+    done
+}
+
+stop_cmd() {
+    if [[ -f "$PID_FILE" ]]; then
+        local daemon_pid=$(cat "$PID_FILE")
+        if kill -0 "$daemon_pid" 2>/dev/null; then
+            kill "$daemon_pid"
+            echo "Stopped daemon"
+        fi
+        rm -f "$PID_FILE"
+    fi
+
+    for pid in $(get_claude_pids); do
+        kill -CONT "$pid" 2>/dev/null && echo "Resumed $pid"
+    done
+
+    rm -f "$FOCUSED_FILE"
+}
+
+case "${1:-}" in
+    daemon)
+        daemon_cmd
+        ;;
+    status)
+        status_cmd
+        ;;
+    stop)
+        stop_cmd
+        ;;
+    *)
+        echo "Usage: claude-throttle <command>"
+        echo ""
+        echo "Commands:"
+        echo "  daemon   - Start daemon (focus set by nvim automatically)"
+        echo "  status   - Show all Claude instances"
+        echo "  stop     - Stop daemon and resume all instances"
+        ;;
+esac

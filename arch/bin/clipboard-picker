@@ -1,0 +1,13 @@
+#!/bin/bash
+# Launch nvim clipboard picker in floating kitty
+
+rm -f /tmp/clipboard-picker-selected
+
+kitty --class clipboard-picker \
+  -o confirm_os_window_close=0 \
+  -e nvim --cmd "let g:clipboard_picker=1" -c "lua require('custom.clipboard-picker').pick()"
+
+if [ -f /tmp/clipboard-picker-selected ]; then
+  rm -f /tmp/clipboard-picker-selected
+  wtype -M shift -k Insert
+fi

@@ -1,0 +1,39 @@
+#!/bin/bash
+# Auto-extract archives in ~/Downloads using inotifywait
+# Uses bsdtar for better path traversal protection
+
+WATCH_DIR="${1:-$HOME/Downloads}"
+
+extract() {
+    local file="$1"
+    local dir="${file%.*}"
+
+    # Handle .tar.* double extensions
+    if [[ "$dir" =~ \.tar$ ]]; then
+        dir="${dir%.tar}"
+    fi
+
+    mkdir -p "$dir"
+
+    case "$file" in
+        *.zip|*.tar|*.tar.gz|*.tgz|*.tar.bz2|*.tbz2|*.tar.xz|*.txz|*.tar.zst)
+            bsdtar -xf "$file" -C "$dir" 2>/dev/null && rm "$file" && echo "Extracted: $file → $dir"
+            ;;
+        *.7z)
+            7z x "$file" -o"$dir" -y >/dev/null && rm "$file" && echo "Extracted: $file → $dir"
+            ;;
+        *.rar)
+            unrar x "$file" "$dir/" >/dev/null && rm "$file" && echo "Extracted: $file → $dir"
+            ;;
+    esac
+}
+
+echo "Watching $WATCH_DIR for archives..."
+
+inotifywait -m -e close_write -e moved_to --format '%w%f' "$WATCH_DIR" | while read -r file; do
+    if [[ "$file" =~ \.(zip|tar|tar\.gz|tgz|tar\.bz2|tbz2|tar\.xz|txz|tar\.zst|7z|rar)$ ]]; then
+        # Small delay to ensure file is fully written
+        sleep 0.5
+        extract "$file"
+    fi
+done

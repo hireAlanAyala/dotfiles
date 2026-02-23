@@ -1,0 +1,17 @@
+#!/bin/bash
+# Run sudo command queued by Claude
+
+CMD_FILE="/tmp/claude-sudo-cmd"
+OUT_FILE="/tmp/claude-sudo-out"
+
+if [ ! -f "$CMD_FILE" ] || [ ! -s "$CMD_FILE" ]; then
+    echo "No command queued."
+    exit 1
+fi
+
+cmd=$(cat "$CMD_FILE")
+
+echo "$cmd"
+eval "$cmd" 2>&1 | tee "$OUT_FILE"
+exit_code=${PIPESTATUS[0]}
+echo "$exit_code" > /tmp/claude-sudo-exit

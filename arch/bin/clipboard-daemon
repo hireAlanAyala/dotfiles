@@ -1,0 +1,6 @@
+#!/bin/bash
+# Persistent clipboard picker daemon
+
+exec kitty --class clipboard-picker-daemon \
+  -o confirm_os_window_close=0 \
+  -e nvim --cmd "let g:clipboard_picker=1" -c "lua require('custom.clipboard-picker').daemon()"

@@ -1,0 +1,10 @@
+#!/bin/bash
+set -euo pipefail
+
+src="$HOME/.config/.codex/config.toml"
+dest="$HOME/.codex/config.toml"
+
+mkdir -p "$HOME/.codex"
+ln -sfn "$src" "$dest"
+
+echo "Linked: $dest -> $src"

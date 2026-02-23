@@ -1,0 +1,7 @@
+#!/bin/bash
+# Quick test: run codex outside tmux's alt screen (same dance as claude-wrapper.sh)
+if [[ -n "$TMUX" ]]; then
+  SESSION=$(tmux display-message -p '#S')
+  exec tmux detach-client -E "codex $*; tmux attach -t '$SESSION'"
+fi
+exec codex "$@"

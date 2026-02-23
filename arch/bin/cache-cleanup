@@ -1,0 +1,53 @@
+#!/bin/bash
+# Clean caches, stale project dependencies, and old logs
+
+set -euo pipefail
+
+DAYS=30
+HOME_DIR="$HOME"
+
+echo "=== Cache Cleanup ==="
+
+# User cache
+echo "Cleaning cache files older than $DAYS days..."
+find "$HOME_DIR/.cache" -type f -atime +$DAYS -delete 2>/dev/null || true
+find "$HOME_DIR/.cache" -type d -empty -delete 2>/dev/null || true
+
+# Go build cache
+if command -v go &>/dev/null; then
+    echo "Cleaning Go build cache..."
+    go clean -cache 2>/dev/null || true
+fi
+
+# Yay/AUR build cache
+if [[ -d "$HOME_DIR/.cache/yay" ]]; then
+    echo "Cleaning Yay build cache..."
+    rm -rf "$HOME_DIR/.cache/yay"/*
+fi
+
+# Systemd journal (keep last 7 days)
+echo "Vacuuming systemd journal..."
+journalctl --user --vacuum-time=7d 2>/dev/null || true
+
+echo "=== Stale Dependencies ==="
+
+# Node modules
+echo "Cleaning stale node_modules (projects untouched for $DAYS days)..."
+find "$HOME_DIR" -maxdepth 6 -name "node_modules" -type d 2>/dev/null | while read -r nm_dir; do
+    parent_dir="$(dirname "$nm_dir")"
+    pkg_json="$parent_dir/package.json"
+
+    [[ -f "$pkg_json" ]] || continue
+
+    if [[ $(find "$pkg_json" -atime +$DAYS 2>/dev/null) ]]; then
+        size=$(du -sh "$nm_dir" 2>/dev/null | cut -f1)
+        echo "Removing $nm_dir ($size)"
+        rm -rf "$nm_dir"
+    fi
+done
+
+# Python pycache
+echo "Cleaning __pycache__ directories..."
+find "$HOME_DIR" -maxdepth 6 -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+
+echo "=== Cleanup complete ==="

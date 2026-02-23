@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# Designed to be run by systemd timer every 30 seconds and alerts if battery is low
+
+THRESHOLDS=(30 20 10 5)
+FLAG_DIR="/run/user/$UID"
+BATTERY_LEVEL=$(battery-remaining)
+BATTERY_STATE=$(upower -i $(upower -e | grep 'BAT') | grep -E "state" | awk '{print $2}')
+
+send_notification() {
+  notify-send -u critical "󱐋 Time to recharge!" "Battery is down to ${1}%" -i battery-caution -t 30000
+}
+
+if [[ -n "$BATTERY_LEVEL" && "$BATTERY_LEVEL" =~ ^[0-9]+$ ]]; then
+  if [[ $BATTERY_STATE == "discharging" ]]; then
+    for threshold in "${THRESHOLDS[@]}"; do
+      flag_file="$FLAG_DIR/battery_notified_$threshold"
+      if [[ $BATTERY_LEVEL -le $threshold && ! -f $flag_file ]]; then
+        send_notification $BATTERY_LEVEL
+        touch "$flag_file"
+        break
+      fi
+    done
+  else
+    rm -f "$FLAG_DIR"/battery_notified_*
+  fi
+fi

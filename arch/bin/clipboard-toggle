@@ -1,0 +1,24 @@
+#!/bin/bash
+# Toggle clipboard picker special workspace
+
+# Check if daemon is running
+if ! pgrep -f "clipboard-picker-daemon" > /dev/null; then
+  # Start daemon
+  clipboard-daemon &
+  sleep 1.5
+fi
+
+# Toggle the special workspace
+hyprctl dispatch togglespecialworkspace clipboard
+
+# Find nvim socket and refresh
+SOCKET=$(ls /run/user/1000/nvim.*.0 2>/dev/null | while read s; do
+  if nvim --server "$s" --remote-expr "exists('g:clipboard_picker')" 2>/dev/null | grep -q 1; then
+    echo "$s"
+    break
+  fi
+done)
+
+if [ -n "$SOCKET" ]; then
+  nvim --server "$SOCKET" --remote-send '<cmd>lua require("custom.clipboard-picker").show()<CR>'
+fi

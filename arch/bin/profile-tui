@@ -1,0 +1,196 @@
+#!/usr/bin/env bash
+# Profile a TUI application's resource usage across different scenarios
+# Usage: profile-tui <PID> [output_dir]
+
+set -euo pipefail
+
+PID="${1:-}"
+OUTPUT_DIR="${2:-/tmp/tui-profile-$(date +%Y%m%d-%H%M%S)}"
+SAMPLE_INTERVAL=0.5
+DURATION=10
+
+if [[ -z "$PID" ]]; then
+    echo "Usage: profile-tui <PID> [output_dir]"
+    echo ""
+    echo "Find Claude Code PIDs with:"
+    echo "  pgrep -f 'claude' -a"
+    exit 1
+fi
+
+if ! kill -0 "$PID" 2>/dev/null; then
+    echo "Error: PID $PID not found or not accessible"
+    exit 1
+fi
+
+mkdir -p "$OUTPUT_DIR"
+echo "Output directory: $OUTPUT_DIR"
+echo "Profiling PID: $PID ($(ps -p $PID -o comm= 2>/dev/null || echo 'unknown'))"
+echo ""
+
+# Read instantaneous CPU from /proc/stat delta
+get_cpu_ticks() {
+    local stat_file="/proc/$PID/stat"
+    [[ -r "$stat_file" ]] || return
+    # Fields 14=utime, 15=stime (in clock ticks)
+    awk '{print $14+$15}' "$stat_file"
+}
+
+# Function to capture a scenario
+capture_scenario() {
+    local name="$1"
+    local duration="${2:-$DURATION}"
+
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "Capturing: $name (${duration}s)"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    local outfile="$OUTPUT_DIR/${name}.csv"
+    local hz=$(getconf CLK_TCK)  # Usually 100
+
+    # Header
+    echo "timestamp,cpu_percent,mem_percent,vsz_kb,rss_kb,read_bytes,write_bytes" > "$outfile"
+
+    local end_time=$((SECONDS + duration))
+    local samples=0
+    local prev_ticks=$(get_cpu_ticks)
+    local prev_time=$(date +%s.%N)
+
+    sleep "$SAMPLE_INTERVAL"
+
+    while [[ $SECONDS -lt $end_time ]]; do
+        if ! kill -0 "$PID" 2>/dev/null; then
+            echo "Process $PID exited!"
+            break
+        fi
+
+        local curr_ticks=$(get_cpu_ticks)
+        local curr_time=$(date +%s.%N)
+
+        # Calculate instantaneous CPU % using awk
+        local tick_delta=$((curr_ticks - prev_ticks))
+        local cpu=$(awk -v td="$tick_delta" -v t1="$prev_time" -v t2="$curr_time" -v hz="$hz" \
+            'BEGIN { printf "%.1f", td / ((t2 - t1) * hz) * 100 }')
+
+        # Get memory from ps
+        local stats
+        stats=$(ps -p "$PID" -o %mem,vsz,rss --no-headers 2>/dev/null | tr -s ' ')
+        local mem=$(echo "$stats" | awk '{print $1}')
+        local vsz=$(echo "$stats" | awk '{print $2}')
+        local rss=$(echo "$stats" | awk '{print $3}')
+
+        # Get I/O from /proc if available
+        local read_bytes=0 write_bytes=0
+        if [[ -r "/proc/$PID/io" ]]; then
+            read_bytes=$(grep "^read_bytes:" "/proc/$PID/io" 2>/dev/null | awk '{print $2}' || echo 0)
+            write_bytes=$(grep "^write_bytes:" "/proc/$PID/io" 2>/dev/null | awk '{print $2}' || echo 0)
+        fi
+
+        echo "$curr_time,$cpu,$mem,$vsz,$rss,$read_bytes,$write_bytes" >> "$outfile"
+
+        prev_ticks=$curr_ticks
+        prev_time=$curr_time
+        ((samples++)) || true
+        sleep "$SAMPLE_INTERVAL"
+    done
+
+    echo "Captured $samples samples -> $outfile"
+    echo ""
+}
+
+# Function to show summary stats
+summarize() {
+    local file="$1"
+    local name=$(basename "$file" .csv)
+
+    if [[ ! -f "$file" ]] || [[ $(wc -l < "$file") -lt 2 ]]; then
+        return
+    fi
+
+    # Skip header, calculate stats
+    local stats
+    stats=$(tail -n +2 "$file" | awk -F',' '
+    BEGIN {
+        sum_cpu=0; sum_mem=0; sum_rss=0; n=0;
+        max_cpu=0; min_cpu=999999;
+        first_write=0; last_write=0;
+    }
+    {
+        sum_cpu+=$2; sum_mem+=$3; sum_rss+=$5; n++;
+        if($2>max_cpu) max_cpu=$2;
+        if($2<min_cpu) min_cpu=$2;
+        if(NR==1) first_write=$7;
+        last_write=$7;
+    }
+    END {
+        if(n>0) {
+            printf "%.1f,%.1f,%.1f,%.1f,%.0f,%.0f",
+                sum_cpu/n, min_cpu, max_cpu, sum_mem/n, sum_rss/n, (last_write-first_write)/1024;
+        }
+    }')
+
+    echo "$name,$stats"
+}
+
+generate_report() {
+    local report="$OUTPUT_DIR/summary.txt"
+
+    echo "═══════════════════════════════════════════════════════════════" | tee "$report"
+    echo "                    TUI PROFILING SUMMARY                       " | tee -a "$report"
+    echo "═══════════════════════════════════════════════════════════════" | tee -a "$report"
+    echo "PID: $PID" | tee -a "$report"
+    echo "Date: $(date)" | tee -a "$report"
+    echo "" | tee -a "$report"
+
+    printf "%-15s %8s %8s %8s %8s %10s %10s\n" \
+        "Scenario" "Avg CPU" "Min CPU" "Max CPU" "Avg Mem" "Avg RSS" "Writes" | tee -a "$report"
+    printf "%-15s %8s %8s %8s %8s %10s %10s\n" \
+        "" "(%)" "(%)" "(%)" "(%)" "(KB)" "(KB)" | tee -a "$report"
+    echo "───────────────────────────────────────────────────────────────" | tee -a "$report"
+
+    for csv in "$OUTPUT_DIR"/*.csv; do
+        [[ -f "$csv" ]] || continue
+        local row
+        row=$(summarize "$csv")
+        if [[ -n "$row" ]]; then
+            echo "$row" | awk -F',' '{printf "%-15s %8.1f %8.1f %8.1f %8.1f %10.0f %10.0f\n", $1, $2, $3, $4, $5, $6, $7}' | tee -a "$report"
+        fi
+    done
+
+    echo "═══════════════════════════════════════════════════════════════" | tee -a "$report"
+    echo "" | tee -a "$report"
+    echo "Raw data: $OUTPUT_DIR/*.csv" | tee -a "$report"
+}
+
+# Main menu
+while true; do
+    echo ""
+    echo "Select scenario to capture (${DURATION}s each):"
+    echo "  1) idle       - No interaction, just sitting"
+    echo "  2) typing     - Actively typing input"
+    echo "  3) streaming  - Receiving a long response"
+    echo "  4) scrolling  - Scrolling through history"
+    echo "  5) resizing   - Resizing the terminal window"
+    echo "  6) custom     - Custom scenario name"
+    echo "  r) report     - Generate summary report"
+    echo "  q) quit       - Exit and show report"
+    echo ""
+    read -p "Choice: " choice
+
+    case "$choice" in
+        1) capture_scenario "idle" ;;
+        2) capture_scenario "typing" ;;
+        3) capture_scenario "streaming" ;;
+        4) capture_scenario "scrolling" ;;
+        5) capture_scenario "resizing" ;;
+        6)
+            read -p "Scenario name: " custom_name
+            capture_scenario "$custom_name"
+            ;;
+        r) generate_report ;;
+        q)
+            generate_report
+            exit 0
+            ;;
+        *) echo "Invalid choice" ;;
+    esac
+done
