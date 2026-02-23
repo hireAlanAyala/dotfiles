@@ -1,0 +1,4 @@
+[filechooser]
+cmd=/home/walker/.local/bin/nvim-filechooser
+default_dir=/home/walker
+create_help_file=0

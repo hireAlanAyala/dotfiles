@@ -459,7 +459,15 @@ return {
             local paths = {}
             local entry = oil.get_cursor_entry()
 
-            if entry and (entry.type == 'file' or (entry.type == 'directory' and vim.g.filechooser_directory == 1)) then
+            if vim.g.filechooser_mode == 'save' then
+              -- Save mode: always use current directory + suggested filename
+              local save_name = vim.g.filechooser_save_filename or ''
+              if save_name ~= '' then
+                table.insert(paths, current_dir .. save_name)
+              else
+                table.insert(paths, current_dir)
+              end
+            elseif entry and (entry.type == 'file' or (entry.type == 'directory' and vim.g.filechooser_directory == 1)) then
               table.insert(paths, current_dir .. entry.name)
             end
 
