@@ -1,0 +1,17 @@
+[projects."/home/walker/.config"]
+trust_level = "trusted"
+
+model_personality = "pragmatic"
+model_verbosity = "low"
+
+[projects."/home/walker"]
+trust_level = "trusted"
+
+[projects."/home/walker/Documents/hpg_two"]
+trust_level = "trusted"
+
+[analytics]
+enabled = false
+
+[tui]
+alternate_screen = "never"
