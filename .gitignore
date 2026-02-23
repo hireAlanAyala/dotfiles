@@ -14,6 +14,7 @@ gh/
 **/tmp/
 
 # Tool-specific sensitive data
+.wrangler/
 pulse/
 gcloud/
 # systemd configs are tracked in arch/systemd/, this ignores the symlinked location
