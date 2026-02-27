@@ -704,7 +704,8 @@ return {
         vim.keymap.set('n', 'g', 'i<A-g><C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
         -- Alt-q to send selected to quickfix in normal mode
         vim.keymap.set('n', '<A-q>', 'i<A-q>', { buffer = buf, noremap = true, silent = true })
-        -- jk to normal mode via <C-\><C-n> (not <Esc> which closes fzf)
+        -- Esc/jk/jj to normal mode via <C-\><C-n> (not <Esc> which closes fzf)
+        vim.keymap.set('t', '<Esc>', '<C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
         vim.keymap.set('t', 'jk', '<C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
         vim.keymap.set('t', 'jj', '<C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
       end,
