@@ -13,11 +13,14 @@ cliphist
 cool-retro-term
 deno
 earlyoom
+efibootmgr
 foot
 freecad
 fuzzel
 ghostty
 git
+gnupg
+go
 grim
 hyprland
 hyprpaper
@@ -38,6 +41,7 @@ linux-firmware
 lvm2
 mako
 mise
+moonlight-qt
 mpv
 noto-fonts-cjk
 noto-fonts-emoji
@@ -82,7 +86,6 @@ uwsm
 vim
 wayvnc
 wf-recorder
-which
 wl-clipboard
 wofi
 wrangler
@@ -93,5 +96,6 @@ xournalpp
 yazi
 ydotool
 zram-generator
+zsh
 zsh-autosuggestions
 zsh-syntax-highlighting
