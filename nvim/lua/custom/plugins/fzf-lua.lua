@@ -691,6 +691,8 @@ return {
         vim.keymap.set('n', '<Esc>', 'i<C-c>', { buffer = buf, noremap = true, silent = true })
         vim.keymap.set('n', 'j', 'i<Down><C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
         vim.keymap.set('n', 'k', 'i<Up><C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
+        vim.keymap.set('n', '<Down>', 'i<Down><C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
+        vim.keymap.set('n', '<Up>', 'i<Up><C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
         vim.keymap.set('n', 'dd', 'i<C-x><C-\\><C-n>', { buffer = buf, noremap = true, silent = true })
         vim.keymap.set('n', 'o', 'i<A-o>', { buffer = buf, noremap = true, silent = true })
         -- Tab for toggle selection in normal mode
