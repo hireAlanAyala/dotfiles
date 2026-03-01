@@ -98,10 +98,13 @@ local function search_and_open(target)
 end
 
 vim.keymap.set('n', 'gx', function()
+  -- Try markdown link first from CWORD, then fall back to cfile for clean extraction
   local raw = vim.fn.expand '<cWORD>'
-  -- Extract URL from markdown link [title](url)
-  local target = raw:match '%[.-%]%((.-)%)' or raw
-  target = target:gsub('[.,;:!?%)%]>]+$', ''):gsub('^~', vim.env.HOME)
+  local target = raw:match '%[.-%]%((.-)%)'
+  if not target then
+    target = vim.fn.expand '<cfile>'
+  end
+  target = target:gsub('[.,;:!?>]+$', ''):gsub('^~', vim.env.HOME)
   if is_url(target) then
     local url = target:match('^https?://') and target or ('https://' .. target)
     local cmd = vim.fn.has 'wsl' == 1 and 'wslview' or 'xdg-open'
