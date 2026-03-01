@@ -43,20 +43,22 @@ systemd-system:
     -sudo systemctl disable --now NetworkManager
     sudo systemctl enable --now iwd systemd-networkd systemd-resolved
     sudo ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
-    -sudo systemctl enable --now bluetooth fstrim.timer earlyoom tlp.service reflector.timer ufw pacman-sync.timer
+    -sudo systemctl enable --now bluetooth fstrim.timer earlyoom tlp.service reflector.timer ufw pacman-sync.timer tailscaled
     -sudo systemctl mask systemd-rfkill.service systemd-rfkill.socket
 
 # Enable user services
 systemd-user:
     -systemctl --user enable pipewire pipewire-pulse wireplumber p11-kit-server.socket
-    -systemctl --user enable elephant.service battery-monitor.timer pipewire-session-manager.service cache-cleanup.timer rustic-backup.timer wifi-prefer.timer claude-throttle.service
+    -systemctl --user enable elephant.service battery-monitor.timer pipewire-session-manager.service cache-cleanup.timer rustic-backup.timer wifi-prefer.timer claude-throttle.service sunshine
 
 # UFW firewall rules
 firewall:
     sudo ufw default deny incoming
     sudo ufw default allow outgoing
+    sudo ufw allow ssh
     sudo ufw allow 53317/udp
     sudo ufw allow 53317/tcp
+    sudo ufw allow in on tailscale0 comment 'allow-tailscale'
     sudo ufw allow in proto udp from 172.16.0.0/12 to 172.17.0.1 port 53 comment 'allow-docker-dns'
     sudo ufw --force enable
 
