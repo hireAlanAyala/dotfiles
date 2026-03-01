@@ -1,32 +1,33 @@
 return {
-  'stevearc/oil.nvim',
-  lazy = false,  -- Load oil immediately to ensure proper initialization
+  'barrettruth/canola.nvim',
+  lazy = false,
   ---@module 'oil'
   ---@type oil.SetupOpt
-  opts = {
-    default_file_explorer = true,
-    delete_to_trash = true,
-    skip_confirm_for_simple_edits = true,
-    lsp_file_methods = {
-      enabled = true,
-      timeout_ms = 1000,
-      autosave_changes = true,
-    },
-    watch_for_changes = true,
-    win_options = {
-      wrap = true,
-    },
-    preview = {
-      max_width = 0.9,
-      min_width = { 40, 0.4 },
-      max_height = 0.9,
-      min_height = { 5, 0.1 },
-      border = 'rounded',
-    },
-    view_options = {
-      show_hidden = true,
-    },
-    keymaps = {
+  config = function()
+    require('oil').setup({
+      default_file_explorer = true,
+      delete_to_trash = true,
+      skip_confirm_for_simple_edits = true,
+      lsp_file_methods = {
+        enabled = true,
+        timeout_ms = 1000,
+        autosave_changes = true,
+      },
+      watch_for_changes = true,
+      win_options = {
+        wrap = true,
+      },
+      preview = {
+        max_width = 0.9,
+        min_width = { 40, 0.4 },
+        max_height = 0.9,
+        min_height = { 5, 0.1 },
+        border = 'rounded',
+      },
+      view_options = {
+        show_hidden = true,
+      },
+      keymaps = {
       ['<leader>os'] = {
         function()
           local oil = require 'oil'
@@ -382,9 +383,7 @@ return {
         mode = { 'n', 'v' },
       },
     },
-  },
-  config = function(_, opts)
-    require('oil').setup(opts)
+    })
 
     -- Clean up oil buffers on exit to prevent :oil files
     vim.api.nvim_create_autocmd("VimLeavePre", {
@@ -420,12 +419,12 @@ return {
       callback = function()
         local oil = require('oil')
         local current_dir = oil.get_current_dir()
-        
+
         -- If we have a valid directory, store it as last visited
         if current_dir and not current_dir:match('v:null') then
           vim.g.oil_last_dir = current_dir
         end
-        
+
         -- If we're in an invalid buffer, navigate to a valid location
         if not current_dir or current_dir:match('v:null') then
           vim.defer_fn(function()
@@ -651,16 +650,16 @@ return {
     })
   end,
   keys = {
-    { '-', function() 
+    { '-', function()
       local oil = require('oil')
-      
+
       -- If we're in an oil buffer, use oil.open() to go to parent
       if vim.bo.filetype == 'oil' then
         oil.open()
       else
         -- Get the directory of the current file
         local current_file = vim.fn.expand('%:p:h')
-        
+
         -- Check if we're in a terminal buffer or if the path is invalid
         if vim.bo.buftype == 'terminal' or current_file == '' or current_file:match('term://') then
           -- Use the last visited oil directory or current working directory
@@ -672,10 +671,10 @@ return {
         end
       end
     end, desc = 'Open file explorer', mode = 'n' },
-    { '<C-\\>-', function() 
+    { '<C-\\>-', function()
       local oil = require('oil')
       local current_dir = oil.get_current_dir()
-      
+
       -- If we're in an invalid oil buffer (like v:null), go to cwd or last visited directory
       if not current_dir or current_dir:match('v:null') then
         -- Try to get the last visited directory from global variable or use cwd
@@ -690,6 +689,4 @@ return {
   },
   -- Optional dependencies
   dependencies = { { 'echasnovski/mini.icons', opts = {} } },
-  -- dependencies = { "nvim-tree/nvim-web-devicons" }, -- use if prefer nvim-web-devicons
 }
-
