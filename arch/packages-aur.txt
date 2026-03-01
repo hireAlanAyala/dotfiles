@@ -11,6 +11,9 @@ pipe-viewer-git
 quickemu
 sunshine
 walker
+wl-kbptr
+wlrctl
+wlrctl-debug
 xdg-desktop-portal-termfilechooser-hunkyburrito-git
 yay-bin
 yay-bin-debug
