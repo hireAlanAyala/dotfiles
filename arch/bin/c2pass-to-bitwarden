@@ -1,0 +1,39 @@
+#!/usr/bin/env python3
+"""Convert C2Password CSV export to Bitwarden import format."""
+
+import csv
+import sys
+
+FIELD_MAP = {
+    "Login_URLs": "url",
+    "Login_Username": "username",
+    "Login_Password": "password",
+    "Notes": "extra",
+    "Display_Name": "name",
+    "Tag": "grouping",
+    "Favorite": "fav",
+    "Login_TOTP": "totp",
+}
+
+def convert(infile, outfile):
+    reader = csv.DictReader(infile)
+    writer = csv.DictWriter(outfile, fieldnames=["url", "username", "password", "extra", "name", "grouping", "fav", "totp"])
+    writer.writeheader()
+    for row in reader:
+        out = {new: row.get(old, "") for old, new in FIELD_MAP.items()}
+        others = row.get("Others", "").strip()
+        if others:
+            notes = out.get("extra", "").strip()
+            out["extra"] = f"{notes}\n{others}".strip()
+        writer.writerow(out)
+
+if __name__ == "__main__":
+    if len(sys.argv) == 2:
+        with open(sys.argv[1]) as f:
+            convert(f, sys.stdout)
+    elif len(sys.argv) == 3:
+        with open(sys.argv[1]) as f, open(sys.argv[2], "w", newline="") as out:
+            convert(f, out)
+    else:
+        print(f"Usage: {sys.argv[0]} <input.csv> [output.csv]", file=sys.stderr)
+        sys.exit(1)

@@ -42,6 +42,9 @@ github-copilot/
 
 # apps
 chromium
+/chromium-hpg/
+/chromium-personal/
+Moonlight Game Streaming Project/
 QtProject.conf
 microsoft-edge/
 BambuStudio/
