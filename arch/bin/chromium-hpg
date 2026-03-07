@@ -1,0 +1,2 @@
+#!/bin/sh
+exec chromium --user-data-dir="$HOME/.config/chromium-hpg" "$@"
