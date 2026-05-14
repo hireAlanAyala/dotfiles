@@ -254,7 +254,8 @@ function M.restore()
         local item = valid[i]
         pcall(create_terminal, item.session_name, item.info.name, false, item.strategy_name, true)
 
-        if item.info.claude_session_id and item.strategy_name == 'tmux' then
+        local is_agent_session = item.session_name:match('_%x%x%x%x%x%x_a_') ~= nil
+        if item.strategy_name == 'tmux' and (item.info.claude_session_id or is_agent_session) then
           -- Wait for client to attach before sending keys (detach-client -E requires a client)
           local attempts = 0
           local max_attempts = 20 -- 2 seconds max
