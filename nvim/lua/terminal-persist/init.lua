@@ -243,6 +243,14 @@ function M.restore()
           if vim.api.nvim_buf_is_valid(current_buf) then
             vim.api.nvim_set_current_buf(current_buf)
           end
+          -- On the initial startup restore only, wipe jumplist entries added
+          -- by buffer switches during restore so <C-o> from the user's first
+          -- navigation doesn't land in a terminal buffer they never visited.
+          -- Subsequent manual restores leave the jumplist alone.
+          if M._initial_restore then
+            M._initial_restore = false
+            vim.cmd('clearjumps')
+          end
           local elapsed_ms = (vim.loop.hrtime() - t_start) / 1e6
           if elapsed_ms > RESTORE_WARN_MS then
             vim.notify(string.format('terminal-persist: restore took %.0fms (threshold: %dms) - possible regression!', elapsed_ms, RESTORE_WARN_MS), vim.log.levels.WARN)
@@ -294,6 +302,7 @@ function M.setup(opts)
   end
 
   if M.config.auto_restore then
+    M._initial_restore = true
     vim.defer_fn(M.restore, 100)
   end
 
