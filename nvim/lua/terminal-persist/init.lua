@@ -106,6 +106,15 @@ local function create_terminal(session_name, name, switch, strategy_name, attach
   vim.b[buf_nr].persist_name = name
   vim.b[buf_nr].persist_strategy = strategy_name
 
+  -- In agent sub-sessions (parent_HASH_a_label), remap <C-c> in terminal mode to
+  -- send Ctrl+U (0x15) so Claude Code clears its input instead of canceling the task.
+  if session_name:match('_%x%x%x%x%x%x_a_') then
+    vim.keymap.set('t', '<C-c>', function()
+      local chan = vim.b[buf_nr].terminal_job_id
+      if chan then vim.api.nvim_chan_send(chan, '\21') end
+    end, { buffer = buf_nr, desc = 'Send Ctrl+U (clear input in Claude Code)' })
+  end
+
   -- Use vim.schedule (not defer) to run after termopen() finishes in the same event loop,
   -- without an arbitrary delay. termopen() overwrites buffer name with the shell command.
   -- We also set term_title because fzf-lua's buffer picker uses vim.b.term_title
