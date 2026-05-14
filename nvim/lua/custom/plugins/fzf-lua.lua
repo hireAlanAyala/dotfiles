@@ -257,14 +257,33 @@ local function tmux_sessions()
         end
       end,
       ["ctrl-x"] = function(selected)
-        if selected and selected[1] then
-          local session_name = selected[1]:match('^([^%s]+)')
-          local confirm = vim.fn.confirm("Delete tmux session '" .. session_name .. "'?", '&Yes\n&No', 2)
-          if confirm == 1 then
-            vim.fn.system(parent_tmux('kill-session -t ' .. vim.fn.shellescape(session_name)))
-            -- Reopen picker
-            vim.schedule(tmux_sessions)
+        if not (selected and selected[1]) then return end
+        local parent_name = selected[1]:match('^([^%s]+)')
+        if not parent_name then return end
+
+        -- Find sub-sessions matching parent_HASH_label
+        local list_result = vim.system({ 'tmux', 'list-sessions', '-F', '#{session_name}' }, { env = { TMUX = '' } }):wait()
+        local children = {}
+        for line in (list_result.stdout or ''):gmatch('[^\n]+') do
+          if line:match('^' .. vim.pesc(parent_name) .. '_%x%x%x%x%x%x_') then
+            table.insert(children, line)
           end
+        end
+
+        if #children == 0 then
+          vim.notify("No sub-sessions for '" .. parent_name .. "'", vim.log.levels.INFO)
+          return
+        end
+
+        local confirm = vim.fn.confirm(
+          string.format("Delete %d sub-session(s) of '%s'?\n  %s", #children, parent_name, table.concat(children, '\n  ')),
+          '&Yes\n&No', 2
+        )
+        if confirm == 1 then
+          for _, child in ipairs(children) do
+            vim.fn.system(parent_tmux('kill-session -t ' .. vim.fn.shellescape(child)))
+          end
+          vim.schedule(tmux_sessions)
         end
       end,
     },
