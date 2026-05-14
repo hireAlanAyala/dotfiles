@@ -6,7 +6,7 @@ vim.env.PATH = vim.env.PATH .. ':' .. os.getenv 'HOME' .. '/.nix-profile/bin'
 vim.env.DOTNET_ROOT = os.getenv 'HOME' .. '/.nix-profile'
 
 -- Basic settings
-vim.opt.number = false
+vim.opt.number = true
 vim.opt.relativenumber = true
 vim.opt.showmode = false -- Don't show the mode, since it's already in the status line
 vim.opt.wrap = true
