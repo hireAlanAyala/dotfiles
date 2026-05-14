@@ -4,10 +4,10 @@
 -- WARNING: I tried to setup centering the cursor line when navigating but it messed with builtin nvim functionality
 
 -- Better window navigation
-vim.keymap.set('n', '<C-h>', '<cmd>TmuxNavigateLeft<cr>', { desc = 'Navigate left (nvim/tmux)' })
-vim.keymap.set('n', '<C-l>', '<cmd>TmuxNavigateRight<cr>', { desc = 'Navigate right (nvim/tmux)' })
-vim.keymap.set('n', '<C-j>', '<cmd>TmuxNavigateDown<cr>', { desc = 'Navigate down (nvim/tmux)' })
-vim.keymap.set('n', '<C-k>', '<cmd>TmuxNavigateUp<cr>', { desc = 'Navigate up (nvim/tmux)' })
+vim.keymap.set('n', '<C-h>', '<C-w>h', { desc = 'Navigate left' })
+vim.keymap.set('n', '<C-l>', '<C-w>l', { desc = 'Navigate right' })
+vim.keymap.set('n', '<C-j>', '<C-w>j', { desc = 'Navigate down' })
+vim.keymap.set('n', '<C-k>', '<C-w>k', { desc = 'Navigate up' })
 
 -- Window resizing keymaps
 vim.keymap.set('n', '<C-Up>', ':resize +2<CR>', { desc = 'Increase window height' })

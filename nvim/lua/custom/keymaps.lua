@@ -22,12 +22,11 @@ vim.keymap.set('v', '>', '>gv', { desc = 'Indent right and reselect' })
 -- Better J behavior
 vim.keymap.set('n', 'J', 'mzJ`z', { desc = 'Join lines and keep cursor position' })
 
--- vim-tmux-navigator keymaps for seamless navigation between nvim and tmux panes
--- These work with the tmux vim-tmux-navigator plugin for unified navigation
-vim.keymap.set('n', '<C-h>', '<cmd>TmuxNavigateLeft<cr>', { desc = 'Navigate left (nvim/tmux)' })
-vim.keymap.set('n', '<C-l>', '<cmd>TmuxNavigateRight<cr>', { desc = 'Navigate right (nvim/tmux)' })
-vim.keymap.set('n', '<C-j>', '<cmd>TmuxNavigateDown<cr>', { desc = 'Navigate down (nvim/tmux)' })
-vim.keymap.set('n', '<C-k>', '<cmd>TmuxNavigateUp<cr>', { desc = 'Navigate up (nvim/tmux)' })
+-- Window navigation
+vim.keymap.set('n', '<C-h>', '<C-w>h', { desc = 'Navigate left' })
+vim.keymap.set('n', '<C-l>', '<C-w>l', { desc = 'Navigate right' })
+vim.keymap.set('n', '<C-j>', '<C-w>j', { desc = 'Navigate down' })
+vim.keymap.set('n', '<C-k>', '<C-w>k', { desc = 'Navigate up' })
 
 -- Terminal persist keymaps
 local terminal_persist = require 'terminal-persist'
