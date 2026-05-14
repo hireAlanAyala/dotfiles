@@ -3,7 +3,13 @@
 #
 # Features:
 #   - Persists claude session ID in terminal-persist state file
-#   - Detaches tmux to run claude directly in nvim terminal, reattaches after
+#   - Detaches tmux to run claude directly in nvim terminal, reattaches after.
+#     Required for nvim-side scrollback: tmux uses the host alt-screen and
+#     nvim's :terminal doesn't preserve alt-screen content past the viewport.
+#     Running outside tmux puts claude's output on the main screen where nvim
+#     keeps a full scrollback buffer.
+#   - Always passes --dangerously-skip-permissions so the UI never blocks on
+#     permission prompts. Trust boundary is the wrapper invocation itself.
 #   - Session ID tied to tmux session name, survives claude restarts
 #
 # Usage:
@@ -89,7 +95,7 @@ if [[ $manage_session -eq 1 ]]; then
       ;;
     -h|-p|-v)
       # Vanilla pass-through (see header for rationale)
-      exec claude "$@"
+      exec claude --dangerously-skip-permissions "$@"
       ;;
     *)
       # New managed session (bare, prompts, --long-flags, -d, etc.)
@@ -111,7 +117,7 @@ if [[ -n "$SESSION" && $is_tui -eq 1 ]]; then
   # Post-detach command runs in nvim's terminal (outside tmux):
   post=""
   # 1. Run claude TUI
-  post+="claude ${args[*]}; "
+  post+="claude --dangerously-skip-permissions ${args[*]}; "
   # 3. Graceful exit (code 0): cleanup session ID from state
   post+="[ \$? -eq 0 ] && ~/.config/nvim/lua/terminal-persist/claude-wrapper.sh --cleanup '$SESSION'; "
   # 4. Reattach to tmux session
@@ -120,4 +126,4 @@ if [[ -n "$SESSION" && $is_tui -eq 1 ]]; then
 fi
 
 # Outside managed session: vanilla pass-through
-exec claude "$@"
+exec claude --dangerously-skip-permissions "$@"
