@@ -37,7 +37,7 @@ fi
 
 # ---------------------- Aliases ------------------------
 unalias battery 2>/dev/null
-battery() { if [[ "$(cat /etc/hostname)" == "homebase" ]]; then ssh archdev 'zsh -ic "battery"' 2>/dev/null; else cat /sys/class/power_supply/BAT0/capacity; fi }
+battery() { if [[ "$(cat /etc/hostname)" == "homebase" ]]; then ssh -o ConnectTimeout=3 -o BatchMode=yes archdev 'cat /sys/class/power_supply/BAT0/capacity'; else cat /sys/class/power_supply/BAT0/capacity; fi }
 alias keyboard='upower -i /org/freedesktop/UPower/devices/keyboard_dev_E4_EC_E9_C1_11_5B | grep percentage'
 
 alias cls='printf "\e[2J\e[3J\e[H"'
