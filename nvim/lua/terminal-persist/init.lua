@@ -287,39 +287,6 @@ function M.setup(opts)
     vim.defer_fn(M.restore, 100)
   end
 
-  -- Terminal buffer options: disable line numbers and signcolumn for terminals.
-  -- We use vim.wo (window-local), so settings persist when switching buffers in the same window.
-  -- To avoid clobbering the window's original settings, we save them on BufEnter and restore on BufLeave.
-  vim.api.nvim_create_autocmd('BufEnter', {
-    callback = function(args)
-      if vim.b[args.buf].terminal_persist_managed then
-        local win = vim.api.nvim_get_current_win()
-        vim.w[win]._terminal_persist_saved = {
-          number = vim.wo.number,
-          relativenumber = vim.wo.relativenumber,
-          signcolumn = vim.wo.signcolumn,
-        }
-        vim.wo.number = false
-        vim.wo.relativenumber = false
-        vim.wo.signcolumn = 'no'
-      end
-    end,
-  })
-
-  vim.api.nvim_create_autocmd('BufLeave', {
-    callback = function(args)
-      if vim.b[args.buf].terminal_persist_managed then
-        local win = vim.api.nvim_get_current_win()
-        local saved = vim.w[win]._terminal_persist_saved
-        if saved then
-          vim.wo.number = saved.number
-          vim.wo.relativenumber = saved.relativenumber
-          vim.wo.signcolumn = saved.signcolumn
-        end
-      end
-    end,
-  })
-
   -- Write focused terminal job PID for claude-throttle daemon
   local function write_throttle_focus()
     local buf = vim.api.nvim_get_current_buf()
