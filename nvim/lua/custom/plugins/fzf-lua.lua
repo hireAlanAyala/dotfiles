@@ -183,20 +183,26 @@ local function tmux_sessions()
   local current_session = output:match('CURRENT:([^\n]+)')
   local sessions_output = output:gsub('CURRENT:[^\n]+\n?', '')
 
+  -- Reduce the current session to its parent so a sub-session marks the parent active
+  local current_parent = current_session
+  if current_session then
+    local parent = current_session:match('^(.-)_%x%x%x%x%x%x_')
+    if parent then current_parent = parent end
+  end
+
   -- Parse all sessions and separate parent sessions from sub-sessions
   local all_sessions = {}
   local sub_sessions = {}
 
   for line in sessions_output:gmatch('[^\n]+') do
-    local name, is_attached = line:match('^([^%(]+)(.*)$')
+    local name = line:match('^([^%(]+)')
     if name then
       name = name:gsub('%s+$', '') -- trim whitespace
-      local is_active = is_attached:match('%(attached%)')
 
-      -- Check if this is a sub-session
-      if name:match('_[%w]+_') then
-        -- Extract parent session name (everything before the first _[hash]_)
-        local parent = name:match('^(.-)_[%w]+_')
+      -- Check if this is a sub-session (parent_HASH_label, where HASH is 6 hex chars)
+      if name:match('_%x%x%x%x%x%x_') then
+        -- Extract parent session name (everything before the _HASH_)
+        local parent = name:match('^(.-)_%x%x%x%x%x%x_')
         if parent then
           if not sub_sessions[parent] then
             sub_sessions[parent] = 0
@@ -204,10 +210,10 @@ local function tmux_sessions()
           sub_sessions[parent] = sub_sessions[parent] + 1
         end
       else
-        -- This is a parent session
+        -- This is a parent session; active iff it's the current parent
         table.insert(all_sessions, {
           name = name,
-          is_active = is_active ~= nil,
+          is_active = name == current_parent,
         })
       end
     end
