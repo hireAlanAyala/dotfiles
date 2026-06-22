@@ -15,3 +15,12 @@ Write bin scripts to arch/bin instead of ~/.local/bin to ensure they are version
 
 Symlink with
 cd ~/.config/arch && just bin
+
+# Encrypted vault
+
+`arch/bin/vault` is a personal encrypted file store (gocryptfs) — it is for
+storing personal files (private documents, image blueprints, etc.). They live
+encrypted at rest in `~/.vault-encrypted` and are exposed as a plaintext view at
+`~/vault` on demand, browsed via nvim/oil, and re-encrypted when you leave. nvim
+integration is `nvim/lua/custom/vault.lua`; behavior + invariants are covered by
+`arch/bin/test-vault` (run it after any change).
