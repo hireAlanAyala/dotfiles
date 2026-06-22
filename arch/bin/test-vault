@@ -113,6 +113,27 @@ t_trash_purge_selective() {    # lock purges vault trash, keeps the rest
     && [ -e "$HOME/.local/share/Trash/files/other.png" ]
 }
 
+t_env_override_no_idle() {     # VAULT_CIPHER/MOUNT override + VAULT_IDLE='' (process-bound consumer)
+  mkdir -p "$HOME/.alt-cipher"
+  printf 'testpw\n' | gocryptfs -init -q "$HOME/.alt-cipher" >/dev/null 2>&1 || return 1
+  export VAULT_CIPHER="$HOME/.alt-cipher" VAULT_MOUNT="$HOME/alt-mnt" VAULT_IDLE=""
+  local good=1
+  if printf 'testpw\n' | "$VAULT" unlock >/dev/null 2>&1; then
+    [ "$("$VAULT" status)" = mounted ] || good=0
+    echo alt-pixels > "$HOME/alt-mnt/x.txt"
+    [ "$(cat "$HOME/alt-mnt/x.txt" 2>/dev/null)" = alt-pixels ] || good=0
+    # No -idle means the gocryptfs cmdline must NOT carry an idle flag.
+    pgrep -af -- "gocryptfs.*$HOME/.alt-cipher" | grep -q -- '-idle' && good=0
+    "$VAULT" lock >/dev/null 2>&1
+    [ -z "$(ls -A "$HOME/alt-mnt" 2>/dev/null)" ] || good=0   # sealed: mountpoint empty
+  else
+    good=0
+  fi
+  "$VAULT" lock >/dev/null 2>&1 || true   # ensure the override mount is torn down
+  unset VAULT_CIPHER VAULT_MOUNT VAULT_IDLE
+  [ "$good" = 1 ]
+}
+
 # ---- invariant / assertion tests -------------------------------------------
 # Run a path-mutated copy of the script and assert it aborts with exit 70.
 assert_aborts() {
@@ -148,6 +169,7 @@ run "unlock: refuses while draining -> exit 76" t_unlock_refuses_while_draining
 run "guard: uninitialized cipher -> exit 2" t_uninitialized
 run "guard: non-empty mountpoint -> exit 3" t_empty_mount_guard
 run "trash: purge is selective"            t_trash_purge_selective
+run "env: override cipher/mount, no idle"  t_env_override_no_idle
 run "assert: cipher == mount aborts (70)"  t_assert_cipher_eq_mount
 run "assert: mount = / aborts (70)"        t_assert_mount_is_root
 run "assert: relative mount aborts (70)"   t_assert_mount_relative

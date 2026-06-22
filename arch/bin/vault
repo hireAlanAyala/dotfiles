@@ -33,10 +33,19 @@
 # Usage: vault {unlock|lock|status}
 set -euo pipefail
 
-CIPHER="$HOME/.vault-encrypted"
-MOUNT="$HOME/vault"
+# Cipher dir / mountpoint default to the personal nvim vault, but can be overridden
+# via env so a SECOND consumer (e.g. an app launcher) can drive its OWN gocryptfs mount
+# through this same, tested script. Invariant: each cipher dir has exactly one live
+# gocryptfs instance -- never point two consumers at the same VAULT_CIPHER.
+CIPHER="${VAULT_CIPHER:-$HOME/.vault-encrypted}"
+MOUNT="${VAULT_MOUNT:-$HOME/vault}"
 TRASH="$HOME/.local/share/Trash"
-IDLE=5m   # gocryptfs self-unmount after this much inactivity (crash/abandon backstop)
+# Idle self-unmount backstop (seals an abandoned mount). 5m suits the nvim-driven
+# vault. A process-bound consumer sets VAULT_IDLE= (empty) to DISABLE it: there the
+# owning process IS the lifecycle, and an idle unmount mid-run would drop the app's
+# writes onto the bare mountpoint as plaintext. `-` (not `:-`) keeps an explicitly
+# empty value empty instead of re-defaulting it.
+IDLE="${VAULT_IDLE-5m}"
 
 # Fail-closed invariant check, run before any command touches the filesystem.
 # A degenerate CIPHER/MOUNT is a BUG, not user error, and could be catastrophic:
@@ -91,7 +100,11 @@ cmd_unlock() {
     exit 3
   fi
   purge_trash   # clear anything a prior idle-unmount left in the trash
-  gocryptfs -q -idle "$IDLE" "$CIPHER" "$MOUNT"
+  # Only pass -idle when an idle window is configured; an empty VAULT_IDLE disables
+  # the self-unmount entirely (for a process-bound consumer that owns the mount).
+  local idle_args=()
+  [ -n "$IDLE" ] && idle_args=(-idle "$IDLE")
+  gocryptfs -q "${idle_args[@]}" "$CIPHER" "$MOUNT"
   is_mounted || { echo "vault: BUG: unlock returned success but $MOUNT is not mounted" >&2; exit 71; }
 }
 
