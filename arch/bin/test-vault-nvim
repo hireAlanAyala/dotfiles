@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# Test harness for the nvim vault GUARDS in nvim/lua/custom/vault.lua: the
+# sealed-mount write refusal, the shada exclusions, and the no-plaintext-
+# derivatives (undo/swap) autocmd. Drives a headless nvim that loads the real
+# module. Run after changing vault.lua:
+#   test-vault-nvim
+# Exits non-zero if any assertion fails.
+#
+# Deterministic parts (wiring) always run. The end-to-end BLOCK assertions need
+# ~/vault to be SEALED; if it happens to be unlocked they are skipped (not failed)
+# so the test never locks a vault you are actively using.
+set -uo pipefail
+
+command -v nvim >/dev/null 2>&1 || { echo "nvim not installed"; exit 1; }
+
+LUA="$(mktemp --suffix=.lua)"
+SOCK="$(mktemp -u --suffix=.sock)"
+trap 'rm -f "$LUA"' EXIT
+
+cat > "$LUA" <<'EOF'
+vim.opt.runtimepath:append(vim.fn.expand('~/.config/nvim'))
+vim.fn.inputsecret = function() return '' end       -- never block on unlock prompt
+
+local pass, fail = 0, 0
+local function check(name, cond)
+  if cond then pass = pass + 1; print('  ok   ' .. name)
+  else fail = fail + 1; print('  FAIL ' .. name) end
+end
+local function exists(p) return vim.uv.fs_stat(p) ~= nil end
+local function mounted(m)
+  for line in io.lines('/proc/mounts') do
+    if line:match('^%S+%s+(%S+)%s') == m then return true end
+  end
+  return false
+end
+
+local ok, err = pcall(function() require('custom.vault').setup() end)
+check('module loads + setup() runs', ok)
+if not ok then print('  (' .. tostring(err) .. ')'); print(('passed: %d  failed: %d'):format(pass, fail)); vim.cmd('cq') end
+
+local vault = vim.fn.expand('~/vault')
+local workflow = vim.fn.expand('~/workflow')
+
+-- Wiring: shada exclusions for both vaults
+local shada = vim.o.shada
+check('shada excludes ~/vault', shada:find('r' .. vault, 1, true) ~= nil)
+check('shada excludes ~/workflow', shada:find('r' .. workflow, 1, true) ~= nil)
+
+-- Wiring: write-guard + undo/swap autocmds cover the workflow pattern
+local function has_au(events)
+  for _, a in ipairs(vim.api.nvim_get_autocmds({ event = events })) do
+    if a.pattern and a.pattern:find('workflow', 1, true) then return true end
+  end
+  return false
+end
+check('BufWriteCmd guard registered', has_au('BufWriteCmd'))
+check('undo/swap guard registered', has_au({ 'BufReadPre', 'BufNewFile' }))
+
+-- End-to-end BLOCK: only meaningful while ~/vault is sealed.
+if mounted(vault) then
+  print('  skip end-to-end BLOCK: ~/vault is currently unlocked')
+else
+  local function try_block(label, target, do_write)
+    os.remove(target)
+    pcall(do_write)
+    local leaked = exists(target)
+    os.remove(target)                                 -- always clean up
+    check(label, not leaked)
+  end
+  try_block('BLOCK save-as into sealed ~/vault', vault .. '/__gt_saveas.txt', function()
+    vim.cmd('enew'); vim.api.nvim_buf_set_lines(0, 0, -1, false, { 'x' })
+    vim.cmd('silent! write ' .. vim.fn.fnameescape(vault .. '/__gt_saveas.txt'))
+  end)
+  try_block('BLOCK in-place save under sealed ~/vault', vault .. '/__gt_inplace.txt', function()
+    vim.cmd('edit ' .. vim.fn.fnameescape(vault .. '/__gt_inplace.txt'))
+    vim.api.nvim_buf_set_lines(0, 0, -1, false, { 'x' })
+    vim.cmd('silent! write')
+  end)
+end
+
+print(('passed: %d  failed: %d'):format(pass, fail))
+vim.cmd(fail == 0 and 'qa!' or 'cq')
+EOF
+
+echo "testing nvim/lua/custom/vault.lua guards"
+env -u NVIM_LISTEN_ADDRESS nvim --headless -u NONE --listen "$SOCK" -c "luafile $LUA" 2>&1 \
+  | sed -r "s/\x1b\[[0-9;?]*[a-zA-Z]//g"
+rc=${PIPESTATUS[0]}
+
+# Belt-and-suspenders: never leave a stray plaintext file in a sealed ~/vault.
+rm -f "$HOME/vault/__gt_saveas.txt" "$HOME/vault/__gt_inplace.txt" 2>/dev/null || true
+
+exit "$rc"

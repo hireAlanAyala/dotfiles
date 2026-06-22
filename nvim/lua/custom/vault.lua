@@ -15,6 +15,13 @@ local MOUNT = vim.fn.expand('~/vault')
 local IDLE_MS = 10000
 local VAULT_BIN = 'vault' -- on PATH via ~/.local/bin
 
+-- The ComfyUI-driven workflow vault. nvim does NOT manage its lock/unlock
+-- LIFECYCLE (run.sh does), but it gets the same PASSIVE protections as ~/vault:
+-- no plaintext derivatives written outside it, kept out of shada, and writes
+-- refused while it is sealed. PROTECTED is the set those guards apply to.
+local WORKFLOW = vim.fn.expand('~/workflow')
+local PROTECTED = { MOUNT, WORKFLOW }
+
 local lock_timer = nil
 local unlocking = false -- guards against stacking password prompts
 
@@ -33,19 +40,32 @@ local function in_vault(path)
   return path == MOUNT or path:sub(1, #MOUNT + 1) == MOUNT .. '/'
 end
 
--- Read /proc/mounts directly (no subprocess) to see if the vault is mounted.
-local function is_mounted()
+-- Read /proc/mounts directly (no subprocess) to see if mountpoint `m` is mounted.
+local function mp_mounted(m)
   local f = io.open('/proc/mounts', 'r')
   if not f then return false end
   for line in f:lines() do
-    local mp = line:match('^%S+%s+(%S+)%s')
-    if mp == MOUNT then
+    if line:match('^%S+%s+(%S+)%s') == m then
       f:close()
       return true
     end
   end
   f:close()
   return false
+end
+
+-- Is the nvim vault (the one whose lifecycle this module drives) mounted?
+local function is_mounted() return mp_mounted(MOUNT) end
+
+-- If `path` is the mountpoint of, or inside, a PROTECTED vault, return that
+-- mountpoint; else nil. Used by the passive guards below.
+local function protected_of(path)
+  if not path or path == '' then return nil end
+  path = vim.fn.fnamemodify(path, ':p'):gsub('/+$', '')
+  for _, m in ipairs(PROTECTED) do
+    if path == m or path:sub(1, #m + 1) == m .. '/' then return m end
+  end
+  return nil
 end
 
 -- Is a vault buffer (oil or file) currently VISIBLE in some window? We check
@@ -150,15 +170,55 @@ function M.setup()
   end
 
   -- Never write nvim's plaintext derivatives (persistent undo, swap) for files
-  -- under the vault -- those land OUTSIDE it and would survive locking, leaking
+  -- under EITHER vault -- those land OUTSIDE it and would survive locking, leaking
   -- full contents. Per-buffer overrides win over the global options.
   vim.api.nvim_create_autocmd({ 'BufReadPre', 'BufNewFile' }, {
-    pattern = MOUNT .. '/*',
+    pattern = { MOUNT .. '/*', WORKFLOW .. '/*' },
     callback = function(args)
       vim.bo[args.buf].undofile = false
       vim.bo[args.buf].swapfile = false
     end,
   })
+
+  -- Refuse to WRITE into a vault mountpoint while it is SEALED (not mounted).
+  -- Sealed, the mountpoint is a bare dir on the real fs: a write would land as
+  -- plaintext at rest AND leave it non-empty, which makes the next `vault unlock`
+  -- refuse to mount (exit 3). Reads are harmless; only writes are the hazard.
+  -- BufWriteCmd fully OWNS the write, so vetoing it blocks EVERY form (in-place
+  -- save and `:w <path>` save-as alike -- a BufWritePre error only aborts the
+  -- former). The target is <afile> (args.match), not the buffer name. On the
+  -- allowed path we redo the write with :noautocmd to avoid re-entering this cmd.
+  vim.api.nvim_create_autocmd('BufWriteCmd', {
+    pattern = { MOUNT .. '/*', WORKFLOW .. '/*' },
+    callback = function(args)
+      local target = args.match
+      local m = protected_of(target)
+      if m and not mp_mounted(m) then
+        vim.notify(('vault: %s is SEALED -- write refused for %s (would leak + block '
+          .. 'the next unlock). Unlock/start it first.'):format(m, vim.fn.fnamemodify(target, ':t')),
+          vim.log.levels.ERROR)
+        return -- buffer stays modified; nothing hits disk
+      end
+      local ok, err = pcall(function()
+        vim.api.nvim_buf_call(args.buf, function()
+          vim.cmd('noautocmd keepalt write! ' .. vim.fn.fnameescape(target))
+        end)
+      end)
+      if not ok then
+        vim.notify('vault: write failed: ' .. tostring(err), vim.log.levels.ERROR)
+      elseif target == vim.api.nvim_buf_get_name(args.buf) then
+        vim.bo[args.buf].modified = false -- in-place save: mark buffer clean
+      end
+    end,
+  })
+
+  -- Keep vault file paths out of ShaDa. In Neovim an `r{path}` ShaDa item means
+  -- "store no ShaDa info for files under this path", so marks/oldfiles for vault
+  -- and workflow files never persist to ~/.local/state/nvim/shada -- which lives
+  -- OUTSIDE the vaults and would otherwise leak which files exist + cursor history.
+  for _, m in ipairs(PROTECTED) do
+    vim.opt.shada:append('r' .. m)
+  end
 
   -- Drive unlock/lock off buffer focus. oil opens one buffer per directory, so
   -- BufEnter fires for both oil navigation and opening files.
