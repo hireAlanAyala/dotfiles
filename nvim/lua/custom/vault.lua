@@ -81,6 +81,13 @@ local function do_lock()
     vim.schedule(function()
       if res.code == 0 then
         vim.notify('Vault locked')
+      elseif res.code == 75 then
+        -- Lazy-detached but gocryptfs is still serving a held process: the vault
+        -- LOOKS locked but its plaintext is still readable by that process.
+        vim.notify(
+          'Vault NOT fully sealed: a process still holds it open (lazily detached). '
+            .. 'It seals once that process exits -- check for a shell/terminal inside ' .. MOUNT .. '.',
+          vim.log.levels.WARN)
       else
         vim.notify('Vault lock failed: ' .. (res.stderr or ''), vim.log.levels.ERROR)
       end

@@ -24,7 +24,9 @@
 #                  in the trash.
 #   vault lock     unmount (clean -> retry -> lazy fallback), then remove any vault
 #                  files sitting in the trash (their plaintext copy is made at
-#                  delete time and lingers there until cleared).
+#                  delete time and lingers there until cleared). Exits 75 if a lazy
+#                  detach left gocryptfs still serving a held process -- i.e. the
+#                  vault LOOKS locked but is not actually sealed yet.
 #   vault status   prints mounted | locked (exit 0 | 1).
 #
 # Usage: vault {unlock|lock|status}
@@ -57,6 +59,10 @@ assert_paths() {
 }
 
 is_mounted() { mountpoint -q "$MOUNT"; }
+
+# gocryptfs still alive for this cipher dir? Stays true after a lazy unmount while
+# a straggler keeps a handle open -- the window where plaintext is still served.
+is_serving() { pgrep -f -- "gocryptfs.* $CIPHER" >/dev/null 2>&1; }
 
 cmd_status() {
   if is_mounted; then echo mounted; return 0; fi
@@ -103,16 +109,25 @@ purge_trash() {
 }
 
 cmd_lock() {
+  local lazy=0
   if is_mounted; then
     if ! fusermount -u "$MOUNT" 2>/dev/null; then
       sleep 1
       if ! fusermount -u "$MOUNT" 2>/dev/null; then
         echo "vault: clean unmount blocked (mount busy), detaching lazily" >&2
         fusermount -u -z "$MOUNT" || true
+        lazy=1
       fi
     fi
   fi
   purge_trash
+  # A lazy detach removes the mountpoint (so it LOOKS locked) but gocryptfs keeps
+  # serving the plaintext to whatever process still holds it. Signal that clearly
+  # (exit 75) so the caller can warn that the vault is not actually sealed yet.
+  if [ "$lazy" = 1 ] && is_serving; then
+    echo "vault: lazily detached but a held process is still being served -- NOT fully sealed" >&2
+    exit 75
+  fi
 }
 
 assert_paths
