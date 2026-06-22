@@ -21,7 +21,8 @@
 #                  mount with the idle backstop. Refuses if the mountpoint is
 #                  non-empty (stray plaintext gocryptfs would silently shadow at
 #                  rest). Also purges any vault files an earlier idle-unmount left
-#                  in the trash.
+#                  in the trash. Exits 76 if a prior gocryptfs instance is still
+#                  serving the cipher dir (draining) -- won't double-mount it.
 #   vault lock     unmount (clean -> retry -> lazy fallback), then remove any vault
 #                  files sitting in the trash (their plaintext copy is made at
 #                  delete time and lingers there until cleared). Exits 75 if a lazy
@@ -71,6 +72,14 @@ cmd_status() {
 
 cmd_unlock() {
   if is_mounted; then exit 0; fi
+  # Refuse to start a SECOND gocryptfs on the same cipher dir while a prior
+  # instance is still serving it (the draining window after a lazy unmount).
+  # Two instances on one cipher dir is unsafe; wait for the straggler to exit.
+  if is_serving; then
+    echo "vault: a gocryptfs instance is still serving $CIPHER (draining from a prior lazy unmount)." >&2
+    echo "       Refusing to start a second instance on the same cipher dir; wait for it to exit." >&2
+    exit 76
+  fi
   if [ ! -f "$CIPHER/gocryptfs.conf" ]; then
     echo "vault: $CIPHER is not an initialized gocryptfs dir (run: gocryptfs -init '$CIPHER')" >&2
     exit 2

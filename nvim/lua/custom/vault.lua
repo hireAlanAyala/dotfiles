@@ -127,6 +127,11 @@ local function unlock()
         if vim.bo.filetype == 'oil' then
           pcall(function() require('oil').open(MOUNT) end)
         end
+      elseif res.code == 76 then
+        -- A prior instance is still draining; mounting now would double-mount the
+        -- cipher dir. Not a failure -- just retry once it has finished sealing.
+        vim.notify('Vault still sealing from a prior lock -- wait a moment and try again.',
+          vim.log.levels.WARN)
       else
         vim.notify('Vault unlock failed: ' .. (res.stderr or ''), vim.log.levels.ERROR)
       end

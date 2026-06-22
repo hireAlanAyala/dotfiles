@@ -78,6 +78,18 @@ t_draining_warns() {           # held mount -> lazy detach + still serving -> ex
   [ "$rc" -eq 75 ]
 }
 
+t_unlock_refuses_while_draining() {   # don't double-mount the cipher dir (exit 76)
+  unlock || return 1
+  ( cd "$HOME/vault" && exec sleep 30 ) &   # holder forces a lazy detach on lock
+  local holder=$!
+  sleep 0.3
+  "$VAULT" lock >/dev/null 2>&1              # now draining: mountpoint gone, still serving
+  printf 'testpw\n' | "$VAULT" unlock >/dev/null 2>&1; local rc=$?
+  kill "$holder" 2>/dev/null; wait "$holder" 2>/dev/null
+  sleep 0.5
+  [ "$rc" -eq 76 ]
+}
+
 t_uninitialized() {            # unlock on a non-gocryptfs dir -> exit 2
   rm -f "$HOME/.vault-encrypted/gocryptfs.conf"
   printf 'x\n' | "$VAULT" unlock >/dev/null 2>&1; [ "$?" -eq 2 ]
@@ -132,6 +144,7 @@ run "roundtrip: survives encrypt/decrypt"  t_roundtrip_encrypted
 run "lock: seals + empties mountpoint"     t_lock_seals
 run "lock: idempotent when already locked" t_lock_idempotent
 run "lock: held mount -> exit 75 (not sealed)" t_draining_warns
+run "unlock: refuses while draining -> exit 76" t_unlock_refuses_while_draining
 run "guard: uninitialized cipher -> exit 2" t_uninitialized
 run "guard: non-empty mountpoint -> exit 3" t_empty_mount_guard
 run "trash: purge is selective"            t_trash_purge_selective
