@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+# Test harness for the `scrub-downloads` script. Each test runs against a
+# throwaway SCRUB_DIR sandbox, so the real ~/Downloads is never touched. Run
+# after any change:
+#   test-scrub-downloads
+# Exits non-zero if any test fails.
+set -uo pipefail   # deliberately NOT -e: run every test, then report
+
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+SCRUB="$SCRIPT_DIR/scrub-downloads"
+
+command -v find >/dev/null 2>&1 || { echo "find not installed"; exit 1; }
+[ -x "$SCRUB" ] || { echo "scrub-downloads not executable at $SCRUB"; exit 1; }
+
+PASS=0 FAIL=0
+ok() { PASS=$((PASS + 1)); printf '  \033[32mok\033[0m   %s\n' "$1"; }
+no() { FAIL=$((FAIL + 1)); printf '  \033[31mFAIL\033[0m %s\n' "$1"; }
+# run NAME FN: fresh sandbox SCRUB_DIR, run FN (0=pass), tear down.
+run() {
+  local name="$1" fn="$2"
+  SBOX="$(mktemp -d)"
+  export SCRUB_DIR="$SBOX/Downloads"
+  mkdir -p "$SCRUB_DIR"
+  if "$fn"; then ok "$name"; else no "$name"; fi
+  rm -rf "$SBOX"
+  unset SCRUB_DIR
+}
+mk()      { : > "$SCRUB_DIR/$1"; }            # create an empty file in the sandbox
+gone()    { [ ! -e "$SCRUB_DIR/$1" ]; }       # assert a file was removed
+kept()    { [ -e "$SCRUB_DIR/$1" ]; }         # assert a file survived
+once()    { "$SCRUB" --once >/dev/null 2>&1; } # one scrub pass
+
+# ---- I1: generator-named files ARE scrubbed (every prefix + ext) ------------
+t_scrubs_gen() {
+  local names=(
+    ComfyUI_temp_bnjlh_00009_.png   # temp preview
+    videogame_art_00042_.png        # saved image, custom prefix
+    flux_00001_.jpg
+    realvis_pose_00002_.jpeg
+    portrait_00007_.webp
+    something_00001_.gif
+    wan_i2v_00003_.mp4              # video output
+    clip_00005_.webm
+    foo_123456_.png                 # 6-digit counter (past 99999)
+  )
+  local n; for n in "${names[@]}"; do mk "$n"; done
+  once
+  for n in "${names[@]}"; do gone "$n" || { echo "    (not scrubbed: $n)" >&2; return 1; }; done
+}
+
+# ---- I2: non-matching files are LEFT ALONE ----------------------------------
+t_keeps_non_gen() {
+  local names=(
+    vacation_photo.png              # no counter
+    report_1234_.png                # only 4 digits
+    image_00001.png                 # no trailing underscore before ext
+    notes.txt                       # wrong extension
+    archive_00001_.zip              # wrong extension
+    invoice_00001_.pdf              # wrong extension
+    holiday.jpg
+  )
+  local n; for n in "${names[@]}"; do mk "$n"; done
+  once
+  for n in "${names[@]}"; do kept "$n" || { echo "    (wrongly scrubbed: $n)" >&2; return 1; }; done
+}
+
+# ---- I3: only the top level is scrubbed (no recursion) ----------------------
+t_scope_no_recursion() {
+  mkdir -p "$SCRUB_DIR/sub"
+  : > "$SCRUB_DIR/sub/keepme_00001_.png"   # gen-named but in a subdir
+  mk "top_00001_.png"
+  once
+  [ ! -e "$SCRUB_DIR/top_00001_.png" ] \
+    && [ -e "$SCRUB_DIR/sub/keepme_00001_.png" ]
+}
+
+# ---- I5: a no-match pass is a clean no-op, and it is idempotent --------------
+t_idempotent_noop() {
+  mk "keep.png"
+  once && once || return 1            # both passes succeed (exit 0)
+  kept "keep.png"
+}
+
+# ---- I4: degenerate dirs abort with exit 70, touching nothing ---------------
+t_failclosed_relative() {
+  SCRUB_DIR="relative/path" "$SCRUB" --once >/dev/null 2>&1; [ "$?" -eq 70 ]
+}
+t_failclosed_root() {
+  SCRUB_DIR="/" "$SCRUB" --once >/dev/null 2>&1; [ "$?" -eq 70 ]
+}
+
+# ---- usage guard ------------------------------------------------------------
+t_bad_arg_usage() {
+  "$SCRUB" --bogus >/dev/null 2>&1; [ "$?" -eq 64 ]
+}
+
+echo "testing $SCRUB"
+run "scrub: generator-named files removed (all prefixes/exts)" t_scrubs_gen
+run "keep: ordinary downloads untouched"                       t_keeps_non_gen
+run "scope: subdirectories not recursed"                       t_scope_no_recursion
+run "noop: empty/no-match pass is idempotent"                  t_idempotent_noop
+run "guard: relative dir aborts (70)"                          t_failclosed_relative
+run "guard: root dir aborts (70)"                              t_failclosed_root
+run "guard: bad arg -> usage (64)"                             t_bad_arg_usage
+
+echo
+echo "passed: $PASS   failed: $FAIL"
+[ "$FAIL" -eq 0 ]

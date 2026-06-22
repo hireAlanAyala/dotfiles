@@ -1,0 +1,12 @@
+[Unit]
+Description=scrub-downloads — delete ComfyUI_* leaks from ~/Downloads on arrival
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/scrub-downloads
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

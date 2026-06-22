@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Watch a downloads dir and immediately delete generated media files dropped
+# there by the browser's download button.
+#
+# Why: such downloads are REDUNDANT plaintext copies of work that is already
+# encrypted in the workflow vault (~/workflow/output). Left in ~/Downloads they
+# sit decrypted on the live machine, defeating the vault. This watcher removes
+# them on arrival so a stray click of the download button can't leak anything.
+#
+# Invariants (exercised by test-scrub-downloads):
+#   I1  A file is scrubbed IFF its basename matches the generator naming
+#       signature: <anything>_<5-or-more digits>_.<ext>, ext in GEN_EXTS.
+#       This is ComfyUI's filename convention (prefix_00001_.png, temp previews,
+#       wan_i2v_00003_.mp4, ...), so it catches every prefix, not just ComfyUI_.
+#   I2  Anything NOT matching that signature is left untouched (real downloads).
+#   I3  Only the TOP LEVEL of the dir is scrubbed (maxdepth 1) -- subdirectories
+#       are never recursed into.
+#   I4  Fail-closed: a non-absolute / degenerate dir aborts with exit 70 and
+#       touches nothing.
+#   I5  A scrub pass over a dir with no matches is a clean no-op (exit 0).
+# The dir is overridable via SCRUB_DIR (defaults to ~/Downloads) so the test
+# harness can run against a throwaway sandbox, never the real Downloads.
+set -uo pipefail
+
+DOWNLOADS="${SCRUB_DIR:-$HOME/Downloads}"
+
+# I4: never operate on a degenerate path -- a bad value plus a broad match could
+# touch the wrong tree. Require absolute and longer than "/".
+case "$DOWNLOADS" in
+  /?*) ;;
+  *) echo "scrub-downloads: BUG: bad downloads path '$DOWNLOADS'" >&2; exit 70 ;;
+esac
+
+# Single source of truth for the match (I1/I2). find -iregex matches the WHOLE
+# path, so the leading .* absorbs the directory prefix. 5-or-more digits covers
+# counters past 99999; the trailing "_" before the extension makes a false
+# positive on an ordinary download very unlikely.
+GEN_EXTS='png|jpg|jpeg|webp|gif|mp4|webm'
+GEN_REGEX=".*_[0-9][0-9][0-9][0-9][0-9]+_\.($GEN_EXTS)"
+
+scrub() {
+  local n=0 f
+  while IFS= read -r -d '' f; do
+    if rm -f -- "$f"; then
+      n=$((n + 1))
+      echo "scrub-downloads: removed $f"
+    fi
+  done < <(find "$DOWNLOADS" -maxdepth 1 -type f -regextype posix-extended \
+             -iregex "$GEN_REGEX" -print0 2>/dev/null)
+  if [ "$n" -gt 0 ]; then
+    notify-send -u low "Downloads scrubbed" \
+      "Removed $n generated file(s) — already encrypted in ~/workflow" 2>/dev/null || true
+  fi
+  return 0
+}
+
+mkdir -p "$DOWNLOADS"
+scrub   # I5: clears anything already sitting there; clean no-op if nothing matches
+
+case "${1:-watch}" in
+  --once|once) exit 0 ;;
+  watch) ;;
+  *) echo "usage: scrub-downloads [--once]" >&2; exit 64 ;;
+esac
+
+# Watch for new arrivals. A browser finalizes a download by renaming its temp
+# .crdownload to the final name (a moved_to event); create/close_write cover
+# other write paths. We re-scan on every event, so the match stays correct even
+# if an individual event is missed or coalesced.
+inotifywait -m -q -e create -e moved_to -e close_write "$DOWNLOADS" 2>/dev/null \
+| while read -r _; do scrub; done
