@@ -30,5 +30,6 @@ require('custom.task-runner').setup()
 require('custom.smart-notes').setup()
 require 'custom.csv'
 require('custom.browser').setup()
+require('custom.vault').setup()
 
 require 'custom.lazy'
