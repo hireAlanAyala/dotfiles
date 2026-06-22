@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+# Test harness for the `vault` script. Each test runs against a throwaway vault in
+# a temp $HOME, so nothing touches your real vault. Run after any change:
+#   test-vault
+# Exits non-zero if any test fails.
+#
+# Note: this performs real gocryptfs mounts/unmounts in the temp dirs.
+set -uo pipefail   # deliberately NOT -e: run every test, then report
+
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+VAULT="$SCRIPT_DIR/vault"
+
+command -v gocryptfs   >/dev/null 2>&1 || { echo "gocryptfs not installed"; exit 1; }
+command -v fusermount  >/dev/null 2>&1 || { echo "fusermount not installed"; exit 1; }
+[ -x "$VAULT" ] || { echo "vault script not executable at $VAULT"; exit 1; }
+
+PASS=0 FAIL=0
+ok()  { PASS=$((PASS + 1)); printf '  \033[32mok\033[0m   %s\n' "$1"; }
+no()  { FAIL=$((FAIL + 1)); printf '  \033[31mFAIL\033[0m %s\n' "$1"; }
+# run NAME FN: fresh sandbox vault, run FN (returns 0=pass), tear down.
+run() {
+  local name="$1" fn="$2"
+  SBOX="$(mktemp -d)"
+  export HOME="$SBOX"
+  mkdir -p "$HOME/.vault-encrypted"
+  printf 'testpw\n' | gocryptfs -init -q "$HOME/.vault-encrypted" >/dev/null 2>&1
+  if "$fn"; then ok "$name"; else no "$name"; fi
+  "$VAULT" lock >/dev/null 2>&1 || true
+  rm -rf "$SBOX"
+}
+unlock() { printf 'testpw\n' | "$VAULT" unlock >/dev/null 2>&1; }
+
+# ---- behavioral tests -------------------------------------------------------
+
+t_status_locked() {            # initialized but not mounted -> locked, rc 1
+  local out rc; out="$("$VAULT" status)"; rc=$?
+  [ "$out" = locked ] && [ "$rc" -eq 1 ]
+}
+
+t_unlock_mounts() {            # unlock -> mounted, rc 0
+  unlock || return 1
+  [ "$("$VAULT" status)" = mounted ]
+}
+
+t_roundtrip_live() {           # data written through the mount reads back
+  unlock || return 1
+  echo "blueprint-bytes" > "$HOME/vault/b.txt"
+  [ "$(cat "$HOME/vault/b.txt")" = "blueprint-bytes" ]
+}
+
+t_roundtrip_encrypted() {      # survives a full encrypt -> decrypt cycle
+  unlock || return 1
+  echo "secret-pixels" > "$HOME/vault/b.txt"
+  "$VAULT" lock >/dev/null 2>&1
+  unlock || return 1
+  [ "$(cat "$HOME/vault/b.txt")" = "secret-pixels" ]
+}
+
+t_lock_seals() {               # lock -> mountpoint empty + status locked
+  unlock || return 1
+  echo x > "$HOME/vault/b.txt"
+  "$VAULT" lock >/dev/null 2>&1
+  [ -z "$(ls -A "$HOME/vault" 2>/dev/null)" ] && [ "$("$VAULT" status)" = locked ]
+}
+
+t_lock_idempotent() {          # lock when already locked is a clean no-op
+  "$VAULT" lock >/dev/null 2>&1 && "$VAULT" lock >/dev/null 2>&1
+}
+
+t_uninitialized() {            # unlock on a non-gocryptfs dir -> exit 2
+  rm -f "$HOME/.vault-encrypted/gocryptfs.conf"
+  printf 'x\n' | "$VAULT" unlock >/dev/null 2>&1; [ "$?" -eq 2 ]
+}
+
+t_empty_mount_guard() {        # stray plaintext in mountpoint -> refuse (exit 3)
+  mkdir -p "$HOME/vault"; echo stray > "$HOME/vault/stray.txt"
+  printf 'testpw\n' | "$VAULT" unlock >/dev/null 2>&1
+  [ "$?" -eq 3 ] && ! "$VAULT" status >/dev/null   # and not mounted
+}
+
+t_trash_purge_selective() {    # lock purges vault trash, keeps the rest
+  mkdir -p "$HOME/.local/share/Trash/files" "$HOME/.local/share/Trash/info"
+  echo pixels > "$HOME/.local/share/Trash/files/v.png"
+  printf '[Trash Info]\nPath=%s/vault/v.png\n' "$HOME" > "$HOME/.local/share/Trash/info/v.png.trashinfo"
+  echo keep   > "$HOME/.local/share/Trash/files/other.png"
+  printf '[Trash Info]\nPath=%s/Documents/other.png\n' "$HOME" > "$HOME/.local/share/Trash/info/other.png.trashinfo"
+  unlock || return 1
+  "$VAULT" lock >/dev/null 2>&1
+  [ ! -e "$HOME/.local/share/Trash/files/v.png" ] \
+    && [ -e "$HOME/.local/share/Trash/files/other.png" ]
+}
+
+# ---- invariant / assertion tests -------------------------------------------
+# Run a path-mutated copy of the script and assert it aborts with exit 70.
+assert_aborts() {
+  local desc="$1"; shift           # remaining args are passed straight to sed
+  local bad rc
+  bad="$(mktemp)"; sed "$@" "$VAULT" > "$bad"
+  bash "$bad" status >/dev/null 2>&1; rc=$?
+  rm -f "$bad"
+  [ "$rc" -eq 70 ] || { echo "    ($desc: expected exit 70, got $rc)" >&2; return 1; }
+}
+t_assert_cipher_eq_mount() {
+  assert_aborts "cipher==mount" \
+    -e 's|^CIPHER=.*|CIPHER="/tmp/vault_test_same"|' \
+    -e 's|^MOUNT=.*|MOUNT="/tmp/vault_test_same"|'
+}
+t_assert_mount_is_root()  { assert_aborts "mount=/"   -e 's|^MOUNT=.*|MOUNT="/"|'; }
+t_assert_mount_relative() { assert_aborts "mount rel" -e 's|^MOUNT=.*|MOUNT="relative/path"|'; }
+t_assert_nested() {
+  assert_aborts "nested" \
+    -e 's|^CIPHER=.*|CIPHER="/tmp/vt"|' \
+    -e 's|^MOUNT=.*|MOUNT="/tmp/vt/inner"|'
+}
+
+echo "testing $VAULT"
+run "status: locked when unmounted"        t_status_locked
+run "unlock: mounts the vault"             t_unlock_mounts
+run "roundtrip: read back through mount"   t_roundtrip_live
+run "roundtrip: survives encrypt/decrypt"  t_roundtrip_encrypted
+run "lock: seals + empties mountpoint"     t_lock_seals
+run "lock: idempotent when already locked" t_lock_idempotent
+run "guard: uninitialized cipher -> exit 2" t_uninitialized
+run "guard: non-empty mountpoint -> exit 3" t_empty_mount_guard
+run "trash: purge is selective"            t_trash_purge_selective
+run "assert: cipher == mount aborts (70)"  t_assert_cipher_eq_mount
+run "assert: mount = / aborts (70)"        t_assert_mount_is_root
+run "assert: relative mount aborts (70)"   t_assert_mount_relative
+run "assert: nested paths abort (70)"      t_assert_nested
+
+echo
+echo "passed: $PASS   failed: $FAIL"
+[ "$FAIL" -eq 0 ]

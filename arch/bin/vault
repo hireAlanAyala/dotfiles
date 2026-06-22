@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# Mount / unmount a gocryptfs vault.
+#
+# Purpose: a personal encrypted file store. Personal files (private documents,
+# image blueprints, etc.) are kept encrypted at rest and exposed as a plaintext
+# view on demand, browsed via nvim/oil, and re-encrypted when you leave.
+#
+# At rest the data lives in ~/.vault-encrypted (the cipher dir). When unlocked it
+# is mounted as a plaintext view at ~/vault (the mountpoint), which is empty while
+# locked. Unmounting IS the re-encryption: once unmounted only ciphertext remains.
+#
+# The mount is started with `gocryptfs -idle`: gocryptfs unmounts ITSELF after
+# this much filesystem inactivity. That is the backstop that seals the vault even
+# if the editor that mounted it crashed or was killed -- so re-locking never
+# depends on a live process. The editor still does the fast, clean lock-on-leave;
+# -idle only catches the abandoned-mount case. Keep it well above any pause you'd
+# take mid-view (or it will unmount under you and you'll re-enter the password).
+#
+# Commands:
+#   vault unlock   read password from STDIN (or the terminal, if interactive) and
+#                  mount with the idle backstop. Refuses if the mountpoint is
+#                  non-empty (stray plaintext gocryptfs would silently shadow at
+#                  rest). Also purges any vault files an earlier idle-unmount left
+#                  in the trash.
+#   vault lock     unmount (clean -> retry -> lazy fallback), then remove any vault
+#                  files sitting in the trash (their plaintext copy is made at
+#                  delete time and lingers there until cleared).
+#   vault status   prints mounted | locked (exit 0 | 1).
+#
+# Usage: vault {unlock|lock|status}
+set -euo pipefail
+
+CIPHER="$HOME/.vault-encrypted"
+MOUNT="$HOME/vault"
+TRASH="$HOME/.local/share/Trash"
+IDLE=5m   # gocryptfs self-unmount after this much inactivity (crash/abandon backstop)
+
+# Fail-closed invariant check, run before any command touches the filesystem.
+# A degenerate CIPHER/MOUNT is a BUG, not user error, and could be catastrophic:
+# an empty or "/" MOUNT makes purge_trash's prefix match EVERY path and wipe the
+# whole trash; a cipher/mount nested in each other shadows the ciphertext. Abort
+# loudly (exit 70 = EX_SOFTWARE) rather than proceed on a broken assumption.
+assert_paths() {
+  local d
+  for d in "$CIPHER" "$MOUNT"; do
+    case "$d" in
+      /?*) ;;   # absolute and longer than "/"
+      *) echo "vault: BUG: path is empty or not absolute: '$d'" >&2; exit 70 ;;
+    esac
+    if [ "$d" = "$HOME" ]; then
+      echo "vault: BUG: refusing to operate directly on \$HOME: '$d'" >&2; exit 70
+    fi
+  done
+  [ "$CIPHER" != "$MOUNT" ] || { echo "vault: BUG: cipher dir == mountpoint ('$CIPHER')" >&2; exit 70; }
+  case "$MOUNT" in "$CIPHER"/*) echo "vault: BUG: mountpoint nested inside cipher dir" >&2; exit 70 ;; esac
+  case "$CIPHER" in "$MOUNT"/*) echo "vault: BUG: cipher dir nested inside mountpoint" >&2; exit 70 ;; esac
+}
+
+is_mounted() { mountpoint -q "$MOUNT"; }
+
+cmd_status() {
+  if is_mounted; then echo mounted; return 0; fi
+  echo locked; return 1
+}
+
+cmd_unlock() {
+  if is_mounted; then exit 0; fi
+  if [ ! -f "$CIPHER/gocryptfs.conf" ]; then
+    echo "vault: $CIPHER is not an initialized gocryptfs dir (run: gocryptfs -init '$CIPHER')" >&2
+    exit 2
+  fi
+  mkdir -p "$MOUNT"
+  if [ -n "$(ls -A "$MOUNT" 2>/dev/null)" ]; then
+    echo "vault: mountpoint $MOUNT is not empty -- refusing to mount over stray plaintext." >&2
+    echo "       Move/remove its contents first; files belong in $CIPHER (encrypted), not here." >&2
+    exit 3
+  fi
+  purge_trash   # clear anything a prior idle-unmount left in the trash
+  gocryptfs -q -idle "$IDLE" "$CIPHER" "$MOUNT"
+  is_mounted || { echo "vault: BUG: unlock returned success but $MOUNT is not mounted" >&2; exit 71; }
+}
+
+# Remove anything trashed FROM the vault: the plaintext copy was made at delete
+# time and lives in the trash until we clear it here.
+purge_trash() {
+  # Defense in depth on the one destructive op: never run with a degenerate MOUNT
+  # even if assert_paths were somehow bypassed.
+  [ -n "$MOUNT" ] && [ "$MOUNT" != / ] || return 0
+  local info="$TRASH/info" files="$TRASH/files"
+  [ -d "$info" ] || return 0
+  local tf p base
+  for tf in "$info"/*.trashinfo; do
+    [ -e "$tf" ] || continue
+    p="$(sed -n 's/^Path=//p' "$tf" | head -1)"
+    case "$p" in
+      "$MOUNT"|"$MOUNT"/*)
+        base="$(basename "${tf%.trashinfo}")"
+        rm -rf -- "$files/$base" 2>/dev/null || true
+        rm -f -- "$tf" 2>/dev/null || true
+        ;;
+    esac
+  done
+}
+
+cmd_lock() {
+  if is_mounted; then
+    if ! fusermount -u "$MOUNT" 2>/dev/null; then
+      sleep 1
+      if ! fusermount -u "$MOUNT" 2>/dev/null; then
+        echo "vault: clean unmount blocked (mount busy), detaching lazily" >&2
+        fusermount -u -z "$MOUNT" || true
+      fi
+    fi
+  fi
+  purge_trash
+}
+
+assert_paths
+case "${1:-}" in
+  unlock) cmd_unlock ;;
+  lock)   cmd_lock ;;
+  status) cmd_status ;;
+  *) echo "Usage: vault {unlock|lock|status}" >&2; exit 64 ;;
+esac
