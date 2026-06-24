@@ -36,8 +36,8 @@ git-filter-repo
 github-cli
 gnupg
 go
-gocryptfs
 go-yq
+gocryptfs
 graphviz
 grim
 htop
@@ -139,8 +139,8 @@ visidata
 viu
 wayvnc
 wf-recorder
-wl-clipboard
 wl-clip-persist
+wl-clipboard
 wofi
 wrangler
 wtype
