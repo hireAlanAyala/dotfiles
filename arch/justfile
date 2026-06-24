@@ -39,18 +39,34 @@ systemd-symlinks:
     ln -sf "{{dir}}"/systemd/user/*.{service,timer} ~/.config/systemd/user/
     systemctl --user daemon-reload
 
-# Enable system services
+# Enable system services (shared, then per-host)
 systemd-system:
     -sudo systemctl disable --now NetworkManager
     sudo systemctl enable --now iwd systemd-networkd systemd-resolved
     sudo ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
-    -sudo systemctl enable --now bluetooth fstrim.timer earlyoom tlp.service reflector.timer ufw pacman-sync.timer tailscaled
+    -sudo systemctl enable --now bluetooth fstrim.timer earlyoom reflector.timer ufw pacman-sync.timer tailscaled
     -sudo systemctl mask systemd-rfkill.service systemd-rfkill.socket
+    -just -f "{{justfile()}}" "_systemd-system-$(hostnamectl hostname)"
 
-# Enable user services
+# Per-host system services
+_systemd-system-homebase:
+    @true
+
+_systemd-system-archdev:
+    -sudo systemctl enable --now tlp.service
+
+# Enable user services (shared, then per-host)
 systemd-user:
     -systemctl --user enable pipewire pipewire-pulse wireplumber p11-kit-server.socket
-    -systemctl --user enable elephant.service battery-monitor.timer pipewire-session-manager.service cache-cleanup.timer rustic-backup.timer wifi-prefer.timer sunshine phone-term.service scrub-downloads.service
+    -systemctl --user enable elephant.service pipewire-session-manager.service cache-cleanup.timer rustic-backup.timer phone-term.service scrub-downloads.service
+    -just -f "{{justfile()}}" "_systemd-user-$(hostnamectl hostname)"
+
+# Per-host user services
+_systemd-user-homebase:
+    -systemctl --user enable sunshine
+
+_systemd-user-archdev:
+    -systemctl --user enable battery-monitor.timer wifi-prefer.timer
 
 # UFW firewall rules
 firewall:
