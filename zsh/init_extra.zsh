@@ -37,7 +37,7 @@ fi
 
 # ---------------------- Aliases ------------------------
 unalias battery 2>/dev/null
-battery() { if [[ "$(cat /etc/hostname)" == "homebase" ]]; then ssh -o ConnectTimeout=3 -o BatchMode=yes archdev 'cat /sys/class/power_supply/BAT0/capacity'; else cat /sys/class/power_supply/BAT0/capacity; fi }
+battery() { if [[ "$(cat /etc/hostname)" == "homebase" ]]; then ssh -o ConnectTimeout=3 -o BatchMode=yes archdev 'printf "%s%% %s\n" "$(cat /sys/class/power_supply/BAT0/capacity)" "$(cat /sys/class/power_supply/BAT0/status)"'; else printf "%s%% %s\n" "$(cat /sys/class/power_supply/BAT0/capacity)" "$(cat /sys/class/power_supply/BAT0/status)"; fi }
 alias keyboard='upower -i /org/freedesktop/UPower/devices/keyboard_dev_E4_EC_E9_C1_11_5B | grep percentage'
 
 alias cls='printf "\e[2J\e[3J\e[H"'
@@ -53,6 +53,17 @@ alias codex="$HOME/.config/arch/bin/codex-wrap"
 alias fd='fd --hidden --no-ignore'
 alias vm='cd ~/vms/windows && quickemu --vm windows-11.conf --display spice'
 alias nvim-control="$HOME/.config/scripts/nvim-control.sh"
+
+# c
+alias gccd='gcc -Wall -Wextra -Wpedantic -Werror -std=c11 -g -O1 -fsanitize=address,undefined'
+
+# Background a command fully detached: new session, no controlling tty,
+# stdin/stdout/stderr redirected so its logs never bleed into the prompt.
+bgr() {
+  local log="${TMPDIR:-/tmp}/bgr-${1:t}-$$.log"
+  setsid "$@" </dev/null >"$log" 2>&1 &
+  echo "bgr: $! -> $log"
+}
 
 # Docker helpers
 export DOCKER_HOST=unix:///var/run/docker.sock
