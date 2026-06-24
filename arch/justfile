@@ -25,8 +25,9 @@ etc:
 
 # Allow wheel group to use sudo
 # Generated instead of symlinked to avoid tracking root-owned files in git
+# pwfeedback echoes '*' per keystroke so you can see the password registering
 sudoers:
-    echo '%wheel ALL=(ALL:ALL) ALL' | sudo tee /etc/sudoers.d/wheel > /dev/null
+    printf '%%wheel ALL=(ALL:ALL) ALL\nDefaults pwfeedback\n' | sudo tee /etc/sudoers.d/wheel > /dev/null
     sudo chmod 440 /etc/sudoers.d/wheel
 
 # Systemd services (system + user)
