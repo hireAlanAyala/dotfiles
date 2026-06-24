@@ -460,7 +460,9 @@ function M.setup(opts)
   vim.api.nvim_create_autocmd('TextYankPost', {
     group = vim.api.nvim_create_augroup('terminal-persist-dewrap', { clear = true }),
     desc = 'Rejoin wrapped commands yanked from a managed terminal (tmux capture-pane -J)',
-    callback = function() dewrap_yank(vim.v.event) end,
+    -- pcall so a yank can never surface an error: worst case is the untouched
+    -- native yank already sitting in the register.
+    callback = function() pcall(dewrap_yank, vim.v.event) end,
   })
 
   -- Cleanup on buffer close
