@@ -48,6 +48,7 @@
 # # Just for example:
 # resize-overlay-duration = 4s 200ms
 font-family = FiraCode Nerd Font
+font-size = 17
 font-feature = -calt
 font-feature = -liga
 font-feature = -dlig
@@ -82,3 +83,8 @@ palette = 14=#FFB000
 palette = 15=#FFCC00
 
 # custom-shader = shaders/bloom.glsl
+
+# Force each ghostty invocation to be its own process. Workaround for IPC bug
+# under Hyprland where `exec, ghostty` opens a blank window mirroring an
+# existing surface with no pty attached.
+gtk-single-instance = false

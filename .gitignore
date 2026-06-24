@@ -70,3 +70,6 @@ sunshine/credentials/
 menus/
 linode-cli
 server exited unexpectedly
+
+# ultralytics (YOLO) writes runtime settings here, not config
+Ultralytics/
