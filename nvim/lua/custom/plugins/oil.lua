@@ -322,6 +322,10 @@ return {
           local name = vim.fn.fnamemodify(dir:gsub('/$', ''), ':t'):gsub('%.', '-')
           if name == '' then name = 'root' end
 
+          -- Close the oil buffer before switching away, so this session isn't
+          -- left sitting in oil when we come back to it (dir/name already captured).
+          pcall(oil.close)
+
           -- Check if session already exists
           local result = vim.system({ 'tmux', 'has-session', '-t', name }, { env = { TMUX = '' } }):wait()
           if result.code == 0 then
