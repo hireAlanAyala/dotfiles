@@ -6,6 +6,6 @@ Target = linux
 Target = intel-ucode
 
 [Action]
-Description = Syncing boot entries from dotfiles...
+Description = Syncing this host's boot entry from dotfiles...
 When = PostTransaction
-Exec = /usr/bin/cp /home/walker/.config/arch/etc/boot/loader/entries/arch.conf /boot/loader/entries/arch.conf
+Exec = /bin/sh -c 'cp "/home/walker/.config/hosts/$(cat /etc/hostname)/boot/loader/entries/arch.conf" /boot/loader/entries/arch.conf'

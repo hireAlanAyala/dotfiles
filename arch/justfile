@@ -15,7 +15,7 @@ etc:
     sudo cp "{{dir}}/etc/pacman.conf" /etc/pacman.conf
     sudo mkdir -p /etc/boot /etc/pacman.d /etc/systemd
     sudo ln -sfn "{{dir}}/etc/bluetooth" /etc/bluetooth
-    sudo ln -sfn "{{dir}}/etc/boot/loader" /etc/boot/loader
+    sudo ln -sfn "{{dir}}/../hosts/$(hostnamectl hostname)/boot/loader" /etc/boot/loader
     sudo ln -sfn "{{dir}}/etc/pacman.d/hooks" /etc/pacman.d/hooks
     sudo ln -sf "{{dir}}/etc/systemd/zram-generator.conf" /etc/systemd/zram-generator.conf
     sudo mkdir -p /etc/systemd/network /etc/systemd/system
