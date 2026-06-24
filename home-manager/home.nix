@@ -23,111 +23,18 @@
   home.stateVersion = "23.05"; # Please read the comment before changing.
 
   home.packages = with pkgs; [
-    # Custom derivations and scripts
-    (callPackage ../derivations/discordo.nix { })
-    (callPackage ../derivations/extract-otp-secrets.nix { })
-    (callPackage ../derivations/mcp-chrome-bridge.nix { })
+    # Shell-script wrappers still sourced from this repo.
     (writeShellScriptBin "show-2fa" (builtins.readFile ../scripts/show_all_2fa.sh))
     (writeShellScriptBin "hm" (builtins.readFile ../scripts/hm.sh))
     #(writeShellScriptBin "mouse-jiggle" (builtins.readFile ../scripts/mouse-jiggle.sh))
 
-    # core
-    # gcc  # Using system gcc for better CGO compatibility
-    unzip
-
-    # ai
-    # claude-code
-    ollama
-
-    # Development languages and runtimes
-    # go  # Using system Go for better CGO/OpenCV compatibility
-    # nodejs_22  # Using Arch's nodejs instead for npm global install flexibility
-    python3Packages.git-filter-repo
-    temurin-bin # java openJDK
-    jbang
-    clojure
-    leiningen
-    lua
-    rustc
-    cargo
-
-    # Node.js ecosystem (managed via Arch's npm now)
-    # nodePackages.typescript
-    # nodePackages.typescript-language-server
-    # nodePackages.nodemon
-    # pnpm  # install via: npm i -g pnpm
-    # yarn-berry  # install via: npm i -g yarn
-
-    # .NET ecosystem
-    dotnetCorePackages.dotnet_8.sdk
-    netcoredbg
-    # dotnet-sdk_8
-    fsautocomplete
-
-    # Cloud and DevOps
-    azure-functions-core-tools
-    azure-cli
-    linode-cli
-    podman
-    docker
-    docker-compose
-    ngrok
-
-    # Development tools
-    gnumake
-    air
-    direnv
-    tree
-    keychain
-    cloc
-    tokei # project code statistics
+    # Nix tooling — goes away when home-manager itself is dropped.
+    # Everything else migrated off Nix:
+    #   pacman/AUR -> arch/packages-{pacman,aur}.txt
+    #   mise       -> java (temurin-21), dotnet (8)
+    #   npm -g     -> mcp-chrome-bridge
+    #   dotnet tool -> fsautocomplete
     nixfmt # Nix formatter
-    sops # secrets management CLI
-
-    # Databases
-    postgresql_15
-    sqlite
-
-    # data processing
-    miller
-
-    # Terminal Core
-    reptyr
-    ttyd
-
-    # CLI utilities
-    jq # sed but for json
-    fzf
-    bat
-    fd
-    zoxide
-    ripgrep
-    yq
-    htop
-    zbar # QR code reader
-    viu # terminal image viewer
-    chafa # terminal image viewer with better compatibility
-    _1password-cli
-
-    # Media and graphics
-    mpv
-    imagemagick
-
-    # Communication and entertainment
-    irssi
-    spotify-player
-
-    # Data tools
-    visidata
-
-    # Hardware
-    arduino-cli
-
-    # Nerd Fonts
-    nerd-fonts.iosevka
-    nerd-fonts.fira-code
-    nerd-fonts.jetbrains-mono
-    nerd-fonts.hack
   ];
 
   home.file = { };

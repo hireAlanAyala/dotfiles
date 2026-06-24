@@ -52,7 +52,8 @@ OpenSCAD/
 kicad/
 pipe-viewer/
 xournalpp/
-mise/
+mise/*
+!mise/config.toml
 
 # Runtime state/binaries
 dconf/user
