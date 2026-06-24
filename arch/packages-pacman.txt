@@ -118,6 +118,7 @@ texlive-fontsrecommended
 texlive-latexrecommended
 tlp
 tlp-rdw
+tmux
 tokei
 ttf-cascadia-mono-nerd
 ttf-firacode-nerd
