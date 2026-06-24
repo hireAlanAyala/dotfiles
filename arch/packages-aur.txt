@@ -1,18 +1,21 @@
 1password-cli
 admesh
-air
 azure-functions-core-tools-bin
+azure-functions-core-tools-bin-debug
 bambustudio-bin
 discordo-git
+discordo-git-debug
 dragon-drop
 dtach
 extract-otp-secrets
+extract-otp-secrets-debug
 google-cloud-cli
 jbang
 linode-cli
 microsoft-edge-stable-bin
 mpvpaper
 netcoredbg
+netcoredbg-debug
 ngrok
 ookla-speedtest-bin
 opencode-bin
@@ -25,4 +28,3 @@ wl-kbptr
 wlrctl
 xdg-desktop-portal-termfilechooser-hunkyburrito-git
 yay-bin
-yay-bin-debug

@@ -30,14 +30,13 @@ foot
 freecad
 fuzzel
 fzf
-gcovr
 ghostty
 git
 git-filter-repo
 gnupg
 go
-gocryptfs
 go-yq
+gocryptfs
 graphviz
 grim
 htop
@@ -93,7 +92,6 @@ playerctl
 podman
 polkit-kde-agent
 postgresql
-python-jinja
 qt5-wayland
 qt6-wayland
 reflector
@@ -138,8 +136,8 @@ visidata
 viu
 wayvnc
 wf-recorder
-wl-clipboard
 wl-clip-persist
+wl-clipboard
 wofi
 wrangler
 wtype
