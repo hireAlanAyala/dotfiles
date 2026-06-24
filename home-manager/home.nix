@@ -98,8 +98,6 @@
 
   # PKG configurations
   imports = [
-    ../programs/bash.nix
-    ../programs/zsh.nix
     # System modules
     ../modules/symlinks.nix
   ];

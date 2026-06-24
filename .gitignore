@@ -35,6 +35,9 @@ go/telemetry/
 # tmux plugins are cloned externally via `just tmux-plugins`
 tmux/plugins/
 
+# zsh completion dump (regenerated at runtime)
+zsh/.zcompdump*
+
 # Build artifacts and caches
 derivations/
 github-copilot/
