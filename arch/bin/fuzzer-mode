@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# fuzzer-mode — presence-gate the tiger-cfo fuzzer concurrency.
+#
+# Writes the desired concurrency to a state file that cfo_supervisor.sh reads on
+# each loop, then restarts the tiger-cfo user service so the change applies now
+# (the supervisor's `kill 0` trap drops all fuzz workers immediately on restart).
+#
+# Driven by hypridle: `present` on resume (low concurrency, cool/responsive for
+# dev), `away` on idle timeout (high concurrency, max fuzzing throughput).
+#
+# Usage: fuzzer-mode present|away|<N>|status
+set -euo pipefail
+
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/fuzzer-concurrency"
+PRESENT=2
+AWAY=20
+SERVICE=tiger-cfo.service
+
+want=""
+case "${1:-}" in
+  present) want=$PRESENT ;;
+  away)    want=$AWAY ;;
+  status)
+    cur=$(cat "$STATE" 2>/dev/null || echo "(unset, default 20)")
+    active=$(systemctl --user is-active "$SERVICE" 2>/dev/null || true)
+    workers=$(pgrep -c tiger-fuzz 2>/dev/null || echo 0)
+    echo "concurrency target: $cur   service: $active   live workers: $workers"
+    exit 0 ;;
+  ''|-h|--help)
+    echo "usage: fuzzer-mode present|away|<N>|status"; exit 0 ;;
+  *)
+    case "$1" in (*[!0-9]*|"") echo "invalid: '$1' (need present|away|<N>|status)" >&2; exit 1 ;; esac
+    want=$1 ;;
+esac
+
+mkdir -p "$(dirname "$STATE")"
+
+# No-op if already at the desired value (avoids needless service restarts —
+# hypridle resume can fire repeatedly).
+cur=$(cat "$STATE" 2>/dev/null || echo "")
+if [ "$cur" = "$want" ]; then
+  exit 0
+fi
+
+echo "$want" > "$STATE"
+
+# Only restart if the service is enabled/loaded; if the user stopped it
+# deliberately, just record the target for next start.
+if systemctl --user is-active "$SERVICE" >/dev/null 2>&1; then
+  systemctl --user restart "$SERVICE"
+fi
