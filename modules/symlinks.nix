@@ -51,6 +51,9 @@ in
       config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.config/claude/.mcp.json";
     ".claude/commands".source =
       config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.config/claude/commands";
+    # Global instructions preloaded into every Claude Code session on this machine.
+    ".claude/CLAUDE.md".source =
+      config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.config/claude/CLAUDE.md";
   };
 
   # ====================== Documentation ======================
