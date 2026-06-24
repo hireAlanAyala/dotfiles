@@ -75,7 +75,7 @@ vim.opt.autochdir = false
 vim.opt.iskeyword:append '-'
 vim.opt.path:append '**'
 -- vim.opt.selection = 'exclusive'
-vim.opt.mouse = 'a'
+vim.opt.mouse = '' -- disable mouse interactions in all modes
 
 -- Folding settings
 vim.opt.foldmethod = 'expr' -- Use expression for folding

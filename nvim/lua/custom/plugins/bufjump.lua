@@ -10,6 +10,10 @@ return {
     -- last-leave position so <M-o>/<M-i> lands you where you actually were.
     vim.api.nvim_create_autocmd('BufLeave', {
       callback = function(args)
+        -- The buffer being left can already be invalid here -- e.g. a floating
+        -- preview window torn down mid-wipe fires BufLeave for a dead buffer.
+        -- Writing a buffer-scoped var on it throws, so bail on an invalid id.
+        if not vim.api.nvim_buf_is_valid(args.buf) then return end
         local ok, pos = pcall(vim.api.nvim_win_get_cursor, 0)
         if not ok then return end
         vim.b[args.buf].bufjump_last_pos = pos
@@ -22,7 +26,15 @@ return {
 
     local function with_restore(fn)
       return function()
+        local prev_buf = vim.api.nvim_get_current_buf()
         fn()
+        -- bufjump only moves when there's a different buffer to jump to. If the
+        -- buffer didn't change we're at the end of the jumplist (e.g. already at
+        -- the most "in" buffer) — do nothing, so we don't move the cursor within
+        -- the current buffer.
+        if vim.api.nvim_get_current_buf() == prev_buf then
+          return
+        end
         if vim.bo.buftype == 'terminal' and vim.b.bufjump_at_end then
           vim.cmd('normal! G')
         else

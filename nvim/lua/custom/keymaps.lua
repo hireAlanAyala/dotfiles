@@ -22,11 +22,41 @@ vim.keymap.set('v', '>', '>gv', { desc = 'Indent right and reselect' })
 -- Better J behavior
 vim.keymap.set('n', 'J', 'mzJ`z', { desc = 'Join lines and keep cursor position' })
 
--- Window navigation
+-- Window navigation (move focus)
 vim.keymap.set('n', '<C-h>', '<C-w>h', { desc = 'Navigate left' })
 vim.keymap.set('n', '<C-l>', '<C-w>l', { desc = 'Navigate right' })
 vim.keymap.set('n', '<C-j>', '<C-w>j', { desc = 'Navigate down' })
 vim.keymap.set('n', '<C-k>', '<C-w>k', { desc = 'Navigate up' })
+
+-- Window moving: swap the current pane with its neighbor in the given direction,
+-- preserving the existing layout and sizes (unlike <C-w>HJKL, which flattens to the edge).
+-- Focus follows the pane so it stays under your cursor. <C-w>HJKL is still there built-in
+-- when you actually want the "throw to wall / flip orientation" behavior.
+-- Alt+Shift (not Ctrl+Shift): Alt passes through tmux as an Esc-prefix, whereas Ctrl+Shift
+-- needs the CSI-u "extended-keys" protocol that this tmux has turned off.
+local function swap_window(dir)
+  local cur = vim.api.nvim_get_current_win()
+  local cur_cursor = vim.api.nvim_win_get_cursor(cur)
+  vim.cmd('wincmd ' .. dir)
+  local target = vim.api.nvim_get_current_win()
+  if target == cur then return end -- no neighbor that way; wincmd was a no-op
+
+  local target_cursor = vim.api.nvim_win_get_cursor(target)
+  local cur_buf = vim.api.nvim_win_get_buf(cur)
+  local target_buf = vim.api.nvim_win_get_buf(target)
+
+  vim.api.nvim_win_set_buf(cur, target_buf)
+  vim.api.nvim_win_set_buf(target, cur_buf)
+  pcall(vim.api.nvim_win_set_cursor, cur, target_cursor)
+  pcall(vim.api.nvim_win_set_cursor, target, cur_cursor)
+
+  vim.api.nvim_set_current_win(target) -- follow the moved buffer to its new spot
+end
+
+vim.keymap.set('n', '<M-S-h>', function() swap_window('h') end, { desc = 'Swap pane left' })
+vim.keymap.set('n', '<M-S-l>', function() swap_window('l') end, { desc = 'Swap pane right' })
+vim.keymap.set('n', '<M-S-j>', function() swap_window('j') end, { desc = 'Swap pane down' })
+vim.keymap.set('n', '<M-S-k>', function() swap_window('k') end, { desc = 'Swap pane up' })
 
 -- Terminal persist keymaps
 local terminal_persist = require 'terminal-persist'

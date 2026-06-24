@@ -24,12 +24,22 @@ return {
     auto_install = true,
     highlight = {
       enable = true,
+      -- Never attach to buffers flagged as big files (see custom/autocmds.lua). Parsing a
+      -- multi-MB file can spin into a tight Lua loop and balloon memory to many GB.
+      disable = function(_, buf)
+        return vim.b[buf].bigfile == true
+      end,
       -- Some languages depend on vim's regex highlighting system (such as Ruby) for indent rules.
       --  If you are experiencing weird indenting issues, add the language to
       --  the list of additional_vim_regex_highlighting and disabled languages for indent.
       additional_vim_regex_highlighting = { 'ruby' },
     },
-    indent = { enable = true, disable = { 'ruby' } },
+    indent = {
+      enable = true,
+      disable = function(lang, buf)
+        return lang == 'ruby' or vim.b[buf].bigfile == true
+      end,
+    },
     -- Add this for HTML in template strings
     injections = {
       enable = true,

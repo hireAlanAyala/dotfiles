@@ -53,6 +53,49 @@ vim.api.nvim_create_autocmd('FileType', {
   end,
 })
 
+-- Big-file guard. Opening a very large file used to spin treesitter / LSP / regex
+-- syntax into a tight Lua loop, balloon memory to many GB, and wedge nvim with no way
+-- to recover the session. Above a size threshold we flag the buffer (vim.b.bigfile,
+-- read by treesitter's disable function) and strip the expensive machinery so the file
+-- opens instantly. Adjust BIGFILE_BYTES to taste.
+local BIGFILE_BYTES = 1.5 * 1024 * 1024
+
+vim.api.nvim_create_autocmd('BufReadPre', {
+  group = augroup,
+  callback = function(ev)
+    local stat = vim.loop.fs_stat(ev.match)
+    if stat and stat.size > BIGFILE_BYTES then
+      vim.b[ev.buf].bigfile = true
+    end
+  end,
+})
+
+vim.api.nvim_create_autocmd('FileType', {
+  group = augroup,
+  callback = function(ev)
+    if not vim.b[ev.buf].bigfile then return end
+    pcall(vim.treesitter.stop, ev.buf)
+    vim.bo[ev.buf].syntax = 'off'
+    vim.bo[ev.buf].swapfile = false
+    vim.bo[ev.buf].undofile = false
+    vim.opt_local.foldmethod = 'manual'
+    vim.opt_local.foldexpr = ''
+    vim.opt_local.spell = false
+    -- Detach any LSP clients that managed to attach before we got here
+    vim.schedule(function()
+      if not vim.api.nvim_buf_is_valid(ev.buf) then return end
+      for _, client in pairs(vim.lsp.get_clients({ bufnr = ev.buf })) do
+        pcall(vim.lsp.buf_detach_client, ev.buf, client.id)
+      end
+    end)
+    vim.notify(
+      ('Big file (%.1f MB): treesitter, syntax & LSP disabled'):format(
+        (vim.loop.fs_stat(vim.api.nvim_buf_get_name(ev.buf)) or { size = 0 }).size / 1024 / 1024),
+      vim.log.levels.WARN
+    )
+  end,
+})
+
 -- Highlight when yanking (copying) text
 --  Try it with `yap` in normal mode
 --  See `:help vim.highlight.on_yank()`

@@ -26,8 +26,15 @@ return {
       },
       view_options = {
         show_hidden = true,
+        sort = {
+          { 'mtime', 'desc' },
+          { 'name', 'asc' },
+        },
       },
       keymaps = {
+      -- Oil maps <C-h> to select_split by default, which shadows the global
+      -- <C-h> = <C-w>h window-nav. Disable it so navigating left works in oil too.
+      ['<C-h>'] = false,
       ['<leader>os'] = {
         function()
           local oil = require 'oil'
@@ -406,6 +413,7 @@ return {
           { '<leader>o', group = 'Oil', buffer = 0 },
           { '<leader>os', desc = 'Sort files', buffer = 0 },
           { '<leader>oi', desc = 'Toggle inline file info', buffer = 0 },
+          { '<leader>op', desc = 'Toggle preview', buffer = 0 },
           { '<leader>oc', desc = 'Convert media file', buffer = 0 },
           { '<leader>od', desc = 'Drag file(s)', buffer = 0 },
           { '<leader>ot', desc = 'Tmux session here', buffer = 0 },
@@ -456,7 +464,11 @@ return {
             if not current_dir then return end
 
             local paths = {}
-            local entry = oil.get_cursor_entry()
+
+            local function want(entry)
+              return entry and entry.name ~= '..'
+                and (entry.type == 'file' or (entry.type == 'directory' and vim.g.filechooser_directory == 1))
+            end
 
             if vim.g.filechooser_mode == 'save' then
               -- Save mode: always use current directory + suggested filename
@@ -466,8 +478,20 @@ return {
               else
                 table.insert(paths, current_dir)
               end
-            elseif entry and (entry.type == 'file' or (entry.type == 'directory' and vim.g.filechooser_directory == 1)) then
-              table.insert(paths, current_dir .. entry.name)
+            else
+              local m = vim.fn.mode()
+              if m == 'v' or m == 'V' or m == '\22' then
+                -- Visual selection: collect every selected entry (multi-select)
+                local s, e = vim.fn.line('v'), vim.fn.line('.')
+                if s > e then s, e = e, s end
+                for lnum = s, e do
+                  local entry = oil.get_entry_on_line(0, lnum)
+                  if want(entry) then table.insert(paths, current_dir .. entry.name) end
+                end
+              else
+                local entry = oil.get_cursor_entry()
+                if want(entry) then table.insert(paths, current_dir .. entry.name) end
+              end
             end
 
             if #paths == 0 then
@@ -521,15 +545,42 @@ return {
       return false
     end
 
+    -- Thumbnail cache (small pre-shrunk copies for the fast first pass)
+    local thumb_dir = vim.fn.stdpath('cache') .. '/oil_thumbs'
+    vim.fn.mkdir(thumb_dir, 'p')
+
     -- Track image preview state
     local image_preview_state = {
       image = nil,
       win = nil,
       buf = nil,
       last_file = nil,
+      token = 0,        -- invalidation token; bumped whenever the target changes
+      job = nil,        -- in-flight thumbnail generation job (vim.system handle)
+      full_timer = nil, -- timer that upgrades to full resolution after settling
     }
 
+    -- Cancel a pending full-res upgrade
+    local function cancel_full_timer()
+      if image_preview_state.full_timer then
+        vim.fn.timer_stop(image_preview_state.full_timer)
+        image_preview_state.full_timer = nil
+      end
+    end
+
+    -- Kill any in-flight thumbnail job
+    local function cancel_thumb_job()
+      if image_preview_state.job then
+        pcall(function() image_preview_state.job:kill('sigterm') end)
+        image_preview_state.job = nil
+      end
+    end
+
     local function close_image_preview()
+      -- Invalidate any in-flight async work so late callbacks no-op
+      image_preview_state.token = image_preview_state.token + 1
+      cancel_full_timer()
+      cancel_thumb_job()
       if image_preview_state.image then
         pcall(function() image_preview_state.image:clear() end)
         image_preview_state.image = nil
@@ -545,16 +596,109 @@ return {
       image_preview_state.last_file = nil
     end
 
+    -- Terminal cells are roughly twice as tall as they are wide; used to convert a
+    -- pixel aspect ratio into a cell-based window height.
+    local CELL_RATIO = 2.0
+
+    -- Width of the preview box as a fraction of the editor. Bump toward 0.5 for a
+    -- bigger preview, down toward 0.25 for a smaller one.
+    local PREVIEW_WIDTH_FRAC = 1 / 2
+
+    -- Real terminal cell aspect ratio (cell_height_px / cell_width_px). image.nvim
+    -- measures the actual pixel size of a cell; using it (instead of assuming 2.0)
+    -- makes the box hug the image so it fills the full box width. Falls back to 2.0.
+    local function cell_ratio()
+      local ok, term = pcall(require, 'image.utils.term')
+      if ok then
+        local sz = term.get_size and term.get_size()
+        if sz and sz.cell_width and sz.cell_height
+          and sz.cell_width > 0 and sz.cell_height > 0 then
+          return sz.cell_height / sz.cell_width
+        end
+      end
+      return CELL_RATIO
+    end
+
+    -- Resize the preview window so the image fills the box width with the height
+    -- derived from its aspect ratio (auto height, no distortion). The float overlays
+    -- a full-width oil buffer, so it is sized against the whole editor — NOT the (zero)
+    -- space beside oil, which is what previously collapsed the box to the 20-col floor.
+    local function fit_preview_to_image(img)
+      local st = image_preview_state
+      local win = st.win
+      if not (win and vim.api.nvim_win_is_valid(win)) then return end
+      local iw = img and img.image_width
+      local ih = img and img.image_height
+      if not (iw and ih and iw > 0 and ih > 0) then return end
+
+      local max_width = math.max(20, vim.o.columns - 2)
+      local max_height = math.max(5, vim.o.lines - 4)
+      local aspect = ih / iw -- image height/width in pixels
+      local ratio = cell_ratio() -- real cell_height/cell_width for this terminal
+
+      -- Target width = the chosen fraction of the editor; the image fills it and the
+      -- height follows from the aspect ratio (ratio converts the px ratio -> cells).
+      local width = math.min(max_width, math.max(20, math.floor(vim.o.columns * PREVIEW_WIDTH_FRAC)))
+      local height = math.floor(width * aspect / ratio + 0.5)
+      -- Portrait too tall for the screen: cap the height and shrink width to keep ratio.
+      if height > max_height then
+        height = max_height
+        width = math.max(20, math.min(max_width, math.floor(height / aspect * ratio + 0.5)))
+      end
+      height = math.max(1, math.min(height, max_height))
+
+      -- Right-align so the oil listing stays visible on the left.
+      local col = math.max(0, vim.o.columns - width - 2)
+      pcall(vim.api.nvim_win_set_config, win, {
+        relative = 'editor', width = width, height = height, col = col, row = 1,
+      })
+    end
+
+    -- Render the given image file into the existing preview window.
+    -- Bails out if the request was superseded (token mismatch) or the window is gone.
+    local function render_into_preview(display_path, token)
+      if token ~= image_preview_state.token then return end
+      local win, buf = image_preview_state.win, image_preview_state.buf
+      if not (win and vim.api.nvim_win_is_valid(win)) then return end
+      if not (buf and vim.api.nvim_buf_is_valid(buf)) then return end
+      -- Bail if the file vanished (e.g. deleted temp files). hijack_buffer throws on a
+      -- missing path, and the resulting vim.schedule retries spin the event loop at 100% CPU.
+      if not vim.loop.fs_stat(display_path) then
+        close_image_preview()
+        return
+      end
+      local ok, image_api = pcall(require, 'image')
+      if not ok then return end
+      -- Drop the previous image object before drawing the next one
+      if image_preview_state.image then
+        pcall(function() image_preview_state.image:clear() end)
+        image_preview_state.image = nil
+      end
+      -- Wrap hijack_buffer: it can still throw (corrupt/unsupported file) even when the
+      -- path exists; an uncaught error here is what froze the editor.
+      -- Override image.nvim's defaults (max_height_window_percentage = 50), which
+      -- otherwise cap the image to HALF the window height and make it render at ~half
+      -- the box width. 100/100 lets the image fill the whole preview box.
+      local ok_render, img = pcall(image_api.hijack_buffer, display_path, win, buf, {
+        max_width_window_percentage = 100,
+        max_height_window_percentage = 100,
+      })
+      if ok_render then
+        image_preview_state.image = img
+        -- Shrink/grow the window box to match the image's aspect ratio.
+        fit_preview_to_image(img)
+      else
+        close_image_preview()
+      end
+    end
+
     local function open_image_preview(filepath)
       -- Skip if same file
       if image_preview_state.last_file == filepath then
         return
       end
 
-      local ok, image_api = pcall(require, 'image')
-      if not ok then return end
-
-      -- Close any existing oil preview first
+      -- Close any existing oil (text) preview first
       local oil_util_ok, oil_util = pcall(require, 'oil.util')
       if oil_util_ok then
         local oil_preview_win = oil_util.get_preview_win()
@@ -563,25 +707,28 @@ return {
         end
       end
 
-      -- Close previous image preview
+      -- Tear down the previous preview (also bumps token + kills its job)
       close_image_preview()
 
-      -- Get oil window dimensions for positioning
-      local oil_win = vim.api.nvim_get_current_win()
-      local oil_width = vim.api.nvim_win_get_width(oil_win)
+      -- Claim a fresh token for this request; async callbacks capture it
+      image_preview_state.token = image_preview_state.token + 1
+      local token = image_preview_state.token
+      image_preview_state.last_file = filepath
 
       -- Create preview buffer
       local buf = vim.api.nvim_create_buf(false, true)
       vim.api.nvim_buf_set_lines(buf, 0, -1, false, { '' })
 
-      -- Calculate window size - maximize available space
-      -- Leave space for oil buffer on the left
-      local width = math.max(20, vim.o.columns - oil_width - 4)
+      -- Initial size: the chosen fraction of the editor wide, full height. Right-aligned
+      -- so the oil listing stays visible on the left. fit_preview_to_image then trims
+      -- the height to the image's aspect ratio once its dimensions are known.
+      local max_width = math.max(20, vim.o.columns - 2)
+      local width = math.min(max_width, math.max(20, math.floor(vim.o.columns * PREVIEW_WIDTH_FRAC)))
       local height = math.max(10, vim.o.lines - 4)
-      local col = math.min(oil_width + 2, vim.o.columns - width - 2)
+      local col = math.max(0, vim.o.columns - width - 2)
       local row = 1
 
-      -- Create floating window (not a preview window to avoid conflicts)
+      -- Create the floating window immediately (cheap) so the box appears at once
       local win = vim.api.nvim_open_win(buf, false, {
         relative = 'editor',
         width = width,
@@ -596,49 +743,140 @@ return {
 
       image_preview_state.win = win
       image_preview_state.buf = buf
-      image_preview_state.last_file = filepath
 
-      -- Render image
-      vim.defer_fn(function()
-        if vim.api.nvim_win_is_valid(win) then
-          image_preview_state.image = image_api.hijack_buffer(filepath, win, buf)
+      -- Sensitive trees: NEVER write a plaintext thumbnail to ~/.cache (it would
+      -- outlive the vault lock and leak the pixels). Skip the magick-thumb cache
+      -- entirely and render the original directly -- image.nvim's own copy lives
+      -- in /tmp (tmpfs/RAM), which dies with nvim and never hits disk. Both are
+      -- gocryptfs mountpoints (plaintext only while unlocked):
+      --   ~/vault     -- the personal nvim vault
+      --   ~/workflow  -- the encrypted workflow store (mounted only while in use)
+      local no_thumb_dirs = {
+        vim.fn.expand('~/vault'),
+        vim.fn.expand('~/workflow'),
+      }
+      for _, dir in ipairs(no_thumb_dirs) do
+        if filepath:sub(1, #dir + 1) == dir .. '/' then
+          vim.defer_fn(function() render_into_preview(filepath, token) end, 10)
+          return
         end
-      end, 10)
+      end
+
+      -- Stage 2: after settling on this file, upgrade to the full-resolution image
+      local function start_full_timer()
+        cancel_full_timer()
+        image_preview_state.full_timer = vim.fn.timer_start(500, function()
+          image_preview_state.full_timer = nil
+          vim.schedule(function() render_into_preview(filepath, token) end)
+        end)
+      end
+
+      -- Cache key includes mtime (sec+nsec) AND size so a file that is still being
+      -- written (e.g. a freshly generated image) never reuses a thumbnail made from a partial
+      -- copy: any change to the source produces a different key, invalidating it.
+      local stat = vim.loop.fs_stat(filepath)
+      local sig = stat
+        and (stat.mtime.sec .. '_' .. (stat.mtime.nsec or 0) .. '_' .. (stat.size or 0))
+        or '0'
+      local thumb = thumb_dir .. '/' .. filepath:gsub('[^%w]', '_') .. '_' .. sig .. '.png'
+
+      if vim.loop.fs_stat(thumb) then
+        -- Cached thumbnail exists: render it right away, then schedule the upgrade
+        vim.defer_fn(function() render_into_preview(thumb, token) end, 10)
+        start_full_timer()
+        return
+      end
+
+      -- Stage 1: generate a small thumbnail asynchronously (non-blocking).
+      -- magick reads frame [0] (first frame of gifs/animations) and strips metadata.
+      -- Write to a PER-REQUEST temp file (unique by token) and atomically rename on
+      -- success. The unique name keeps overlapping jobs (rapid cursor moves) from
+      -- racing on one path, and the rename means a killed/aborted job never leaves a
+      -- truncated PNG that later reads as a valid "cached" thumbnail.
+      local thumb_tmp = thumb .. '.' .. token .. '.tmp'
+      local ok_job, job = pcall(vim.system,
+        { 'magick', filepath .. '[0]', '-thumbnail', '1000x1000', '-strip', thumb_tmp },
+        { text = false },
+        function(res)
+          vim.schedule(function()
+            if token ~= image_preview_state.token then -- moved away: cancel + clean up
+              pcall(os.remove, thumb_tmp)
+              return
+            end
+            image_preview_state.job = nil
+            if res.code == 0 and vim.loop.fs_stat(thumb_tmp) then
+              os.rename(thumb_tmp, thumb)
+              render_into_preview(thumb, token)
+            else
+              -- magick failed/missing: drop the partial temp and render the original
+              pcall(os.remove, thumb_tmp)
+              render_into_preview(filepath, token)
+            end
+            start_full_timer()
+          end)
+        end
+      )
+
+      if ok_job then
+        image_preview_state.job = job
+      else
+        -- vim.system unavailable / magick not found: render original directly
+        vim.defer_fn(function() render_into_preview(filepath, token) end, 10)
+      end
     end
 
     -- Debounce timer for preview
     local preview_timer = nil
 
-    -- Auto-preview files when cursor moves in oil buffer
+    -- Preview is OFF by default; toggled per-buffer with <leader>op (see below).
+    local preview_enabled = false
+
+    -- Preview whatever file is under the cursor (image -> float, else oil's text preview).
+    local function preview_current_entry()
+      local oil = require('oil')
+      local entry = oil.get_cursor_entry()
+      if not entry or entry.type ~= 'file' then
+        close_image_preview()
+        return
+      end
+
+      local current_dir = oil.get_current_dir()
+      if not current_dir then return end
+      local filepath = current_dir .. entry.name
+
+      if is_image(entry.name) then
+        open_image_preview(filepath)
+      else
+        close_image_preview()
+        oil.open_preview()
+      end
+    end
+
+    -- Close any open preview (custom image float + oil's built-in text preview).
+    local function close_all_previews()
+      close_image_preview()
+      local ok, oil_util = pcall(require, 'oil.util')
+      if ok then
+        local w = oil_util.get_preview_win()
+        if w and vim.api.nvim_win_is_valid(w) then
+          pcall(vim.api.nvim_win_close, w, true)
+        end
+      end
+    end
+
+    -- Auto-preview files when cursor moves in oil buffer (only while enabled)
     vim.api.nvim_create_autocmd('CursorMoved', {
       pattern = 'oil://*',
       callback = function()
+        if not preview_enabled then return end
         -- Debounce rapid cursor movements
         if preview_timer then
           vim.fn.timer_stop(preview_timer)
         end
 
-        preview_timer = vim.fn.timer_start(50, function()
+        preview_timer = vim.fn.timer_start(80, function()
           preview_timer = nil
-          vim.schedule(function()
-            local oil = require('oil')
-            local entry = oil.get_cursor_entry()
-            if not entry or entry.type ~= 'file' then
-              close_image_preview()
-              return
-            end
-
-            local current_dir = oil.get_current_dir()
-            if not current_dir then return end
-            local filepath = current_dir .. entry.name
-
-            if is_image(entry.name) then
-              open_image_preview(filepath)
-            else
-              close_image_preview()
-              oil.open_preview()
-            end
-          end)
+          vim.schedule(preview_current_entry)
         end)
       end,
     })
@@ -647,6 +885,36 @@ return {
     vim.api.nvim_create_autocmd('BufLeave', {
       pattern = 'oil://*',
       callback = close_image_preview,
+    })
+
+    -- File preview is OFF by default; <leader>op toggles it (buffer-local in oil).
+    local function toggle_preview()
+      preview_enabled = not preview_enabled
+      if preview_enabled then
+        preview_current_entry()
+        vim.notify('Oil preview: on')
+      else
+        close_all_previews()
+        vim.notify('Oil preview: off')
+      end
+    end
+
+    vim.api.nvim_create_autocmd('FileType', {
+      pattern = 'oil',
+      callback = function()
+        vim.keymap.set('n', '<leader>op', toggle_preview, { buffer = 0, desc = 'Toggle preview' })
+
+        -- Buffer-local line-move maps WITHOUT the reindent (`==`/`=gv`) used by the
+        -- global <A-j>/<A-k>. Reordering lines within an oil listing is a no-op on save
+        -- (a directory has no intrinsic order), so this lets you shuffle scattered
+        -- entries together, then visually select + cut them as one block. The reindent
+        -- is dropped because `=` can prepend/strip leading whitespace and corrupt oil's
+        -- line format (oil would read it as a rename).
+        vim.keymap.set('n', '<A-j>', ':m .+1<CR>', { buffer = 0, silent = true, desc = 'Move entry down' })
+        vim.keymap.set('n', '<A-k>', ':m .-2<CR>', { buffer = 0, silent = true, desc = 'Move entry up' })
+        vim.keymap.set('v', '<A-j>', ":m '>+1<CR>gv", { buffer = 0, silent = true, desc = 'Move entries down' })
+        vim.keymap.set('v', '<A-k>', ":m '<-2<CR>gv", { buffer = 0, silent = true, desc = 'Move entries up' })
+      end,
     })
   end,
   keys = {

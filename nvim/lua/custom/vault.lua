@@ -236,6 +236,22 @@ function M.setup()
     end,
   })
 
+  -- BufEnter is edge-triggered on ENTERING a buffer, but you can also LEAVE the
+  -- vault by closing its window/split/tab while focus stays put -- that fires no
+  -- BufEnter, so the idle lock would never arm and the vault would stay mounted
+  -- indefinitely. WinClosed (also fires per-window on tab close) and BufWinLeave
+  -- cover those exits. Deferred so any_buffer_in_vault() sees the post-close window
+  -- state; the guard keeps it a no-op while any vault view is still visible.
+  vim.api.nvim_create_autocmd({ 'WinClosed', 'BufWinLeave' }, {
+    callback = function()
+      vim.schedule(function()
+        if is_mounted() and not any_buffer_in_vault() then
+          schedule_lock()
+        end
+      end)
+    end,
+  })
+
   -- Lock when nvim exits, so the vault never stays decrypted after you close the
   -- editor. Synchronous; the bin script's lazy fallback keeps it from hanging.
   vim.api.nvim_create_autocmd('VimLeavePre', {

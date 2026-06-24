@@ -239,18 +239,30 @@ return {
         theme = lualine_theme,
       },
       sections = {
-        lualine_a = { 'mode' },
+        -- Show the parent tmux session name; fall back to the mode when not in one.
+        -- parent_session() reads a cached value (refreshed on focus), so no tmux call on redraw.
+        lualine_a = {
+          {
+            function() return require('custom.session-jump').parent_session() or '' end,
+            cond = function() return require('custom.session-jump').parent_session() ~= nil end,
+          },
+          {
+            'mode',
+            cond = function() return require('custom.session-jump').parent_session() == nil end,
+          },
+        },
         lualine_b = { 'diagnostics' },
         lualine_c = { { 'filename', path = 1 } },
         lualine_x = { 'searchcount', 'selectioncount' },
         lualine_y = {},
-        lualine_z = { 'location' },
+        -- Just the line number (no column) -- the column is rarely actionable.
+        lualine_z = { function() return vim.fn.line('.') end },
       },
       inactive_sections = {
         lualine_a = {},
         lualine_b = {},
         lualine_c = { { 'filename', path = 1 } },
-        lualine_x = { 'location' },
+        lualine_x = { function() return vim.fn.line('.') end },
         lualine_y = {},
         lualine_z = {},
       },

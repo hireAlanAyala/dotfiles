@@ -619,7 +619,9 @@ return {
     },
 
     files = {
-      fd_opts = "--color=never --type f --hidden --exclude .git",
+      -- --no-ignore so gitignored files (e.g. .env) show up; exclude the heavy
+      -- gitignored dirs so the picker isn't flooded with deps/build output.
+      fd_opts = "--color=never --type f --hidden --no-ignore --exclude .git --exclude node_modules --exclude .venv --exclude target --exclude dist --exclude build --exclude .next",
       fzf_opts = {},
       file_icons = true,
       color_icons = true,

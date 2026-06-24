@@ -13,6 +13,10 @@ M.config = {
   state_file = '.nvim/terminal-sessions.json',
   auto_restore = true,
   scrollback = 100000,
+  -- Where per-session output logs are streamed for live inspection. Logs live
+  -- exactly as long as their tmux session (see arm_logging). Out-of-repo so
+  -- they can't be committed; agent terminals (name ~ '^a_') are never logged.
+  log_dir = vim.fn.stdpath('state') .. '/term-logs',
   -- Strategy patterns: map name patterns to strategies
   -- First matching pattern wins. Unmatched names use default_strategy.
   -- Example: strategy_patterns = { ['^special_'] = 'custom_strategy' }
@@ -86,6 +90,32 @@ local function find_buffer_for_session(session_name)
 end
 
 -- ============================================================================
+-- Output logging
+-- ============================================================================
+
+-- Path of the log file for a session (always derivable, even if logging is off).
+local function log_path(session_name)
+  return M.config.log_dir .. '/' .. session_name .. '.log'
+end
+
+-- Stream a session's pane output to a log file for live inspection.
+-- The piped `cat` reads the pane's output; when the tmux session/pane dies it
+-- gets EOF and exits, and the EXIT trap removes the log -- so the file lives
+-- exactly as long as the session does (it survives nvim quit because the
+-- session does). Only newly-created, non-agent sessions are armed; restored
+-- sessions are already piping from the nvim that created them.
+local function arm_logging(session_name, name)
+  if not name or name:match('^a_') then return end
+  local log = log_path(session_name)
+  vim.fn.mkdir(M.config.log_dir, 'p')
+  -- No `exec`: the shell must stay alive as cat's parent so the trap survives.
+  -- When the pane dies cat gets EOF (or tmux signals the command); the trap then
+  -- removes the log. Trap signals too, in case tmux terminates rather than EOFs.
+  local pipe_cmd = string.format("trap 'rm -f %s' EXIT HUP INT TERM; cat > %s", log, log)
+  vim.system({ 'tmux', 'pipe-pane', '-t', session_name, pipe_cmd })
+end
+
+-- ============================================================================
 -- Terminal Creation
 -- ============================================================================
 
@@ -94,26 +124,29 @@ local function create_terminal(session_name, name, switch, strategy_name, attach
   local strategy = get_strategy(strategy_name)
   local buf_nr = vim.api.nvim_create_buf(true, false)
 
+  -- Detect whether create_or_attach is about to create a brand-new session, so
+  -- we only arm logging once (not on restore/attach, which would replace a live
+  -- pipe and trip its cleanup trap). Skipped on the restore hot path (attach_only).
+  local newly_created = false
+  if not attach_only and strategy.session_exists then
+    newly_created = not strategy:session_exists(session_name)
+  end
+
   vim.api.nvim_buf_call(buf_nr, function()
     local cmd = attach_only and strategy:attach(session_name) or strategy:create_or_attach(session_name)
     vim.fn.termopen(cmd)
     vim.bo[buf_nr].scrollback = M.config.scrollback
   end)
 
+  if newly_created then
+    arm_logging(session_name, name)
+  end
+
   -- Setup buffer
   vim.b[buf_nr].terminal_persist_managed = true
   vim.b[buf_nr].persist_session = session_name
   vim.b[buf_nr].persist_name = name
   vim.b[buf_nr].persist_strategy = strategy_name
-
-  -- In agent sub-sessions (parent_HASH_a_label), remap <C-c> in terminal mode to
-  -- send Ctrl+U (0x15) so Claude Code clears its input instead of canceling the task.
-  if session_name:match('_%x%x%x%x%x%x_a_') then
-    vim.keymap.set('t', '<C-c>', function()
-      local chan = vim.b[buf_nr].terminal_job_id
-      if chan then vim.api.nvim_chan_send(chan, '\21') end
-    end, { buffer = buf_nr, desc = 'Send Ctrl+U (clear input in Claude Code)' })
-  end
 
   -- Use vim.schedule (not defer) to run after termopen() finishes in the same event loop,
   -- without an arbitrary delay. termopen() overwrites buffer name with the shell command.
@@ -172,6 +205,8 @@ function M.new(name, switch, cmd)
     name = name,
     strategy = strategy_name,
     created = os.time(),
+    -- Output log for live inspection (nil for agent terminals, which aren't logged).
+    log = (name and not name:match('^a_')) and log_path(session_name) or nil,
   }
   write_state(state)
 
@@ -305,43 +340,6 @@ function M.setup(opts)
     M._initial_restore = true
     vim.defer_fn(M.restore, 100)
   end
-
-  -- Write focused terminal job PID for claude-throttle daemon
-  local function write_throttle_focus()
-    local buf = vim.api.nvim_get_current_buf()
-    if vim.bo[buf].buftype ~= 'terminal' then return end
-    local name = vim.b[buf].persist_name
-    if name and name:match('^a_') then
-      local chan = vim.b[buf].terminal_job_id
-      if chan then
-        local pid = vim.fn.jobpid(chan)
-        local f = io.open('/tmp/claude-throttle-focused', 'w')
-        if f then f:write(tostring(pid)); f:close() end
-      end
-    end
-  end
-
-  -- Update focus immediately on tmux session/pane switch
-  vim.api.nvim_create_autocmd('FocusGained', {
-    callback = write_throttle_focus,
-  })
-
-  -- Clear focus file when leaving so daemon doesn't throttle based on stale data
-  vim.api.nvim_create_autocmd('FocusLost', {
-    callback = function()
-      os.remove('/tmp/claude-throttle-focused')
-    end,
-  })
-
-  -- Also update on keypress in terminal buffers (debounced)
-  local throttle_last_write = 0
-  vim.on_key(function()
-    if vim.bo.buftype ~= 'terminal' then return end
-    local now = vim.uv.now() -- ms
-    if now - throttle_last_write < 2000 then return end
-    throttle_last_write = now
-    write_throttle_focus()
-  end)
 
   -- Cleanup on buffer close
   vim.api.nvim_create_autocmd({ 'BufDelete', 'BufWipeout' }, {

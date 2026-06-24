@@ -10,7 +10,9 @@ local daemon_mode = false
 
 local function load_entries()
   entries = {}
-  local output = vim.fn.systemlist("cliphist list")
+  -- List form bypasses 'shell'/'shellcmdflag' (which is `zsh -ic`), so interactive
+  -- zsh startup noise can't pollute the captured output. See select_entry below.
+  local output = vim.fn.systemlist({ "cliphist", "list" })
   for _, line in ipairs(output) do
     local id, content = line:match("^(%d+)%s+(.*)$")
     if id then
@@ -80,7 +82,7 @@ local function update_preview()
   else
     -- Text preview - async loading
     local lines = {}
-    preview_job = vim.fn.jobstart("cliphist decode " .. entry.id, {
+    preview_job = vim.fn.jobstart({ "cliphist", "decode", entry.id }, {
       stdout_buffered = true,
       on_stdout = function(_, data)
         if data then
@@ -105,9 +107,12 @@ local function select_entry()
   local cursor = vim.api.nvim_win_get_cursor(list_win)
   local entry = entries[cursor[1]]
   if entry then
-    -- Synchronous copy to ensure clipboard is set before hiding
-    local content = vim.fn.system("cliphist decode " .. entry.id)
-    vim.fn.system("wl-copy", content)
+    -- Synchronous copy to ensure clipboard is set before hiding.
+    -- List form (no shell) is REQUIRED: 'shellcmdflag' is `-ic`, so string-form
+    -- system() runs interactive zsh whose startup noise (e.g. "can't change
+    -- option: zle") gets captured into `content` and copied to the clipboard.
+    local content = vim.fn.system({ "cliphist", "decode", entry.id })
+    vim.fn.system({ "wl-copy" }, content)
     -- Signal for auto-paste
     vim.fn.writefile({}, "/tmp/clipboard-picker-selected")
   end
