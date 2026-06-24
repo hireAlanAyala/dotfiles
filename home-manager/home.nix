@@ -48,26 +48,6 @@
   #   };
   # };
 
-  # GPG configuration for SOPS automation
-  programs.gpg = {
-    enable = true;
-    settings = {
-      use-agent = true;
-      pinentry-mode = "loopback";
-    };
-  };
-
-  services.gpg-agent = {
-    enable = true;
-    defaultCacheTtl = 28800; # 8 hours
-    maxCacheTtl = 86400; # 24 hours
-    enableSshSupport = true;
-    extraConfig = ''
-      allow-loopback-pinentry
-      pinentry-program ${pkgs.pinentry-tty}/bin/pinentry-tty
-    '';
-  };
-
   home.sessionVariables = {
     EDITOR = "nvim";
     # WARNING: This only applies to programs launched from home-manager,

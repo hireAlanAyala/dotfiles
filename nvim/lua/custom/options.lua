@@ -1,9 +1,10 @@
 -- Shell and environment setup
-vim.o.shell = os.getenv 'HOME' .. '/.nix-profile/bin/zsh'
+-- Prefer the nix-profile zsh if present, otherwise fall back to the system zsh.
+local nix_zsh = os.getenv 'HOME' .. '/.nix-profile/bin/zsh'
+vim.o.shell = (vim.fn.executable(nix_zsh) == 1) and nix_zsh or (vim.fn.exepath 'zsh' ~= '' and vim.fn.exepath 'zsh' or '/usr/bin/zsh')
 vim.o.shellcmdflag = '-ic' -- Run as interactive shell so :! commands have access to .zshrc aliases/functions
-vim.env.PATH = vim.env.PATH .. ':' .. os.getenv 'HOME' .. '/.nix-profile/bin'
--- helps mason find the dotnet env
-vim.env.DOTNET_ROOT = os.getenv 'HOME' .. '/.nix-profile'
+-- Keep the dotnet env inherited from the shell (mise manages it); only fall back if unset.
+vim.env.DOTNET_ROOT = vim.env.DOTNET_ROOT or (os.getenv 'HOME' .. '/.local/share/mise/dotnet-root')
 
 -- Basic settings
 vim.opt.number = true

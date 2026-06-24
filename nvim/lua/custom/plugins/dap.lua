@@ -55,7 +55,7 @@ return {
     -- Language configs
     dap.adapters.coreclr = {
       type = 'executable',
-      command = os.getenv 'HOME' .. '/.nix-profile/bin/netcoredbg',
+      command = vim.fn.exepath 'netcoredbg' ~= '' and vim.fn.exepath 'netcoredbg' or '/usr/bin/netcoredbg',
       args = { '--interpreter=vscode' },
     }
 

@@ -97,7 +97,7 @@ shell:
     ln -sf "{{dir}}/../bash/.bash_profile" ~/.bash_profile
     ln -sf "{{dir}}/../bash/.profile" ~/.profile
 
-# Symlink dotfiles that must live outside ~/.config (ssh + claude)
+# Symlink dotfiles that must live outside ~/.config (ssh + claude + gpg)
 dotfiles:
     mkdir -p ~/.ssh ~/.claude
     ln -sf "{{dir}}/../.ssh/config" ~/.ssh/config
@@ -106,6 +106,9 @@ dotfiles:
     ln -sf "{{dir}}/../claude/.mcp.json" ~/.claude/.mcp.json
     ln -sfn "{{dir}}/../claude/commands" ~/.claude/commands
     ln -sf "{{dir}}/../claude/CLAUDE.md" ~/.claude/CLAUDE.md
+    mkdir -p ~/.gnupg && chmod 700 ~/.gnupg
+    ln -sf "{{dir}}/../gnupg/gpg.conf" ~/.gnupg/gpg.conf
+    ln -sf "{{dir}}/../gnupg/gpg-agent.conf" ~/.gnupg/gpg-agent.conf
 
 # Show what will be linked
 check:
