@@ -5,6 +5,8 @@ bambustudio-bin
 discordo-git
 dragon-drop
 dtach
+elephant-all
+elephant-all-debug
 extract-otp-secrets
 google-cloud-cli
 jbang
