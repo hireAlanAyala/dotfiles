@@ -100,7 +100,6 @@
   imports = [
     ../programs/bash.nix
     ../programs/zsh.nix
-    ../programs/tmux.nix
     # System modules
     ../modules/symlinks.nix
   ];

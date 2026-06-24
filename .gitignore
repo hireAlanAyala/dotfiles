@@ -32,8 +32,8 @@ go/telemetry/
 .ssh/*_dsa
 .ssh/*.pub
 
-# Home-manager nix store symlinks (auto-generated)
-tmux/tmux.conf
+# tmux plugins are cloned externally via `just tmux-plugins`
+tmux/plugins/
 
 # Build artifacts and caches
 derivations/

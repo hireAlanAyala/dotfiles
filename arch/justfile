@@ -83,6 +83,11 @@ bin:
     mkdir -p ~/.local/bin
     for f in "{{dir}}"/bin/*; do ln -sf "$f" ~/.local/bin/; done
 
+# Clone tmux plugins (Dracula theme, loaded by ~/.config/tmux/tmux.conf)
+tmux-plugins:
+    mkdir -p ~/.config/tmux/plugins
+    test -d ~/.config/tmux/plugins/dracula || git clone --depth 1 --branch v3.1.0 https://github.com/dracula/tmux ~/.config/tmux/plugins/dracula
+
 # Show what will be linked
 check:
     @echo "etc: pacman.conf bluetooth boot/loader pacman.d/hooks systemd/zram-generator.conf tlp"
