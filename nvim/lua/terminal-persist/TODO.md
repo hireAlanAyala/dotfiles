@@ -43,11 +43,23 @@ command wider than the pane becomes multiple buffer lines with a hard `\n` at th
 wrap column. Pasting into a shell ran the first line early.
 
 **Fix:** `dewrap_yank` (a `TextYankPost` hook in `init.lua`). On a *multi-line*
-yank in a managed terminal it re-fetches the history via `tmux capture-pane -J`
-(tmux knows the real wrap points and rejoins them), anchors on the first and last
-selected rows, and replaces the register with the rejoined single line. Single-
-line yanks and no-match lookups fall through to the native wrapped yank, so it's
-never worse than before. Native `y`/motions are untouched (no remap).
+yank in a managed terminal it rejoins the command via two strategies:
+
+1. **tmux** (`dewrap_via_tmux`) — for plain terminals whose content lives in the
+   tmux pane: `capture-pane -J` (tmux knows the real wrap points), anchored on the
+   first and last selected rows, replacing the register with the rejoined line.
+2. **grid width** (`dewrap_via_grid`) — claude (`a_*`) terminals run *outside*
+   tmux via the wrapper's detach dance, so their output lives in nvim's own grid
+   and the tmux pane is empty. Reconstruct from the grid: a row filling the full
+   terminal width is a soft-wrap continuation (concatenate, no separator); a
+   shorter row ends a real line. Uses the full buffer lines of the `'[`..`']`
+   region so width detection sees whole rows.
+
+Single-line yanks, and either strategy finding nothing, fall through to the native
+wrapped yank — never worse than before, and the grid path fails *safe* (an
+unrecognised break stays split, never a silent merge). Native `y`/motions are
+untouched (no remap). Residual risk: a real line that is *exactly* terminal-width
+could be glued to the next — uncommon in command output.
 
 ## Bug 2: claude session IDs restore under the wrong terminal (swap)
 

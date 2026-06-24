@@ -334,38 +334,47 @@ end
 -- nvim's terminal buffer stores the screen as a grid: a command wider than the
 -- pane wraps onto multiple physical rows, each becoming a separate buffer line.
 -- Yanking across a wrap therefore captures a hard newline that was never in the
--- command -- pasting it into a shell runs the first line early. tmux tracks which
--- rows are soft-wrap continuations, so `capture-pane -J` rejoins them into the
--- true logical line. On a *multi-line* yank in a managed terminal we look the
--- selection up in that joined capture and replace the register with the rejoined
--- command. Single-line yanks (already correct) and lookups that find no match
--- fall through untouched, so this is strictly never worse than a native yank.
+-- command -- pasting it into a shell runs the first line early. On a *multi-line*
+-- yank in a managed terminal we rejoin the command via one of two strategies:
+--
+--   1. tmux: for content that lives in the tmux pane (plain terminals), tmux
+--      tracks which rows are soft-wrap continuations, so `capture-pane -J`
+--      rejoins them. We look the selection up in that joined capture.
+--   2. grid width: claude terminals run *outside* tmux (the wrapper's detach
+--      dance), so their output lives in nvim's own grid -- tmux's pane is empty.
+--      There we reconstruct from the grid: a row filling the full terminal width
+--      is a soft-wrap continuation; a shorter row ends a real line.
+--
+-- Single-line yanks (already correct), and either strategy finding nothing, fall
+-- through untouched -- so this is never worse than a native yank, and the grid
+-- path fails *safe* (an unrecognised break stays split, never a silent merge).
 
 -- How far back to search tmux history for the yanked command (lines).
 M.config.dewrap_depth = M.config.dewrap_depth or 10000
 
-local function dewrap_yank(event)
-  -- Only post-process genuine yanks of multi-line text in a managed terminal.
-  if event.operator ~= 'y' then return end
-  if vim.bo.buftype ~= 'terminal' then return end
-  local session = vim.b.persist_session
-  if not session then return end
+-- Charwise-replace the just-yanked text, so it pastes as one shell-ready line.
+-- Mirrors to '0' (the yank register) when the yank was to the unnamed register.
+local function set_dewrapped(event, joined)
+  local reg = (event.regname ~= '' and event.regname) or '"'
+  vim.fn.setreg(reg, joined, 'v')
+  if event.regname == '' then vim.fn.setreg('0', joined, 'v') end
+end
 
-  local lines = event.regcontents
-  if type(lines) ~= 'table' or #lines < 2 then return end -- single line: native
-
+-- Strategy 1: rejoin via tmux's wrap flags. Returns true if it replaced the reg.
+local function dewrap_via_tmux(event, session)
   -- Anchor on the first and last selected rows. Matching against trimmed text
   -- sidesteps the grid's trailing-pad spaces; capturing without `-e` keeps the
   -- text plain so it compares byte-for-byte with what nvim displayed.
+  local lines = event.regcontents
   local first = vim.trim(lines[1])
   local last = vim.trim(lines[#lines])
-  if first == '' then return end
+  if first == '' then return false end
 
   local res = vim.system(
     { 'tmux', 'capture-pane', '-p', '-J', '-t', session, '-S', '-' .. M.config.dewrap_depth },
     { text = true }
   ):wait()
-  if res.code ~= 0 or not res.stdout then return end
+  if res.code ~= 0 or not res.stdout then return false end
 
   -- Search most-recent-first: find a logical line containing the first row, then
   -- require the last row to appear after it on that same line. Two anchors make a
@@ -377,17 +386,60 @@ local function dewrap_yank(event)
     if s then
       local e = line:find(last, s, true)
       if e then
-        local joined = line:sub(s, e + #last - 1)
-        -- Replace whatever register received the yank (unnamed -> '"' + '0').
-        -- Charwise so it pastes as a single shell-ready line, never linewise.
-        local reg = (event.regname ~= '' and event.regname) or '"'
-        vim.fn.setreg(reg, joined, 'v')
-        if event.regname == '' then vim.fn.setreg('0', joined, 'v') end
-        return
+        set_dewrapped(event, line:sub(s, e + #last - 1))
+        return true
       end
     end
   end
-  -- No match: leave the native (wrapped) yank in place.
+  return false
+end
+
+-- Strategy 2: reconstruct from nvim's own grid using terminal width (claude
+-- terminals, whose output never reaches tmux). Returns true if it merged rows.
+local function dewrap_via_grid(event)
+  local win = vim.api.nvim_get_current_win()
+  local width = vim.api.nvim_win_get_width(win) - (vim.fn.getwininfo(win)[1].textoff or 0)
+  if width < 1 then return false end
+
+  -- Use the full buffer lines of the yanked region (marked '[ .. ']), not the
+  -- possibly column-trimmed selection -- width detection needs whole rows.
+  local sp, ep = vim.fn.getpos("'["), vim.fn.getpos("']")
+  if sp[2] == 0 or ep[2] == 0 or ep[2] < sp[2] then return false end
+  local full = vim.api.nvim_buf_get_lines(0, sp[2] - 1, ep[2], false)
+  if #full < 2 then return false end
+
+  -- A row that fills the full width is a soft-wrap continuation -> concatenate
+  -- the next row with no separator; a shorter row is a real line break.
+  local out, cur = {}, full[1]
+  for i = 2, #full do
+    if vim.fn.strdisplaywidth(full[i - 1]) >= width then
+      cur = cur .. full[i]
+    else
+      table.insert(out, cur)
+      cur = full[i]
+    end
+  end
+  table.insert(out, cur)
+
+  if #out >= #full then return false end -- nothing merged: leave native yank
+  set_dewrapped(event, table.concat(out, '\n'))
+  return true
+end
+
+local function dewrap_yank(event)
+  -- Only post-process genuine yanks of multi-line text in a managed terminal.
+  if event.operator ~= 'y' then return end
+  if vim.bo.buftype ~= 'terminal' then return end
+  local session = vim.b.persist_session
+  if not session then return end
+
+  local lines = event.regcontents
+  if type(lines) ~= 'table' or #lines < 2 then return end -- single line: native
+
+  -- tmux first (authoritative wrap flags); grid fallback for content that lives
+  -- in nvim rather than the tmux pane. Either miss leaves the native yank.
+  if dewrap_via_tmux(event, session) then return end
+  dewrap_via_grid(event)
 end
 
 -- ============================================================================
