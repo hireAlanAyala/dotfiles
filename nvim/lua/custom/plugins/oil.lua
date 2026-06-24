@@ -457,21 +457,20 @@ return {
         if vim.g.filechooser_mode or vim.g.clipboard_picker then return end
 
         -- Defer so the buffer is fully gone (and the replacement [No Name]
-        -- buffer exists) before we count what's left. Dropped automatically if
-        -- nvim is exiting, so this never fires during :qa.
+        -- buffer exists) before we look at what we landed on. Dropped
+        -- automatically if nvim is exiting, so this never fires during :qa.
         vim.schedule(function()
-          for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-            if vim.api.nvim_buf_is_valid(buf)
-              and vim.bo[buf].buflisted
-              and vim.bo[buf].buftype == ''
-            then
-              local name = vim.api.nvim_buf_get_name(buf)
-              if name ~= '' and not name:match('^oil://') then
-                return -- a real file buffer remains; nothing to do
-              end
-            end
-          end
-          -- Nothing left but the empty scratch buffer: open oil at the cwd.
+          -- Only step in when the user is actually stranded on the empty
+          -- [No Name] scratch buffer (e.g. they :bd'd their last file). If the
+          -- current buffer is anything real -- a file, a terminal opened via
+          -- <leader>tn, or oil itself -- leave it alone. The old version scanned
+          -- *all* buffers and reopened oil whenever no file buffer existed, which
+          -- (a) clobbered a terminal the user had just switched to, and (b) since
+          -- oil.open() deletes the previous oil buffer, re-fired this very
+          -- BufDelete and spun open->delete->open in a tight loop.
+          local cur = vim.api.nvim_get_current_buf()
+          if vim.bo[cur].buftype ~= '' then return end             -- terminal / oil(acwrite) / help / etc.
+          if vim.api.nvim_buf_get_name(cur) ~= '' then return end  -- a real, named file buffer
           require('oil').open(vim.fn.getcwd())
         end)
       end,

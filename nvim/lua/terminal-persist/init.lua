@@ -79,6 +79,17 @@ local function get_strategy(strategy_name)
   return strategies.strategies[strategy_name or M.config.default_strategy]
 end
 
+-- Display a buffer in the current window. Uses nvim_win_set_buf rather than
+-- `:buffer`, because some buffer types (notably oil) intercept the `:buffer`
+-- command and silently swallow the switch -- leaving the user stranded on a
+-- non-modifiable buffer (E21 on every keystroke) instead of the new terminal.
+-- win_set_buf sets the window's buffer directly and is not interceptable.
+local function switch_to_buffer(buf_nr)
+  if not pcall(vim.api.nvim_win_set_buf, 0, buf_nr) then
+    pcall(vim.cmd, 'buffer ' .. buf_nr)
+  end
+end
+
 -- Find existing buffer for a session
 local function find_buffer_for_session(session_name)
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
@@ -160,7 +171,7 @@ local function create_terminal(session_name, name, switch, strategy_name, attach
   end)
 
   if switch then
-    vim.cmd('buffer ' .. buf_nr)
+    switch_to_buffer(buf_nr)
     vim.defer_fn(function() vim.cmd 'startinsert' end, 100)
   end
 
@@ -181,7 +192,7 @@ function M.new(name, switch, cmd)
   local existing_buf = find_buffer_for_session(session_name)
   if existing_buf then
     if switch then
-      vim.cmd('buffer ' .. existing_buf)
+      switch_to_buffer(existing_buf)
       vim.defer_fn(function() vim.cmd 'startinsert' end, 100)
     end
     return existing_buf, session_name
@@ -217,6 +228,26 @@ end
 local RESTORE_WARN_MS = 500
 
 function M.restore()
+  -- Guard: bail if &shell no longer resolves to an executable. The async
+  -- jobstart below (and termopen during create_terminal) run through &shell;
+  -- if its binary moved out from under a running session -- e.g. a profile or
+  -- nix->native shell migration deleting the cached path -- jobstart throws
+  -- E903 mid-restore, the restore aborts half-built, and the wedged window
+  -- layout cascades into fzf-lua/oil errors. Skip loudly instead, and tell the
+  -- user how to re-run restore once &shell is fixed.
+  local shell_bin = vim.o.shell:match('^%S+') or vim.o.shell
+  if vim.fn.executable(shell_bin) ~= 1 then
+    vim.notify(
+      string.format(
+        "terminal-persist: &shell '%s' is not executable -- skipping restore to avoid a wedged session. "
+          .. "Fix vim.o.shell, then run :lua require('terminal-persist').restore()",
+        shell_bin
+      ),
+      vim.log.levels.ERROR
+    )
+    return
+  end
+
   local t_start = vim.loop.hrtime()
   local state = read_state()
   local project_id = get_project_id()
