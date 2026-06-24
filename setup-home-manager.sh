@@ -1,6 +1,9 @@
 #!/bin/bash
 
 # Home Manager setup script (assumes Nix is already installed)
+#
+# ⚠️ OBSOLETE — home-manager has been removed; nothing replaces this. Dotfiles
+# are native (just dotfiles/shell); packages are pacman/AUR/mise.
 
 set -euo pipefail
 

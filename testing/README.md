@@ -1,5 +1,8 @@
 # VPS Configuration Docker Testing
 
+> ⚠️ Note: the Home Manager test steps below are obsolete (home-manager was
+> removed; provisioning is now `just all` + `just packages-all`).
+
 This directory contains Docker-based testing tools for your VPS configuration scripts, allowing you to test changes locally before deploying to your VPS.
 
 ## What This Tests

@@ -2,6 +2,11 @@
 
 # Dotfiles Nix + Home Manager Installation Script
 # Based on manual installation notes
+#
+# ⚠️ OBSOLETE — DO NOT RUN AS-IS. This bootstrapped the old multi-user Nix +
+# home-manager setup, which has been removed. Provisioning is now native:
+# `just packages-all` then `just all`. Kept for the still-useful 1Password /
+# GPG / SSH-key steps; to be rewritten into a clean bootstrap on the laptop.
 
 set -euo pipefail
 
