@@ -22,6 +22,9 @@ etc:
     sudo cp "{{dir}}"/etc/systemd/network/*.network /etc/systemd/network/
     sudo cp "{{dir}}"/etc/systemd/system/*.{service,timer} /etc/systemd/system/
     sudo ln -sfn "{{dir}}/etc/tlp" /etc/tlp
+    sudo mkdir -p /etc/systemd/sleep.conf.d /etc/systemd/logind.conf.d
+    sudo ln -sf "{{dir}}/etc/systemd/sleep.conf.d/hibernate.conf" /etc/systemd/sleep.conf.d/hibernate.conf
+    sudo ln -sf "{{dir}}/etc/systemd/logind.conf.d/lid.conf" /etc/systemd/logind.conf.d/lid.conf
 
 # Allow wheel group to use sudo
 # Generated instead of symlinked to avoid tracking root-owned files in git
@@ -98,7 +101,7 @@ packages-all: packages packages-aur
 # Symlink bin scripts
 bin:
     mkdir -p ~/.local/bin
-    for f in "{{dir}}"/bin/*; do ln -sf "$f" ~/.local/bin/; done
+    for f in "{{dir}}"/bin/*; do chmod +x "$f"; ln -sf "$f" ~/.local/bin/; done
 
 # Clone tmux plugins (Dracula theme, loaded by ~/.config/tmux/tmux.conf)
 tmux-plugins:

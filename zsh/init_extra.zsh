@@ -53,6 +53,7 @@ alias codex="$HOME/.config/arch/bin/codex-wrap"
 alias fd='fd --hidden --no-ignore'
 alias vm='cd ~/vms/windows && quickemu --vm windows-11.conf --display spice'
 alias nvim-control="$HOME/.config/scripts/nvim-control.sh"
+alias moonlight="$HOME/.config/scripts/moonlight-adaptive.sh"
 
 # eza (ls replacement) — flags formerly set via home-manager programs.eza
 alias ls='eza -F --group-directories-first --icons'
@@ -136,6 +137,26 @@ alias op-help='op_help'
 
 # SSH Agent with keychain - auto-discover private keys
 if command -v keychain &> /dev/null; then
+    # Guard against dead agents whose PID got recycled by another process
+    # (this is what produced the "ssh-add failed: Connection refused" warning
+    # on shell startup). ssh-add -l returns 2 when it cannot reach the agent.
+
+    # 1) Drop a dead agent inherited from the session env.
+    ssh-add -l &> /dev/null; [ $? -eq 2 ] && unset SSH_AUTH_SOCK SSH_AGENT_PID
+
+    # 2) keychain caches its agent in ~/.keychain/<host>-{sh,csh,fish}. Even with
+    #    --noinherit it reuses that cache, and its own liveness check only does
+    #    `kill -0 $PID` -- which passes when the dead agent's PID has been
+    #    recycled by another process (e.g. mako). So we validate the cached
+    #    agent ourselves by actually talking to its socket, and wipe the cache
+    #    if it's dead. (Hostname-independent glob: `hostname` isn't on PATH here.
+    #    We never `keychain --stop`, since that would SIGTERM the recycled PID.)
+    local _kc
+    for _kc in "$HOME"/.keychain/*-sh(N); do
+        ( . "$_kc" 2> /dev/null; ssh-add -l &> /dev/null; [ $? -ne 2 ] ) \
+            || rm -f "${_kc%-sh}-"{sh,csh,fish}
+    done
+
     # Auto-discover private keys in ~/.ssh
     local ssh_keys=()
     for key in ~/.ssh/*; do
@@ -143,9 +164,11 @@ if command -v keychain &> /dev/null; then
             ssh_keys+=($(basename "$key"))
         fi
     done
-    
+
     if [ ${#ssh_keys[@]} -gt 0 ]; then
-        eval $(keychain --eval --quiet "${ssh_keys[@]}")
+        # --noinherit: keychain manages its own persistent agent via ~/.keychain
+        # rather than trusting whatever SSH_AUTH_SOCK is in the environment.
+        eval "$(keychain --eval --quiet --noinherit "${ssh_keys[@]}")"
     fi
 fi
 
@@ -161,11 +184,11 @@ export GOPROXY="https://proxy.golang.org"
 export PATH=$PATH:~/.local/share/nvim/lazy/vim-iced/bin
 
 
-# start ssh agent if not running
-if [ -z "$SSH_AUTH_SOCK" ] || ! ps -p "$SSH_AGENT_PID" > /dev/null 2>&1; then
-  eval "$(ssh-agent -s)"
-  ssh-add ~/.ssh/azure_hpg 2>/dev/null
-fi
+# NOTE: the old manual "start ssh-agent if not running" block was removed.
+# It was redundant with keychain above (which already loads azure_hpg via the
+# auto-discover loop), and its `ps -p $SSH_AGENT_PID` liveness check gave false
+# positives when the agent's PID got recycled by another process (e.g. mako),
+# leaving a dead agent that everything else tripped over.
 
 # allows nix to apply shell packages when I cd into a repo with nix as the package manager
 eval "$(direnv hook zsh)"
