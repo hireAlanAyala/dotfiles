@@ -246,4 +246,34 @@ if [[ -t 0 ]]; then
       local _session_key=${_tsess//_${_cwdhash}_/_}
       HISTFILE="$HOME/.zsh_history_${_session_key}"
     fi
+
+    # Ctrl+R fuzzy-searches history. It opens on THIS terminal's history (same
+    # scope as up-arrow) and toggles to every terminal's history with C-g; C-l
+    # goes back. Sources come from `zhist` (most-recent-first, deduped, decoded
+    # via zsh's own parser so the live history up-arrow uses is never touched).
+    # --read0 keeps multi-line commands intact; --no-wrap keeps long commands on
+    # one truncated line instead of wrapping; --no-sort preserves recency order.
+    if command -v fzf >/dev/null && command -v zhist >/dev/null; then
+      fzf-history-widget() {
+        emulate -L zsh
+        setopt localoptions no_aliases 2>/dev/null
+        local localf=${HISTFILE:-$HOME/.zsh_history}
+        local sel
+        sel=$(
+          zhist "$localf" | fzf --read0 --no-sort --no-wrap \
+            --height=60% --layout=reverse --query="$LBUFFER" \
+            --prompt='hist(local)> ' \
+            --header='C-g: all terminals   C-l: this terminal' \
+            --bind "ctrl-g:change-prompt(hist(all)> )+reload(zhist --all)" \
+            --bind "ctrl-l:change-prompt(hist(local)> )+reload(zhist ${(q)localf})"
+        )
+        if [[ -n $sel ]]; then
+          BUFFER=$sel
+          CURSOR=$#BUFFER
+        fi
+        zle reset-prompt
+      }
+      zle -N fzf-history-widget
+      bindkey '^r' fzf-history-widget
+    fi
 fi

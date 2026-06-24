@@ -3,6 +3,25 @@ vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 vim.g.have_nerd_font = true
 
+-- Harden the shell: if $SHELL (nvim's 'shell') no longer exists -- e.g. after
+-- migrating off a Nix-provided zsh -- fall back to a system shell so :terminal,
+-- terminal-persist, and fzf-lua can still spawn. Warn so a stale $SHELL gets
+-- noticed (a re-login into the session usually refreshes it).
+do
+  if vim.fn.executable(vim.o.shell) == 0 then
+    local stale = vim.o.shell
+    local fallback = (vim.fn.executable('/usr/bin/zsh') == 1 and '/usr/bin/zsh')
+      or (vim.fn.executable('zsh') == 1 and 'zsh' or '/bin/sh')
+    vim.o.shell = fallback
+    vim.schedule(function()
+      vim.notify(
+        ('$SHELL %q not found — using %q. Re-login to refresh the session env.'):format(stale, fallback),
+        vim.log.levels.WARN
+      )
+    end)
+  end
+end
+
 -- Initialize persistent socket (must be done before other modules)
 require('custom.socket').init()
 
