@@ -88,6 +88,15 @@ tmux-plugins:
     mkdir -p ~/.config/tmux/plugins
     test -d ~/.config/tmux/plugins/dracula || git clone --depth 1 --branch v3.1.0 https://github.com/dracula/tmux ~/.config/tmux/plugins/dracula
 
+# Symlink shell rc files into $HOME (zsh + bash entry points)
+shell:
+    ln -sf "{{dir}}/../zsh/.zshenv" ~/.zshenv
+    ln -sf "{{dir}}/../zsh/.zshrc" ~/.zshrc
+    ln -sf "{{dir}}/../zsh/.zprofile" ~/.zprofile
+    ln -sf "{{dir}}/../bash/.bashrc" ~/.bashrc
+    ln -sf "{{dir}}/../bash/.bash_profile" ~/.bash_profile
+    ln -sf "{{dir}}/../bash/.profile" ~/.profile
+
 # Show what will be linked
 check:
     @echo "etc: pacman.conf bluetooth boot/loader pacman.d/hooks systemd/zram-generator.conf tlp"
