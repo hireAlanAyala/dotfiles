@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Region screenshot with a capture-then-edit workflow.
+#
+#   capture (default): freeze the screen (so animations / :hover / tooltips hold
+#     still while you select), capture the region to the clipboard AND save it as
+#     the "last" screenshot so it can be re-opened for editing. Falls back to
+#     plain slurp+grim if wayfreeze isn't installed.
+#   edit: open the last screenshot in swappy to annotate -- no new selection.
+#
+# Usage: screenshot [capture|edit]   (default: capture)
+set -euo pipefail
+
+last="${XDG_CACHE_HOME:-$HOME/.cache}/last-screenshot.png"
+mode="${1:-capture}"
+
+if [ "$mode" = edit ]; then
+  if [ ! -f "$last" ]; then
+    notify-send "Screenshot" "No screenshot to edit yet"
+    exit 0
+  fi
+  # Prefer satty (more tools, nicer UI); fall back to swappy if not installed.
+  if command -v satty >/dev/null; then
+    # satty shows the image ~1:1, so small captures open tiny. Upscale small
+    # ones to a comfortable editing size first (large captures left as-is).
+    src=$(python3 - "$last" <<'PY'
+import sys
+from PIL import Image
+p = sys.argv[1]
+im = Image.open(p)
+w, h = im.size
+target = 1600           # min size of the longer side, in px
+m = max(w, h)
+if m >= target:
+    print(p)
+else:
+    s = target / m
+    out = "/tmp/satty-edit.png"
+    im.resize((max(1, round(w * s)), max(1, round(h * s))), Image.LANCZOS).save(out)
+    print(out)
+PY
+) || src="$last"
+    [ -f "$src" ] || src="$last"
+    exec satty --filename "$src" --copy-command wl-copy --initial-tool brush --output-filename '~/Downloads/screenshot-%Y%m%d-%H%M%S.png' --actions-on-enter save-to-clipboard,exit
+  fi
+  exec swappy -f "$last"
+fi
+
+# capture
+mkdir -p "$(dirname "$last")"
+
+if command -v wayfreeze >/dev/null; then
+  freeze_pid=""
+  cleanup() { [ -n "$freeze_pid" ] && kill "$freeze_pid" 2>/dev/null || true; }
+  trap cleanup EXIT
+  wayfreeze --hide-cursor &
+  freeze_pid=$!
+  sleep 0.3
+  region=$(slurp) || exit 0          # cancel -> keep the previous "last"
+  grim -g "$region" - > "$last"
+  kill "$freeze_pid" 2>/dev/null || true; freeze_pid=""
+else
+  region=$(slurp) || exit 0
+  grim -g "$region" - > "$last"
+fi
+
+wl-copy < "$last"
