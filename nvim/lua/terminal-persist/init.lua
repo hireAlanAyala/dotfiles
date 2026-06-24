@@ -328,6 +328,69 @@ function M.restore()
 end
 
 -- ============================================================================
+-- De-wrap yanks (pull joined text from tmux instead of nvim's wrapped grid)
+-- ============================================================================
+--
+-- nvim's terminal buffer stores the screen as a grid: a command wider than the
+-- pane wraps onto multiple physical rows, each becoming a separate buffer line.
+-- Yanking across a wrap therefore captures a hard newline that was never in the
+-- command -- pasting it into a shell runs the first line early. tmux tracks which
+-- rows are soft-wrap continuations, so `capture-pane -J` rejoins them into the
+-- true logical line. On a *multi-line* yank in a managed terminal we look the
+-- selection up in that joined capture and replace the register with the rejoined
+-- command. Single-line yanks (already correct) and lookups that find no match
+-- fall through untouched, so this is strictly never worse than a native yank.
+
+-- How far back to search tmux history for the yanked command (lines).
+M.config.dewrap_depth = M.config.dewrap_depth or 10000
+
+local function dewrap_yank(event)
+  -- Only post-process genuine yanks of multi-line text in a managed terminal.
+  if event.operator ~= 'y' then return end
+  if vim.bo.buftype ~= 'terminal' then return end
+  local session = vim.b.persist_session
+  if not session then return end
+
+  local lines = event.regcontents
+  if type(lines) ~= 'table' or #lines < 2 then return end -- single line: native
+
+  -- Anchor on the first and last selected rows. Matching against trimmed text
+  -- sidesteps the grid's trailing-pad spaces; capturing without `-e` keeps the
+  -- text plain so it compares byte-for-byte with what nvim displayed.
+  local first = vim.trim(lines[1])
+  local last = vim.trim(lines[#lines])
+  if first == '' then return end
+
+  local res = vim.system(
+    { 'tmux', 'capture-pane', '-p', '-J', '-t', session, '-S', '-' .. M.config.dewrap_depth },
+    { text = true }
+  ):wait()
+  if res.code ~= 0 or not res.stdout then return end
+
+  -- Search most-recent-first: find a logical line containing the first row, then
+  -- require the last row to appear after it on that same line. Two anchors make a
+  -- wrong-line match very unlikely; the slice between them is the rejoined command.
+  local captured = vim.split((res.stdout:gsub('\n$', '')), '\n', { plain = true })
+  for i = #captured, 1, -1 do
+    local line = captured[i]
+    local s = line:find(first, 1, true)
+    if s then
+      local e = line:find(last, s, true)
+      if e then
+        local joined = line:sub(s, e + #last - 1)
+        -- Replace whatever register received the yank (unnamed -> '"' + '0').
+        -- Charwise so it pastes as a single shell-ready line, never linewise.
+        local reg = (event.regname ~= '' and event.regname) or '"'
+        vim.fn.setreg(reg, joined, 'v')
+        if event.regname == '' then vim.fn.setreg('0', joined, 'v') end
+        return
+      end
+    end
+  end
+  -- No match: leave the native (wrapped) yank in place.
+end
+
+-- ============================================================================
 -- Setup
 -- ============================================================================
 
@@ -340,6 +403,13 @@ function M.setup(opts)
     M._initial_restore = true
     vim.defer_fn(M.restore, 100)
   end
+
+  -- De-wrap multi-line yanks in managed terminals by rejoining via tmux.
+  vim.api.nvim_create_autocmd('TextYankPost', {
+    group = vim.api.nvim_create_augroup('terminal-persist-dewrap', { clear = true }),
+    desc = 'Rejoin wrapped commands yanked from a managed terminal (tmux capture-pane -J)',
+    callback = function() dewrap_yank(vim.v.event) end,
+  })
 
   -- Cleanup on buffer close
   vim.api.nvim_create_autocmd({ 'BufDelete', 'BufWipeout' }, {
