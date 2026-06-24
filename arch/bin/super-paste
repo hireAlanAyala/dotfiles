@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+"""Universal paste for SUPER+V under Hyprland.
+
+Synthetic key events inherit any physically-held modifier, so injecting
+Shift+Insert while SUPER is still down makes apps see Super+Shift+Insert and
+ignore it. Releasing the virtual meta key doesn't help (Hyprland recomputes
+modifier state from the physical key). The reliable fix: poll the real keyboard
+state and wait until SUPER is released, then inject Shift+Insert (which pastes
+the clipboard in ghostty and GTK/Qt apps).
+
+Reads current key state via EVIOCGKEY (no event-stream parsing). Falls back to
+injecting after a short timeout in case the release was missed.
+"""
+import os
+import glob
+import fcntl
+import time
+import subprocess
+
+KEY_LEFTMETA = 125
+KEY_RIGHTMETA = 126
+KEYMAP_LEN = 96  # (KEY_MAX + 7) // 8, covers all key codes
+# EVIOCGKEY(len) = _IOR('E', 0x18, len): dir=READ(2), type='E'(0x45), nr=0x18
+EVIOCGKEY = (2 << 30) | (KEYMAP_LEN << 16) | (0x45 << 8) | 0x18
+TIMEOUT_S = 1.5
+POLL_S = 0.005
+
+
+def open_keyboards():
+    fds = []
+    for path in glob.glob("/dev/input/event*"):
+        try:
+            fds.append(os.open(path, os.O_RDONLY | os.O_NONBLOCK))
+        except OSError:
+            pass
+    return fds
+
+
+def super_held(fds):
+    for fd in fds:
+        buf = bytearray(KEYMAP_LEN)
+        try:
+            fcntl.ioctl(fd, EVIOCGKEY, buf)
+        except OSError:
+            continue
+        for k in (KEY_LEFTMETA, KEY_RIGHTMETA):
+            if buf[k >> 3] & (1 << (k & 7)):
+                return True
+    return False
+
+
+def main():
+    fds = open_keyboards()
+    deadline = time.monotonic() + TIMEOUT_S
+    while super_held(fds) and time.monotonic() < deadline:
+        time.sleep(POLL_S)
+    for fd in fds:
+        os.close(fd)
+    # Shift+Insert: 42=LEFTSHIFT, 110=INSERT (1=press, 0=release)
+    subprocess.run(["ydotool", "key", "42:1", "110:1", "110:0", "42:0"])
+
+
+if __name__ == "__main__":
+    main()
