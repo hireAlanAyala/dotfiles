@@ -99,14 +99,8 @@
   # PKG configurations
   imports = [
     ../programs/bash.nix
-    ../programs/bat.nix
-    ../programs/eza.nix
-    ../programs/fzf.nix
-    ../programs/ripgrep.nix
-    ../programs/zoxide.nix
     ../programs/zsh.nix
     ../programs/git.nix
-    ../programs/neovim.nix
     ../programs/tmux.nix
     ../programs/onepassword.nix
     # System modules

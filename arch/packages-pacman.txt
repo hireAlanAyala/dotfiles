@@ -24,11 +24,13 @@ docker
 docker-compose
 earlyoom
 efibootmgr
+eza
 fd
 foot
 freecad
 fuzzel
 fzf
+gcovr
 ghostty
 git
 git-filter-repo
@@ -42,7 +44,6 @@ htop
 hypridle
 hyprland
 hyprpaper
-imagemagick
 impala
 inotify-tools
 intel-media-driver
@@ -50,7 +51,6 @@ intel-ucode
 irssi
 iwd
 jdk21-openjdk
-jq
 just
 kcov
 keychain
@@ -67,13 +67,13 @@ linux-firmware
 linux-headers
 liquidctl
 ltrace
-lua
 lvm2
 mako
 miller
 mise
 moonlight-qt
 mpv
+neovim
 noto-fonts-cjk
 noto-fonts-emoji
 nvidia-open-dkms
@@ -93,13 +93,12 @@ playerctl
 podman
 polkit-kde-agent
 postgresql
+python-jinja
 qt5-wayland
 qt6-wayland
 reflector
 reptyr
-ripgrep
 rofi
-rust
 rustic
 satty
 slurp
@@ -107,7 +106,6 @@ socat
 sof-firmware
 sops
 spotify-player
-sqlite
 starship
 strace
 stress-ng
@@ -122,7 +120,6 @@ texlive-latexrecommended
 tlp
 tlp-rdw
 tokei
-tree
 ttf-cascadia-mono-nerd
 ttf-firacode-nerd
 ttf-hack-nerd

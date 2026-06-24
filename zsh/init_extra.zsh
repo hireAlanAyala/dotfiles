@@ -54,6 +54,13 @@ alias fd='fd --hidden --no-ignore'
 alias vm='cd ~/vms/windows && quickemu --vm windows-11.conf --display spice'
 alias nvim-control="$HOME/.config/scripts/nvim-control.sh"
 
+# eza (ls replacement) — flags formerly set via home-manager programs.eza
+alias ls='eza -F --group-directories-first --icons'
+alias ll='ls -l'
+alias la='ls -a'
+alias lla='ls -la'
+alias lt='ls --tree'
+
 # c
 alias gccd='gcc -Wall -Wextra -Wpedantic -Werror -std=c11 -g -O1 -fsanitize=address,undefined'
 
@@ -151,6 +158,9 @@ eval "$(direnv hook zsh)"
 
 # mise - polyglot runtime manager (node, python, etc)
 eval "$(mise activate zsh)"
+
+# zoxide - smarter cd (formerly home-manager programs.zoxide)
+eval "$(zoxide init zsh)"
 
 # Allow Node to require() global npm packages
 export NODE_PATH="$HOME/.npm-global/lib/node_modules"
