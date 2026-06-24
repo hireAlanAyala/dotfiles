@@ -1,28 +1,27 @@
 #!/bin/bash
 
-# Get the path to the Nix-managed zsh dynamically
-NIX_ZSH="$HOME/.nix-profile/bin/zsh"
+# Set the login shell to the system zsh.
+ZSH_PATH="$(command -v zsh || echo /usr/bin/zsh)"
 
-# Check if the Nix-managed zsh exists
-if [ ! -f "$NIX_ZSH" ]; then
-    echo "Error: Nix-managed zsh not found at $NIX_ZSH"
+if [ ! -x "$ZSH_PATH" ]; then
+    echo "Error: zsh not found (install it first)"
     exit 1
 fi
 
-# Check if the Nix-managed zsh is already in /etc/shells
-if ! grep -q "$NIX_ZSH" /etc/shells; then
-    echo "Adding Nix-managed zsh to /etc/shells..."
-    echo "$NIX_ZSH" | sudo tee -a /etc/shells
+# Ensure zsh is listed in /etc/shells
+if ! grep -qx "$ZSH_PATH" /etc/shells 2>/dev/null; then
+    echo "Adding $ZSH_PATH to /etc/shells..."
+    echo "$ZSH_PATH" | sudo tee -a /etc/shells
 else
-    echo "Nix-managed zsh is already in /etc/shells."
+    echo "$ZSH_PATH is already in /etc/shells."
 fi
 
-# Change the login shell to the Nix-managed zsh
-if [ "$SHELL" != "$NIX_ZSH" ]; then
-    echo "Changing login shell to Nix-managed zsh..."
-    chsh -s "$NIX_ZSH"
+# Change the login shell to zsh
+if [ "$SHELL" != "$ZSH_PATH" ]; then
+    echo "Changing login shell to $ZSH_PATH..."
+    chsh -s "$ZSH_PATH"
 else
-    echo "Login shell is already set to Nix-managed zsh."
+    echo "Login shell is already $ZSH_PATH."
 fi
 
-echo "Setup complete. Please log out and log back in for changes to take effect."
+echo "Setup complete. Log out and back in for changes to take effect."
