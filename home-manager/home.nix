@@ -100,9 +100,7 @@
   imports = [
     ../programs/bash.nix
     ../programs/zsh.nix
-    ../programs/git.nix
     ../programs/tmux.nix
-    ../programs/onepassword.nix
     # System modules
     ../modules/symlinks.nix
   ];

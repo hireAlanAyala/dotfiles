@@ -1,0 +1,13 @@
+[user]
+	name = Alan Walker
+	email = alan.ayala@hpgbrands.com
+
+[gpg]
+	format = openpgp
+[gpg "openpgp"]
+	program = gpg
+
+[credential "https://github.com"]
+	helper = !gh auth git-credential
+[credential "https://gist.github.com"]
+	helper = !gh auth git-credential

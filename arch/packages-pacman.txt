@@ -33,10 +33,11 @@ fzf
 ghostty
 git
 git-filter-repo
+github-cli
 gnupg
 go
-go-yq
 gocryptfs
+go-yq
 graphviz
 grim
 htop
@@ -136,8 +137,8 @@ visidata
 viu
 wayvnc
 wf-recorder
-wl-clip-persist
 wl-clipboard
+wl-clip-persist
 wofi
 wrangler
 wtype

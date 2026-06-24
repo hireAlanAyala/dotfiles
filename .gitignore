@@ -33,7 +33,6 @@ go/telemetry/
 .ssh/*.pub
 
 # Home-manager nix store symlinks (auto-generated)
-git/config
 tmux/tmux.conf
 
 # Build artifacts and caches
