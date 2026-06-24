@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Launch the phone-term mobile tmux bridge.
+# Source lives in ~/.config/phone-term; served on 127.0.0.1:8787 and exposed
+# over the tailnet via `tailscale serve` (see phone-term/README.md).
+set -euo pipefail
+
+exec deno run \
+  --allow-net \
+  --allow-run=tmux \
+  --allow-read="$HOME/.config/phone-term" \
+  --allow-env \
+  "$HOME/.config/phone-term/server.ts"

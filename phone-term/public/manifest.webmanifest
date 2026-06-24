@@ -1,0 +1,13 @@
+{
+  "name": "phone-term",
+  "short_name": "term",
+  "description": "Mobile bridge to tmux/claude sessions",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#15161e",
+  "theme_color": "#15161e",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

@@ -49,7 +49,7 @@ systemd-system:
 # Enable user services
 systemd-user:
     -systemctl --user enable pipewire pipewire-pulse wireplumber p11-kit-server.socket
-    -systemctl --user enable elephant.service battery-monitor.timer pipewire-session-manager.service cache-cleanup.timer rustic-backup.timer wifi-prefer.timer claude-throttle.service sunshine
+    -systemctl --user enable elephant.service battery-monitor.timer pipewire-session-manager.service cache-cleanup.timer rustic-backup.timer wifi-prefer.timer sunshine phone-term.service scrub-downloads.service
 
 # UFW firewall rules
 firewall:

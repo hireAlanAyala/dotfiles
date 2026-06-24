@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#15161e" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="icon" href="/icon.svg" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css" />
+<title>phone-term</title>
+<style>
+  :root { --bg:#15161e; --bar:#1f2030; --fg:#c0caf5; --accent:#7aa2f7; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--fg);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overscroll-behavior:none; }
+  body { display:flex; flex-direction:column;
+    height:100dvh; padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom); }
+  #topbar { display:flex; align-items:center; gap:8px; padding:6px 8px; background:var(--bar);
+    flex:0 0 auto; }
+  #title { font-weight:600; color:var(--accent); font-size:14px; margin-right:auto;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #sessions { flex:0 1 auto; max-width:55%; background:var(--bg); color:var(--fg);
+    border:1px solid #2a2c3f; border-radius:8px; padding:7px 10px; font-size:14px; }
+  #term { flex:1 1 auto; min-height:0; padding:4px; }
+  #keybar { display:flex; gap:6px; padding:6px 8px; background:var(--bar); flex:0 0 auto;
+    overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  #keybar button { flex:0 0 auto; min-width:42px; padding:9px 11px; font-size:14px;
+    background:var(--bg); color:var(--fg); border:1px solid #2a2c3f; border-radius:8px;
+    font-family:inherit; }
+  #keybar button.on { background:var(--accent); color:#15161e; border-color:var(--accent); }
+  #status { font-size:12px; color:#565f89; padding:0 8px 6px; flex:0 0 auto; }
+</style>
+</head>
+<body>
+  <div id="topbar">
+    <span id="title">phone-term</span>
+    <select id="sessions" aria-label="session"></select>
+  </div>
+  <div id="term"></div>
+  <div id="keybar">
+    <button data-key="\x1b">esc</button>
+    <button data-key="\t">tab</button>
+    <button id="ctrl">ctrl</button>
+    <button data-key="\x1b[A">↑</button>
+    <button data-key="\x1b[B">↓</button>
+    <button data-key="\x1b[D">←</button>
+    <button data-key="\x1b[C">→</button>
+    <button data-key="\x03">^C</button>
+    <button data-key="\x1bOM" data-cr>⏎</button>
+  </div>
+  <div id="status">connecting…</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js"></script>
+<script>
+const term = new Terminal({
+  fontFamily: 'ui-monospace, Menlo, monospace',
+  fontSize: 13,
+  cursorBlink: true,
+  scrollback: 5000,
+  theme: { background: '#15161e', foreground: '#c0caf5', cursor: '#7aa2f7' },
+});
+const fit = new FitAddon.FitAddon();
+term.loadAddon(fit);
+term.open(document.getElementById('term'));
+
+const statusEl = document.getElementById('status');
+const titleEl  = document.getElementById('title');
+const select   = document.getElementById('sessions');
+const setStatus = (s) => statusEl.textContent = s;
+
+let ws = null;
+let ctrlArmed = false;
+
+function send(data) {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'input', data }));
+}
+
+// xterm keystrokes -> server. ctrl-arm transforms the next printable char into a control code.
+term.onData((data) => {
+  if (ctrlArmed && data.length === 1) {
+    const c = data.toUpperCase().charCodeAt(0);
+    if (c >= 64 && c <= 95) data = String.fromCharCode(c & 0x1f);
+    toggleCtrl(false);
+  }
+  send(data);
+});
+
+function connect(session) {
+  if (ws) { ws.onclose = null; ws.close(); }
+  fit.fit();
+  const { cols, rows } = term;
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws?session=${encodeURIComponent(session)}&cols=${cols}&rows=${rows}`);
+  ws.binaryType = 'arraybuffer';
+  titleEl.textContent = session;
+  setStatus('attaching…');
+  ws.onopen = () => setStatus(`● ${session}  ${cols}×${rows}`);
+  ws.onmessage = (ev) => {
+    if (ev.data instanceof ArrayBuffer) term.write(new Uint8Array(ev.data));
+    else term.write(ev.data);
+  };
+  ws.onclose = () => setStatus(`○ ${session} (detached)`);
+  ws.onerror = () => setStatus('error');
+  term.focus();
+}
+
+function resize() {
+  fit.fit();
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+    setStatus(`● ${select.value}  ${term.cols}×${term.rows}`);
+  }
+}
+addEventListener('resize', () => setTimeout(resize, 50));
+// keyboard show/hide on mobile changes the visual viewport height
+if (window.visualViewport) visualViewport.addEventListener('resize', () => setTimeout(resize, 50));
+
+async function loadSessions() {
+  const list = await (await fetch('/api/sessions')).json();
+  const prev = select.value;
+  select.innerHTML = '';
+  let lastParent = null;
+  let group = null;
+  for (const s of list) {
+    if (s.parent !== lastParent) {
+      group = document.createElement('optgroup');
+      group.label = s.parent;
+      select.appendChild(group);
+      lastParent = s.parent;
+    }
+    const opt = document.createElement('option');
+    opt.value = s.name;
+    opt.textContent = `${s.label}${s.command ? ' · ' + s.command : ''}`;
+    group.appendChild(opt);
+  }
+  if (list.some((s) => s.name === prev)) select.value = prev;
+  return list;
+}
+
+select.addEventListener('change', () => connect(select.value));
+
+// key-bar buttons
+function toggleCtrl(force) {
+  ctrlArmed = force === undefined ? !ctrlArmed : force;
+  document.getElementById('ctrl').classList.toggle('on', ctrlArmed);
+}
+document.getElementById('keybar').addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  if (btn.id === 'ctrl') { toggleCtrl(); term.focus(); return; }
+  if (btn.dataset.cr !== undefined) { send('\r'); term.focus(); return; }
+  const key = btn.dataset.key.replace(/\\x([0-9a-f]{2})/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
+                              .replace(/\\t/g, '\t');
+  send(key);
+  term.focus();
+});
+
+(async () => {
+  const list = await loadSessions();
+  if (list.length) connect(select.value || list[0].name);
+  else setStatus('no tmux sessions');
+  setInterval(loadSessions, 5000); // keep switcher fresh
+})();
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+</script>
+</body>
+</html>

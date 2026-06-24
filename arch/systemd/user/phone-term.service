@@ -1,0 +1,13 @@
+[Unit]
+Description=phone-term — mobile tmux/claude bridge
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/phone-term
+Restart=on-failure
+RestartSec=2
+# Reaches the user tmux server via the default socket in $XDG_RUNTIME_DIR.
+
+[Install]
+WantedBy=default.target
