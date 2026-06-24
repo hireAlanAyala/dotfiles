@@ -7,7 +7,7 @@ set quiet
 dir := justfile_directory()
 
 # Full system setup
-all: etc sudoers systemd firewall bin
+all: etc sudoers systemd firewall bin dotfiles shell tmux-plugins
 
 # /etc symlinks and configs
 # Only tracks customized configs - the rest of /etc stays system-managed
@@ -96,6 +96,16 @@ shell:
     ln -sf "{{dir}}/../bash/.bashrc" ~/.bashrc
     ln -sf "{{dir}}/../bash/.bash_profile" ~/.bash_profile
     ln -sf "{{dir}}/../bash/.profile" ~/.profile
+
+# Symlink dotfiles that must live outside ~/.config (ssh + claude)
+dotfiles:
+    mkdir -p ~/.ssh ~/.claude
+    ln -sf "{{dir}}/../.ssh/config" ~/.ssh/config
+    ln -sf "{{dir}}/../.ssh/authorized_keys" ~/.ssh/authorized_keys
+    ln -sf "{{dir}}/../claude/settings.json" ~/.claude/settings.json
+    ln -sf "{{dir}}/../claude/.mcp.json" ~/.claude/.mcp.json
+    ln -sfn "{{dir}}/../claude/commands" ~/.claude/commands
+    ln -sf "{{dir}}/../claude/CLAUDE.md" ~/.claude/CLAUDE.md
 
 # Show what will be linked
 check:

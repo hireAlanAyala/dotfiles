@@ -97,8 +97,5 @@
   # Docs for programs config httd:s://nix-community.github.io/home-manager/options.html#opt-home.packages
 
   # PKG configurations
-  imports = [
-    # System modules
-    ../modules/symlinks.nix
-  ];
+  imports = [ ];
 }
