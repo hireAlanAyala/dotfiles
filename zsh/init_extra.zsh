@@ -78,15 +78,14 @@ export DOCKER_HOST=unix:///var/run/docker.sock
 # Individual service shortcuts
 totp-get() {
     local service="$1"
-    nix-shell -p oath-toolkit yq --run "
-        secret=\$(sops -d ~/.config/secrets.yaml | yq .totp_secrets.$service)
-        if [[ -n \"\$secret\" && \"\$secret\" != \"null\" ]]; then
-            oathtool --totp --base32 \"\$secret\"
-        else
-            echo \"Secret not found for: $service\"
-            exit 1
-        fi
-    "
+    local secret
+    secret=$(sops -d ~/.config/secrets.yaml | yq ".totp_secrets.$service")
+    if [[ -n "$secret" && "$secret" != "null" ]]; then
+        oathtool --totp --base32 "$secret"
+    else
+        echo "Secret not found for: $service"
+        return 1
+    fi
 }
 
 # 1Password CLI helper functions

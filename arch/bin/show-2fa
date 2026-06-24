@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Native replacement for the home-manager writeShellScriptBin "show-2fa".
+exec "$HOME/.config/scripts/show_all_2fa.sh" "$@"

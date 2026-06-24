@@ -447,6 +447,36 @@ return {
       end,
     })
 
+    -- When the last real file buffer is closed, nvim drops you on an empty
+    -- [No Name] scratch buffer. Replace that with oil at the cwd instead, so
+    -- "no buffers open" always lands in the file explorer.
+    vim.api.nvim_create_autocmd('BufDelete', {
+      callback = function()
+        -- Ephemeral file-picker / clipboard nvim instances manage their own
+        -- buffers; don't hijack them with oil.
+        if vim.g.filechooser_mode or vim.g.clipboard_picker then return end
+
+        -- Defer so the buffer is fully gone (and the replacement [No Name]
+        -- buffer exists) before we count what's left. Dropped automatically if
+        -- nvim is exiting, so this never fires during :qa.
+        vim.schedule(function()
+          for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+            if vim.api.nvim_buf_is_valid(buf)
+              and vim.bo[buf].buflisted
+              and vim.bo[buf].buftype == ''
+            then
+              local name = vim.api.nvim_buf_get_name(buf)
+              if name ~= '' and not name:match('^oil://') then
+                return -- a real file buffer remains; nothing to do
+              end
+            end
+          end
+          -- Nothing left but the empty scratch buffer: open oil at the cwd.
+          require('oil').open(vim.fn.getcwd())
+        end)
+      end,
+    })
+
     -- Open oil at startup when no file is specified
     vim.api.nvim_create_autocmd('VimEnter', {
       callback = function()
