@@ -622,7 +622,11 @@ return {
       -- --no-ignore so gitignored files (e.g. .env) show up; exclude the heavy
       -- gitignored dirs so the picker isn't flooded with deps/build output.
       fd_opts = "--color=never --type f --hidden --no-ignore --exclude .git --exclude node_modules --exclude .venv --exclude target --exclude dist --exclude build --exclude .next",
-      fzf_opts = {},
+      -- path scheme weights the filename (last path component) highest and gives a
+      -- bonus to matches at path boundaries, so the file you named ranks above
+      -- incidental matches deep in a directory path. Default scheme scores the whole
+      -- path uniformly, which makes results feel unintuitive.
+      fzf_opts = { ["--scheme"] = "path" },
       file_icons = true,
       color_icons = true,
       actions = {},
