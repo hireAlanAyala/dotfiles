@@ -55,12 +55,13 @@ alias vm='cd ~/vms/windows && quickemu --vm windows-11.conf --display spice'
 alias nvim-control="$HOME/.config/scripts/nvim-control.sh"
 alias moonlight="$HOME/.config/scripts/moonlight-adaptive.sh"
 
-# eza (ls replacement) — flags formerly set via home-manager programs.eza
-alias ls='eza -F --group-directories-first --icons'
-alias ll='ls -l'
-alias la='ls -a'
-alias lla='ls -la'
-alias lt='ls --tree'
+# Vanilla ls (predictable alphabetical order); nicer variants build on it.
+alias ls='ls --color=auto'
+alias ll='ls -lhF --group-directories-first'
+alias la='ls -lAhF --group-directories-first'
+alias lla='ls -lahF --group-directories-first'
+alias lr='ls -ltrh'
+alias lt='tree'
 
 # c
 alias gccd='gcc -Wall -Wextra -Wpedantic -Werror -std=c11 -g -O1 -fsanitize=address,undefined'

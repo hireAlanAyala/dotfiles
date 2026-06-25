@@ -24,7 +24,6 @@ docker
 docker-compose
 earlyoom
 efibootmgr
-eza
 fd
 foot
 freecad
