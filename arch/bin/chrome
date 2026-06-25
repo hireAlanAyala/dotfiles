@@ -1,0 +1,39 @@
+#!/bin/sh
+names=$(for d in "$HOME"/.config/chromium-*/; do
+	[ -d "$d" ] || continue
+	name=${d%/}
+	printf '%s\n' "${name##*/chromium-}"
+done)
+order="me hpg $names"
+i=0
+seen=' '
+for name in $order; do
+	case "$seen" in *" $name "*) continue ;; esac
+	case "$names" in *"$name"*) ;; *) continue ;; esac
+	seen="$seen$name "
+	i=$((i + 1))
+	eval "p$i=\$name"
+done
+
+if [ -n "$1" ]; then
+	choice="$1"
+	shift
+else
+	n=0
+	while [ "$n" -lt "$i" ]; do
+		n=$((n + 1))
+		eval "name=\$p$n"
+		printf '  %d) %s\n' "$n" "$name"
+	done
+	printf '> '
+	read -r choice
+fi
+
+case "$choice" in
+	'') profile=me ;;
+	*[!0-9]*) profile=$choice ;;
+	*) eval "profile=\$p$choice" ;;
+esac
+[ -z "$profile" ] && profile=me
+
+setsid chromium --user-data-dir="$HOME/.config/chromium-$profile" "$@" >/dev/null 2>&1 < /dev/null &
