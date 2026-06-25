@@ -17,12 +17,18 @@ for _ in $(seq 1 60); do
 import json,sys
 print(next((c['address'] for c in json.load(sys.stdin) if c.get('class')=='$class'), ''))" 2>/dev/null)
   if [ -n "$addr" ]; then
-    read -r W H < <(hyprctl -j monitors 2>/dev/null | python3 -c "
+    # hyprctl reports width/height in PHYSICAL pixels, but resizewindowpixel /
+    # movewindowpixel use LOGICAL coordinates -- so divide by the monitor scale
+    # (a HiDPI eDP at scale 2.0 is 3840x2160 physical = 1920x1080 logical).
+    # Also carry the monitor's logical x/y offset so centering stays correct on
+    # a non-primary monitor in a multi-head layout.
+    read -r W H MX MY < <(hyprctl -j monitors 2>/dev/null | python3 -c "
 import json,sys
 ms=json.load(sys.stdin); m=next((x for x in ms if x.get('focused')), ms[0])
-print(m['width'], m['height'])" 2>/dev/null)
+s=m.get('scale') or 1
+print(round(m['width']/s), round(m['height']/s), m.get('x',0), m.get('y',0))" 2>/dev/null)
     [ -n "$W" ] || break
-    w=$((W * pct / 100)); h=$((H * pct / 100)); x=$(((W - w) / 2)); y=$(((H - h) / 2))
+    w=$((W * pct / 100)); h=$((H * pct / 100)); x=$((MX + (W - w) / 2)); y=$((MY + (H - h) / 2))
     hyprctl dispatch resizewindowpixel "exact $w $h,address:$addr" >/dev/null 2>&1
     hyprctl dispatch movewindowpixel   "exact $x $y,address:$addr" >/dev/null 2>&1
     break
