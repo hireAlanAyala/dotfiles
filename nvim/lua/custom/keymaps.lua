@@ -15,6 +15,12 @@ vim.keymap.set('n', '<A-k>', ':m .-2<CR>==', { desc = 'Move line up' })
 vim.keymap.set('v', '<A-j>', ":m '>+1<CR>gv=gv", { desc = 'Move selection down' })
 vim.keymap.set('v', '<A-k>', ":m '<-2<CR>gv=gv", { desc = 'Move selection up' })
 
+-- Move lines to top/bottom of buffer (mirrors gg / G)
+vim.keymap.set('n', '<A-g><A-g>', ':m 0<CR>==', { desc = 'Move line to top' })
+vim.keymap.set('n', '<A-G>', ':m $<CR>==', { desc = 'Move line to bottom' })
+vim.keymap.set('v', '<A-g><A-g>', ":m 0<CR>gv=gv", { desc = 'Move selection to top' })
+vim.keymap.set('v', '<A-G>', ":m '>$<CR>gv=gv", { desc = 'Move selection to bottom' })
+
 -- Better indenting in visual mode
 vim.keymap.set('v', '<', '<gv', { desc = 'Indent left and reselect' })
 vim.keymap.set('v', '>', '>gv', { desc = 'Indent right and reselect' })
