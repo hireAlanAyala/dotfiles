@@ -247,10 +247,21 @@ if [[ -t 0 ]]; then
     # Per-session history files for tmux-backed terminals.
     # Each terminal gets its own HISTFILE so up-arrow is session-local
     # and history survives terminal restarts.
+    #
+    # The terminal-persist nvim plugin hands us the history key directly via
+    # tmux -e TERMINAL_HIST_KEY, so we key off it verbatim. The fallback derives
+    # the key from the tmux session name by stripping the project path hash --
+    # used for sessions created outside the plugin (or older ones without the
+    # env). Note the fallback can diverge when the recomputed cwd hash doesn't
+    # match the one embedded in the session name; the explicit key avoids that.
     if [[ -n "$TMUX" ]]; then
-      local _tsess=$(tmux display-message -p '#S')
-      local _cwdhash=$(printf '%s' "$PWD" | sha256sum | cut -c1-6)
-      local _session_key=${_tsess//_${_cwdhash}_/_}
-      HISTFILE="$HOME/.zsh_history_${_session_key}"
+      if [[ -n "$TERMINAL_HIST_KEY" ]]; then
+        HISTFILE="$HOME/.zsh_history_${TERMINAL_HIST_KEY}"
+      else
+        local _tsess=$(tmux display-message -p '#S')
+        local _cwdhash=$(printf '%s' "$PWD" | sha256sum | cut -c1-6)
+        local _session_key=${_tsess//_${_cwdhash}_/_}
+        HISTFILE="$HOME/.zsh_history_${_session_key}"
+      fi
     fi
 fi

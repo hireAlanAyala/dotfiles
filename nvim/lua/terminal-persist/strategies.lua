@@ -22,11 +22,16 @@ M.strategies.tmux = {
     return string.format('~/.config/nvim/lua/terminal-persist/tmux-attach-with-history.sh %s', session_name)
   end,
 
-  create_or_attach = function(self, session_name)
+  create_or_attach = function(self, session_name, hist_key)
     if not self:session_exists(session_name) then
+      -- Hand the per-session history key to the first shell via tmux -e, so zsh
+      -- keys HISTFILE off it directly instead of reverse-engineering it from the
+      -- session name (hist_key chars are restricted to [%w%-_], so it's safe
+      -- unquoted). Omitted for anonymous terminals; zsh then falls back.
+      local env = hist_key and string.format('-e TERMINAL_HIST_KEY=%s ', hist_key) or ''
       vim.fn.system(string.format(
-        "tmux new-session -d -s %s -c '%s' \\; set-option -t %s history-limit 50000",
-        session_name, vim.fn.getcwd(), session_name
+        "tmux new-session -d %s-s %s -c '%s' \\; set-option -t %s history-limit 50000",
+        env, session_name, vim.fn.getcwd(), session_name
       ))
     end
     return self:attach(session_name)

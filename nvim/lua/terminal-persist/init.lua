@@ -67,6 +67,20 @@ local function generate_session_name(name)
   return string.format('%s_%s', project_id, name or os.date '%H%M%S')
 end
 
+-- History key handed to the shell (via tmux -e) so per-session HISTFILEs are
+-- keyed deterministically by project + terminal name. Mirrors the dir_name +
+-- name form zsh used to derive by stripping the path hash out of the session
+-- name -- but computed authoritatively here, so the shell never has to recover
+-- it from the session name (a strip that silently diverges when the recomputed
+-- cwd hash doesn't match, scattering one terminal's history across two files).
+-- nil for anonymous terminals: no key is sent and zsh falls back to the strip.
+local function get_hist_key(name)
+  if not name then return nil end
+  local cwd = vim.fn.getcwd()
+  local dir_name = vim.fn.fnamemodify(cwd, ':t'):gsub('[^%w%-_]', '_')
+  return string.format('%s_%s', dir_name, name)
+end
+
 local function get_strategy_for_name(name)
   if not name then return M.config.default_strategy end
   for pattern, strategy in pairs(M.config.strategy_patterns) do
@@ -130,7 +144,7 @@ end
 -- Terminal Creation
 -- ============================================================================
 
-local function create_terminal(session_name, name, switch, strategy_name, attach_only)
+local function create_terminal(session_name, name, switch, strategy_name, attach_only, hist_key)
   strategy_name = strategy_name or get_strategy_for_name(name)
   local strategy = get_strategy(strategy_name)
   local buf_nr = vim.api.nvim_create_buf(true, false)
@@ -144,7 +158,7 @@ local function create_terminal(session_name, name, switch, strategy_name, attach
   end
 
   vim.api.nvim_buf_call(buf_nr, function()
-    local cmd = attach_only and strategy:attach(session_name) or strategy:create_or_attach(session_name)
+    local cmd = attach_only and strategy:attach(session_name) or strategy:create_or_attach(session_name, hist_key)
     vim.fn.termopen(cmd)
     vim.bo[buf_nr].scrollback = M.config.scrollback
   end)
@@ -187,6 +201,7 @@ function M.new(name, switch, cmd)
 
   local session_name = generate_session_name(name)
   local strategy_name = get_strategy_for_name(name)
+  local hist_key = get_hist_key(name)
 
   -- Check if buffer already exists for this session
   local existing_buf = find_buffer_for_session(session_name)
@@ -198,7 +213,7 @@ function M.new(name, switch, cmd)
     return existing_buf, session_name
   end
 
-  local buf_nr = create_terminal(session_name, name, switch, strategy_name)
+  local buf_nr = create_terminal(session_name, name, switch, strategy_name, false, hist_key)
 
   -- Send initial command if provided
   if cmd then
