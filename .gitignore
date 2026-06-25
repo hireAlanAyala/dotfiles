@@ -64,6 +64,9 @@ pavucontrol.ini
 mimeapps.list
 tmp
 
+# libqalculate writes runtime settings here (via elephant's calc provider)
+qalculate/
+
 # Sunshine runtime
 sunshine/sunshine.log
 sunshine/sunshine_state.json
