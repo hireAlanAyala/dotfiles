@@ -486,8 +486,6 @@ return {
         if vim.g.filechooser_mode then
           local oil = require('oil')
           local start_dir = vim.g.filechooser_start_dir or vim.fn.getcwd()
-          local mode_text = vim.g.filechooser_mode == 'save' and 'SAVE' or
-                           vim.g.filechooser_mode == 'directory' and 'DIRECTORY' or 'OPEN'
 
           -- Global keymaps (ephemeral nvim instance)
           -- Using <Tab> because <S-CR> and <C-CR> don't work reliably:
@@ -551,7 +549,6 @@ return {
 
           vim.defer_fn(function()
             oil.open(start_dir)
-            vim.notify('File Picker: ' .. mode_text .. ' | <Tab> confirm | <Esc> cancel')
           end, 50)
           return
         end
