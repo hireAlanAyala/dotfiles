@@ -21,7 +21,7 @@ etc:
     sudo mkdir -p /etc/systemd/network /etc/systemd/system
     sudo cp "{{dir}}"/etc/systemd/network/*.network /etc/systemd/network/
     sudo cp "{{dir}}"/etc/systemd/system/*.{service,timer} /etc/systemd/system/
-    sudo ln -sfn "{{dir}}/etc/tlp" /etc/tlp
+    sudo ln -sf "{{dir}}/etc/tlp/tlp.conf" /etc/tlp.conf
     sudo mkdir -p /etc/systemd/sleep.conf.d /etc/systemd/logind.conf.d
     sudo ln -sf "{{dir}}/etc/systemd/sleep.conf.d/hibernate.conf" /etc/systemd/sleep.conf.d/hibernate.conf
     sudo ln -sf "{{dir}}/etc/systemd/logind.conf.d/lid.conf" /etc/systemd/logind.conf.d/lid.conf
@@ -61,12 +61,12 @@ _systemd-system-archdev:
 # Enable user services (shared, then per-host)
 systemd-user:
     -systemctl --user enable pipewire pipewire-pulse wireplumber p11-kit-server.socket
-    -systemctl --user enable elephant.service pipewire-session-manager.service cache-cleanup.timer rustic-backup.timer phone-term.service scrub-downloads.service
+    -systemctl --user enable elephant.service pipewire-session-manager.service cache-cleanup.timer phone-term.service scrub-downloads.service
     -just -f "{{justfile()}}" "_systemd-user-$(hostnamectl hostname)"
 
 # Per-host user services
 _systemd-user-homebase:
-    -systemctl --user enable sunshine
+    -systemctl --user enable sunshine rustic-backup.timer
 
 _systemd-user-archdev:
     -systemctl --user enable battery-monitor.timer wifi-prefer.timer

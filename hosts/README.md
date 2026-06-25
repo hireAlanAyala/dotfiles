@@ -17,7 +17,7 @@ Everything not listed here is shared and byte-identical, so the two machines fee
 -just -f "{{justfile()}}" "_systemd-user-$(hostnamectl hostname)"
 ```
 
-So `_systemd-user-homebase` (enables `sunshine`) and `_systemd-user-archdev` (enables `battery-monitor.timer` `wifi-prefer.timer`) only run on their machine. Same pattern for `_systemd-system-*` (`tlp` → archdev). Add a new host = add `_systemd-{user,system}-<hostname>` recipes; an absent recipe is a no-op (the `-` prefix ignores it).
+So `_systemd-user-homebase` (enables `sunshine`, `rustic-backup.timer`) and `_systemd-user-archdev` (enables `battery-monitor.timer` `wifi-prefer.timer`) only run on their machine. `rustic-backup` is homebase-only because the desktop is the canonical source of truth — the laptop is an emergency box that pulls from ssh/github, not a backup origin. Same pattern for `_systemd-system-*` (`tlp` → archdev). Add a new host = add `_systemd-{user,system}-<hostname>` recipes; an absent recipe is a no-op (the `-` prefix ignores it).
 
 For per-host **files**, put them under `hosts/<hostname>/` and host-select in the recipe. Example — **boot config** lives at `hosts/<host>/boot/loader/`: the `etc` recipe symlinks `/etc/boot/loader` to the host's, and the `sync-boot-entries` pacman hook copies `hosts/$(cat /etc/hostname)/boot/loader/entries/arch.conf` to `/boot` on kernel upgrades.
 
