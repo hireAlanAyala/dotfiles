@@ -36,4 +36,4 @@ case "$choice" in
 esac
 [ -z "$profile" ] && profile=me
 
-setsid chromium --user-data-dir="$HOME/.config/chromium-$profile" "$@" >/dev/null 2>&1 < /dev/null &
+setsid chromium --user-data-dir="$HOME/.config/chromium-$profile" --restore-last-session "$@" >/dev/null 2>&1 < /dev/null &
