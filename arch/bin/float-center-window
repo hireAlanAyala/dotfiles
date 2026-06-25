@@ -1,0 +1,31 @@
+#!/bin/bash
+# Float + center a window (by Wayland app-id / class) to <percent>% of the
+# FOCUSED monitor. Polls until the window appears, then resizes + recenters via
+# hyprctl. Done from a script (not a windowrule) because this hyprland's
+# windowrule `size` only accepts absolute pixels -- computing the percentage
+# here keeps it correct across the laptop/desktop monitors.
+#
+# Usage:  float-center-window <app-id> [percent]     -- run it backgrounded (&)
+# The matching float+center is still set via windowrule; this only sizes/places.
+
+class="$1"
+pct="${2:-75}"
+[ -n "$class" ] || exit 0
+
+for _ in $(seq 1 60); do
+  addr=$(hyprctl -j clients 2>/dev/null | python3 -c "
+import json,sys
+print(next((c['address'] for c in json.load(sys.stdin) if c.get('class')=='$class'), ''))" 2>/dev/null)
+  if [ -n "$addr" ]; then
+    read -r W H < <(hyprctl -j monitors 2>/dev/null | python3 -c "
+import json,sys
+ms=json.load(sys.stdin); m=next((x for x in ms if x.get('focused')), ms[0])
+print(m['width'], m['height'])" 2>/dev/null)
+    [ -n "$W" ] || break
+    w=$((W * pct / 100)); h=$((H * pct / 100)); x=$(((W - w) / 2)); y=$(((H - h) / 2))
+    hyprctl dispatch resizewindowpixel "exact $w $h,address:$addr" >/dev/null 2>&1
+    hyprctl dispatch movewindowpixel   "exact $x $y,address:$addr" >/dev/null 2>&1
+    break
+  fi
+  sleep 0.05
+done

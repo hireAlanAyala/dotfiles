@@ -454,7 +454,7 @@ return {
       callback = function()
         -- Ephemeral file-picker / clipboard nvim instances manage their own
         -- buffers; don't hijack them with oil.
-        if vim.g.filechooser_mode or vim.g.clipboard_picker then return end
+        if vim.g.filechooser_mode or vim.g.clipboard_picker or vim.g.clipboard_oil then return end
 
         -- Defer so the buffer is fully gone (and the replacement [No Name]
         -- buffer exists) before we look at what we landed on. Dropped
@@ -479,8 +479,8 @@ return {
     -- Open oil at startup when no file is specified
     vim.api.nvim_create_autocmd('VimEnter', {
       callback = function()
-        -- Skip for clipboard picker
-        if vim.g.clipboard_picker then return end
+        -- Skip for clipboard picker (old custom-float experiment + new oil one)
+        if vim.g.clipboard_picker or vim.g.clipboard_oil then return end
 
         -- Filechooser mode - open oil at the specified directory
         if vim.g.filechooser_mode then

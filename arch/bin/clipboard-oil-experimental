@@ -1,0 +1,35 @@
+#!/bin/bash
+# ============================================================================
+# EXPERIMENTAL clipboard history picker -- browsed inside nvim + oil.
+#
+# Second attempt at an nvim clipboard manager. Opens a normal floating ghostty
+# window (hypr windowrule floats + centers it -- see
+# hypr/bindings/clipboard-oil-experimental.conf) running nvim in clipboard-oil
+# mode. Because it's an ordinary window (NOT a special-workspace daemon), it
+# focuses and closes like anything else -- the failure mode of the old picker.
+#
+# nvim module: nvim/lua/custom/experimental/clipboard-oil.lua
+# Inside: <leader>op previews (image or text), <Tab> copies + pastes (only key).
+# ============================================================================
+
+rm -f /tmp/clipboard-oil-selected
+
+# CRITICAL: drop any inherited nvim server env. When launched from inside an nvim
+# terminal (terminal-persist etc.), NVIM_LISTEN_ADDRESS/NVIM point at the PARENT
+# nvim's socket; the picker's nvim then fails with "address already in use",
+# exits rc=1, and ghostty keeps the window open on its error screen -- an
+# uncloseable "stuck" window whose nvim never started (so no in-nvim failsafe).
+unset NVIM_LISTEN_ADDRESS NVIM NVIM_LOG_FILE
+
+# Size + center the window to 75% of the focused monitor (backgrounded; the
+# ghostty call below blocks until nvim exits).
+float-center-window com.clipboardoil.Picker 75 &
+
+ghostty --class=com.clipboardoil.Picker \
+  -e nvim --cmd "let g:clipboard_oil=1" \
+  -c "lua require('custom.experimental.clipboard-oil').start()"
+
+if [ -f /tmp/clipboard-oil-selected ]; then
+  rm -f /tmp/clipboard-oil-selected
+  wtype -M shift -k Insert
+fi
