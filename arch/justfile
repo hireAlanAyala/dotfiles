@@ -22,6 +22,8 @@ etc:
     sudo mkdir -p /etc/systemd/network /etc/systemd/system
     sudo cp "{{dir}}"/etc/systemd/network/*.network /etc/systemd/network/
     sudo cp "{{dir}}"/etc/systemd/system/*.{service,timer} /etc/systemd/system/
+    sudo mkdir -p /etc/systemd/system/systemd-networkd-wait-online.service.d
+    sudo ln -sf "{{dir}}/etc/systemd/system/systemd-networkd-wait-online.service.d/any.conf" /etc/systemd/system/systemd-networkd-wait-online.service.d/any.conf
     sudo install -m 644 -o root -g root "{{dir}}/etc/tlp/tlp.conf" /etc/tlp.conf
     sudo mkdir -p /etc/systemd/sleep.conf.d /etc/systemd/logind.conf.d
     sudo ln -sf "{{dir}}/etc/systemd/sleep.conf.d/hibernate.conf" /etc/systemd/sleep.conf.d/hibernate.conf
