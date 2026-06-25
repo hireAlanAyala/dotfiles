@@ -66,7 +66,7 @@ systemd-user:
 
 # Per-host user services
 _systemd-user-homebase:
-    -systemctl --user enable sunshine rustic-backup.timer
+    -systemctl --user enable sunshine rustic-backup.timer guacamole-web.service
 
 _systemd-user-archdev:
     -systemctl --user enable battery-monitor.timer wifi-prefer.timer
