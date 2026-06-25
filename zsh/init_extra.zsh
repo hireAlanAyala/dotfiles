@@ -120,21 +120,6 @@ op-get-field() {
     op item get "$1" --fields "$2"
 }
 
-# 1Password daemon helpers + aliases (formerly programs/onepassword.nix)
-if [[ -f /opt/onepass/client.sh ]] && [[ -f ~/.config/provision/onepass-helpers.sh ]]; then
-  source /opt/onepass/client.sh
-  source ~/.config/provision/onepass-helpers.sh
-fi
-alias op-signin='op_interactive_signin'
-alias op-status='op_status'
-alias op-signout='op_daemon_signout'
-alias op-get='op_safe_get_password'
-alias op-field='op_safe_get_field'
-alias op-list='op_list_formatted'
-alias op-search='op_search'
-alias op-health='op_health_check'
-alias op-help='op_help'
-
 # SSH Agent with keychain - auto-discover private keys
 if command -v keychain &> /dev/null; then
     # Guard against dead agents whose PID got recycled by another process
