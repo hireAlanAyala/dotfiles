@@ -1,6 +1,7 @@
 7zip
 abduco
 alsa-utils
+archiso
 arduino-cli
 awww
 azure-cli
@@ -24,6 +25,7 @@ docker
 docker-compose
 earlyoom
 efibootmgr
+exfatprogs
 eza
 fd
 foot
@@ -136,6 +138,7 @@ visidata
 viu
 wayvnc
 wf-recorder
+which
 wl-clip-persist
 wl-clipboard
 wofi
