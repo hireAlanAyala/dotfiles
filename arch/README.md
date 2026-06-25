@@ -4,7 +4,7 @@ Deploy everything: `just all`
 
 ## Adding things
 
-**Package:** Add to `packages-pacman.txt` or `packages-aur.txt`, run `just packages` or `just packages-aur`.
+**Package:** Just install it (`pacman -S` / `yay -S`). On homebase, `just packages-sync` blesses it into `packages/base.txt` (the source of truth). For a laptop-only difference, edit `packages/archdev.{exclude,include}`. `just packages-check` shows drift; the pre-push hook blocks pushing while stale. To converge a machine: `just packages` / `just packages-aur`.
 
 **Bin script:** Create in `bin/`, run `just bin`. Symlinks to `~/.local/bin/`.
 

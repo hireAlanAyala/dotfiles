@@ -5,9 +5,10 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 set quiet
 
 dir := justfile_directory()
+pkgdir := dir / "packages"
 
 # Full system setup
-all: etc sudoers systemd firewall bin dotfiles shell tmux-plugins
+all: etc sudoers systemd firewall bin dotfiles shell tmux-plugins githooks
 
 # /etc symlinks and configs
 # Only tracks customized configs - the rest of /etc stays system-managed
@@ -87,16 +88,54 @@ firewall-docker:
     sudo ufw-docker install
     sudo ufw reload
 
-# Install official repo packages
+# Effective desired set = (base − host.exclude) + host.include. suffix: "" or "-aur".
+# Missing delta files = empty (homebase has none → falls back to base).
+_pkg-effective suffix:
+    @h=$(hostnamectl hostname); \
+    base="{{pkgdir}}/base{{suffix}}.txt"; \
+    ex="{{pkgdir}}/$h.exclude{{suffix}}"; inc="{{pkgdir}}/$h.include{{suffix}}"; \
+    { grep -vxFf "$ex" "$base" 2>/dev/null || cat "$base"; cat "$inc" 2>/dev/null || true; } | sort -u
+
+# Install official repo packages (converge toward desired state)
 packages:
-    grep -v '^#\|^\s*$' "{{dir}}/../hosts/$(hostnamectl hostname)/packages-pacman.txt" | sudo pacman -S --needed -
+    just -f "{{justfile()}}" _pkg-effective "" | sudo pacman -S --needed -
 
 # Install AUR packages (requires yay)
 packages-aur:
-    grep -v '^#\|^\s*$' "{{dir}}/../hosts/$(hostnamectl hostname)/packages-aur.txt" | yay -S --needed -
+    just -f "{{justfile()}}" _pkg-effective "-aur" | yay -S --needed -
 
 # Install all packages (pacman + AUR)
 packages-all: packages packages-aur
+
+# Print what WOULD be installed for this host (no side effects)
+packages-show:
+    @echo "# pacman ($(hostnamectl hostname)):"
+    just -f "{{justfile()}}" _pkg-effective ""
+    @echo "# aur:"
+    just -f "{{justfile()}}" _pkg-effective "-aur"
+
+# Drift report: desired vs actually installed (read-only)
+packages-check:
+    @d=$(just -f "{{justfile()}}" _pkg-effective ""); i=$(pacman -Qqen | sort); \
+    da=$(just -f "{{justfile()}}" _pkg-effective "-aur"); ia=$(pacman -Qqem | sort); \
+    out=$( { comm -23 <(echo "$d") <(echo "$i")  | sed 's/^/  MISSING       /'; \
+            comm -13 <(echo "$d") <(echo "$i")  | sed 's/^/  ORPHAN        /'; \
+            comm -23 <(echo "$da") <(echo "$ia") | sed 's/^/  MISSING (aur) /'; \
+            comm -13 <(echo "$da") <(echo "$ia") | sed 's/^/  ORPHAN  (aur) /'; } ); \
+    [ -n "$out" ] && echo "$out" || echo "  in sync ✓"
+
+# Bless installed state as the new base. Guards: source-of-truth host only,
+# and a machine-local sentinel so a half-provisioned box can't clobber desired-state.
+packages-sync:
+    @test "$(hostnamectl hostname)" = homebase || { echo "refusing: packages-sync runs only on the source-of-truth host (homebase)"; exit 1; }
+    @test -f "{{pkgdir}}/.provisioned" || { echo "refusing: no {{pkgdir}}/.provisioned — finish provisioning, then 'touch' it"; exit 1; }
+    pacman -Qqen | sort > "{{pkgdir}}/base.txt"
+    pacman -Qqem | sort > "{{pkgdir}}/base-aur.txt"
+    @echo "blessed base — review 'git diff arch/packages' before committing"
+
+# Wire the pre-push drift gate (per-clone git config; run once per machine)
+githooks:
+    git -C "{{dir}}/.." config core.hooksPath "$HOME/.config/arch/githooks"
 
 # Symlink bin scripts
 bin:

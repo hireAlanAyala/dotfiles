@@ -79,3 +79,6 @@ server exited unexpectedly
 
 # ultralytics (YOLO) writes runtime settings here, not config
 Ultralytics/
+
+# package-sync provisioned sentinel (machine-local, never tracked)
+arch/packages/.provisioned

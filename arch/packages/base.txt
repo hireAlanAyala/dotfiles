@@ -1,7 +1,6 @@
 7zip
 abduco
 alsa-utils
-archiso
 arduino-cli
 awww
 azure-cli
@@ -25,7 +24,6 @@ docker
 docker-compose
 earlyoom
 efibootmgr
-exfatprogs
 eza
 fd
 foot
@@ -38,8 +36,8 @@ git-filter-repo
 github-cli
 gnupg
 go
-go-yq
 gocryptfs
+go-yq
 graphviz
 grim
 htop
@@ -60,6 +58,7 @@ kicad
 kitty
 leiningen
 less
+lib32-nvidia-utils
 libnotify
 libpst
 libva-utils
@@ -77,6 +76,8 @@ mpv
 neovim
 noto-fonts-cjk
 noto-fonts-emoji
+nvidia-open-dkms
+nvidia-utils
 oath-toolkit
 ollama
 openbsd-netcat
@@ -138,9 +139,8 @@ visidata
 viu
 wayvnc
 wf-recorder
-which
-wl-clip-persist
 wl-clipboard
+wl-clip-persist
 wofi
 wrangler
 wtype
