@@ -40,6 +40,10 @@ else:
 PY
 ) || src="$last"
     [ -f "$src" ] || src="$last"
+    # Size + center to 80% of the focused monitor. Backgrounded before exec (so it
+    # survives) since this hyprland's windowrule size ignores %. The float+center
+    # windowrule for com.gabm.satty lives in hypr/input.conf.
+    float-center-window com.gabm.satty 80 &
     exec satty --filename "$src" --copy-command wl-copy --initial-tool brush --output-filename '~/Downloads/screenshot-%Y%m%d-%H%M%S.png' --actions-on-enter save-to-clipboard,exit
   fi
   exec swappy -f "$last"
