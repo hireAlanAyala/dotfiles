@@ -245,8 +245,6 @@ return {
       })
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
 
-      print('mason bin: ', vim.fn.stdpath 'data' .. '/mason/bin/fantomas')
-
       require('mason-lspconfig').setup {
         automatic_installation = true,
         handlers = {
