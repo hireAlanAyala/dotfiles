@@ -498,6 +498,7 @@ function M.setup(opts)
 
   -- Cleanup on buffer close
   vim.api.nvim_create_autocmd({ 'BufDelete', 'BufWipeout' }, {
+    group = vim.api.nvim_create_augroup('terminal-persist-cleanup', { clear = true }),
     callback = function(args)
       local buf = args.buf
       if not vim.api.nvim_buf_is_valid(buf) then return end
@@ -507,6 +508,13 @@ function M.setup(opts)
       if not session then return end
 
       vim.defer_fn(function()
+        -- Re-claim guard: if a live buffer now maps to this session, the user
+        -- recreated a same-named terminal within the defer window and is attached
+        -- to it. Killing here would tear that session out from under the new
+        -- buffer (and drop its state entry), so skip -- the session and its
+        -- per-session history stay intact for the recreated terminal.
+        if find_buffer_for_session(session) then return end
+
         local strategy = get_strategy(strategy_name)
         strategy:kill(session)
         local state = read_state()
