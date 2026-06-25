@@ -50,7 +50,15 @@ fi
 # Launch ghostty with nvim in picker mode
 # Variables are set via --cmd (runs before plugins load)
 # Oil opening is handled by the VimEnter autocmd in oil.lua
-exec ghostty --title="File Picker" -e nvim \
+#
+# Float + center at 75% of the focused monitor (matches the clipboard picker).
+# A dotted reverse-DNS --class is required: ghostty rejects hyphens and falls
+# back to com.mitchellh.ghostty, which has no float windowrule (-> tiled panel).
+# Backgrounded before exec so it survives the exec and resizes once the window
+# appears; the float+center windowrule lives in hypr/input.conf.
+float-center-window com.nvimfilechooser.Picker 75 &
+
+exec ghostty --class=com.nvimfilechooser.Picker --title="File Picker" -e nvim \
     --cmd "let g:filechooser_mode='$mode'" \
     --cmd "let g:filechooser_output='$out_esc'" \
     --cmd "let g:filechooser_multiple=$multiple" \
