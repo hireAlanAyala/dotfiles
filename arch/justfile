@@ -89,11 +89,11 @@ firewall-docker:
 
 # Install official repo packages
 packages:
-    grep -v '^#\|^\s*$' "{{dir}}/packages-pacman.txt" | sudo pacman -S --needed -
+    grep -v '^#\|^\s*$' "{{dir}}/../hosts/$(hostnamectl hostname)/packages-pacman.txt" | sudo pacman -S --needed -
 
 # Install AUR packages (requires yay)
 packages-aur:
-    grep -v '^#\|^\s*$' "{{dir}}/packages-aur.txt" | yay -S --needed -
+    grep -v '^#\|^\s*$' "{{dir}}/../hosts/$(hostnamectl hostname)/packages-aur.txt" | yay -S --needed -
 
 # Install all packages (pacman + AUR)
 packages-all: packages packages-aur

@@ -7,4 +7,4 @@ Target = *
 
 [Action]
 When = PostTransaction
-Exec = /bin/sh -c 'pacman -Qqen > /home/walker/.config/arch/packages-pacman.txt; pacman -Qqem > /home/walker/.config/arch/packages-aur.txt'
+Exec = /bin/sh -c 'H=$(cat /etc/hostname); pacman -Qqen > "/home/walker/.config/hosts/$H/packages-pacman.txt"; pacman -Qqem > "/home/walker/.config/hosts/$H/packages-aur.txt"'

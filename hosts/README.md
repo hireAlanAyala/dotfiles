@@ -24,5 +24,5 @@ For per-host **files**, put them under `hosts/<hostname>/` and host-select in th
 ## TODO — required before provisioning the laptop (`archdev`)
 
 - ✅ **boot config** — DONE. Moved to `hosts/<host>/boot/loader/`; the `etc` recipe + `sync-boot-entries` hook now host-select. ⚠️ Still need to create `hosts/archdev/boot/loader/entries/arch.conf` with the laptop's own LUKS UUID (no nvidia) — see `hosts/archdev/README.md`. Until then the hook fails harmlessly, leaving the laptop's `/boot` untouched.
-- **per-host packages** — `nvidia-open-dkms`/`nvidia-utils`/`lib32-nvidia-utils` are homebase-only; `tlp`/`tlp-rdw` are archdev-only. Blocked on the `export-packages` pacman hook, which regenerates one list from installed state — it needs to learn to keep a shared list + per-host deltas.
+- ✅ **per-host packages** — DONE. Lists live at `hosts/<host>/packages-{pacman,aur}.txt`; the `export-packages` hook writes the current host's list (`hosts/$(cat /etc/hostname)/...`), and `just packages`/`packages-aur` read it. So each machine's auto-generated list never clobbers the other's. archdev = homebase minus `nvidia-*` (pacman) and `sunshine` (aur).
 - **networks** — `10-ethernet.network` (homebase) vs `20-wireless.network` (archdev); currently both are deployed (harmless, only the matching iface activates) but could be host-split for tidiness.
