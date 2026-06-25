@@ -7,11 +7,11 @@ Requires=guacamole-pod.service
 Type=simple
 Restart=always
 TimeoutStartSec=300
-ExecStartPre=-/home/walker/.nix-profile/bin/podman rm -f guacd
-ExecStart=/home/walker/.nix-profile/bin/podman run --rm --name guacd \
+ExecStartPre=-/usr/bin/podman rm -f guacd
+ExecStart=/usr/bin/podman run --rm --name guacd \
     --pod guacamole-pod \
     docker.io/guacamole/guacd:latest
-ExecStop=/home/walker/.nix-profile/bin/podman stop guacd
+ExecStop=/usr/bin/podman stop guacd
 
 [Install]
 WantedBy=default.target

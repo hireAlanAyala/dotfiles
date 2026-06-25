@@ -8,8 +8,10 @@ export DOCKER_HOST="unix://$HOME/.docker/desktop/docker.sock"
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 
-# Source the Nix daemon if present (remove once Nix is gone).
-if [ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then
+# Bare Nix is kept (single-user) for dev-shells; make its tools available.
+if [ -e "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
+  . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+elif [ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then
   . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
 fi
 
