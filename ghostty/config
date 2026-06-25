@@ -82,6 +82,8 @@ palette = 13=#FFAA00
 palette = 14=#FFB000
 palette = 15=#FFCC00
 
+confirm-close-surface = false
+
 # custom-shader = shaders/bloom.glsl
 
 # Force each ghostty invocation to be its own process. Workaround for IPC bug
