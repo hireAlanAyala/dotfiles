@@ -1,6 +1,7 @@
 7zip
 abduco
 alsa-utils
+archiso
 arduino-cli
 awww
 azure-cli
@@ -24,6 +25,7 @@ docker
 docker-compose
 earlyoom
 efibootmgr
+exfatprogs
 fd
 foot
 freecad
@@ -57,7 +59,6 @@ kicad
 kitty
 leiningen
 less
-lib32-nvidia-utils
 libnotify
 libpst
 libva-utils
@@ -75,8 +76,6 @@ mpv
 neovim
 noto-fonts-cjk
 noto-fonts-emoji
-nvidia-open-dkms
-nvidia-utils
 oath-toolkit
 ollama
 openbsd-netcat
@@ -138,6 +137,7 @@ visidata
 viu
 wayvnc
 wf-recorder
+which
 wl-clipboard
 wl-clip-persist
 wofi

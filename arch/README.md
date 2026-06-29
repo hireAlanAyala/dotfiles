@@ -4,7 +4,7 @@ Deploy everything: `just all`
 
 ## Adding things
 
-**Package:** Just install it (`pacman -S` / `yay -S`). On homebase, `just packages-sync` blesses it into `packages/base.txt` (the source of truth). For a laptop-only difference, edit `packages/archdev.{exclude,include}`. `just packages-check` shows drift; the pre-push hook blocks pushing while stale. To converge a machine: `just packages` / `just packages-aur`.
+**Package:** Just install it (`pacman -S` / `yay -S`), then `just packages-sync` to bless it into this host's own list (`packages/<host>.txt` / `<host>-aur.txt`). Each host is the source of truth for itself — a laptop-only package simply lives in `archdev.txt` and never touches the desktop. A genuinely-shared package must be installed + blessed on both hosts. `just packages-check` shows drift; the pre-push hook blocks pushing while stale. To converge a machine: `just packages` / `just packages-aur`.
 
 **Bin script:** Create in `bin/`, run `just bin`. Symlinks to `~/.local/bin/`.
 

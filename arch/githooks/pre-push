@@ -10,11 +10,7 @@ drift=$(just packages-check 2>/dev/null | grep -E 'MISSING|ORPHAN')
   echo "⚠  package list is stale vs what's actually installed:"
   echo "$drift" | sed 's/^/      /'
   h=$(hostnamectl hostname)
-  if [ "$h" = homebase ]; then
-    echo "   → run 'just packages-sync' to bless current state, or edit the host deltas"
-  else
-    echo "   → add to packages/$h.include, or ignore if intentional"
-  fi
+  echo "   → run 'just packages-sync' to bless $h's state, or edit packages/$h.txt / $h-aur.txt"
   echo "   (push blocked — fix it, or 'git push --no-verify' to override)"
   echo ""
 } >&2
