@@ -24,6 +24,8 @@ etc:
     sudo cp "{{dir}}"/etc/systemd/system/*.{service,timer} /etc/systemd/system/
     sudo mkdir -p /etc/systemd/system/systemd-networkd-wait-online.service.d
     sudo ln -sf "{{dir}}/etc/systemd/system/systemd-networkd-wait-online.service.d/any.conf" /etc/systemd/system/systemd-networkd-wait-online.service.d/any.conf
+    sudo mkdir -p /etc/modprobe.d
+    sudo install -m 644 -o root -g root "{{dir}}/etc/modprobe.d/iwlwifi-powersave.conf" /etc/modprobe.d/iwlwifi-powersave.conf
     -just -f "{{justfile()}}" "_etc-$(hostnamectl hostname)"
 
 # Per-host /etc configs

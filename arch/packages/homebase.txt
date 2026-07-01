@@ -48,6 +48,7 @@ inotify-tools
 intel-media-driver
 intel-ucode
 irssi
+iw
 iwd
 jdk21-openjdk
 just
